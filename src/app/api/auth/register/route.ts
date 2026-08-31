@@ -20,6 +20,7 @@ export async function POST(request: Request) {
 
     if (
       typeof email !== "string" ||
+      email.trim().length > 255 ||
       !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
     ) {
       return NextResponse.json(
@@ -43,6 +44,10 @@ export async function POST(request: Request) {
     }
 
     const normalizedEmail = email.trim().toLowerCase();
+    const sanitizedName =
+      typeof name === "string" && name.trim().length > 0
+        ? name.trim().slice(0, 100)
+        : normalizedEmail.split("@")[0];
 
     // Check if user already exists
     const [existingUser] = await db
@@ -59,14 +64,14 @@ export async function POST(request: Request) {
     }
 
     const newUserId = crypto.randomUUID();
-    const hashedPassword = hashPassword(String(password));
+    const hashedPassword = hashPassword(password);
 
     const [newUser] = await db
       .insert(users)
       .values({
         id: newUserId,
         email: normalizedEmail,
-        name: name ? String(name).trim() : normalizedEmail.split("@")[0],
+        name: sanitizedName,
         password: hashedPassword,
         role: "investor",
       })

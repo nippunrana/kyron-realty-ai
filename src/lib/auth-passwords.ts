@@ -5,6 +5,9 @@ import crypto from "node:crypto";
  * Stored format: <salt_hex>:<derivedKey_hex>
  */
 export function hashPassword(password: string): string {
+  if (typeof password !== "string" || !password) {
+    throw new Error("Password must be a non-empty string");
+  }
   const salt = crypto.randomBytes(16).toString("hex");
   const derivedKey = crypto.scryptSync(password, salt, 64);
   return `${salt}:${derivedKey.toString("hex")}`;
@@ -17,6 +20,7 @@ export function hashPassword(password: string): string {
  */
 export function verifyPassword(password: string, storedHash: string): boolean {
   if (!password || !storedHash) return false;
+  if (typeof password !== "string" || typeof storedHash !== "string") return false;
 
   const parts = storedHash.split(":");
   if (parts.length !== 2) {

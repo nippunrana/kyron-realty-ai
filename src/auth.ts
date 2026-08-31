@@ -19,7 +19,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     verificationTokensTable: verificationTokens,
   }),
   trustHost: true,
-  secret: process.env.AUTH_SECRET || "agora-realty-ai-dev-secret-key-32-chars-long",
+  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "agora-realty-ai-dev-secret-key-32-chars-long",
   session: {
     strategy: "jwt",
     maxAge: 30 * 24 * 60 * 60, // 30 days
@@ -49,8 +49,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null;
         }
 
-        const email = String(credentials.email).toLowerCase().trim();
-        const password = String(credentials.password);
+        if (typeof credentials.email !== "string" || typeof credentials.password !== "string") {
+          return null;
+        }
+
+        const email = credentials.email.toLowerCase().trim();
+        const password = credentials.password;
 
         try {
           const [user] = await db
