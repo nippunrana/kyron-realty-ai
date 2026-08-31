@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import {
   Building2,
   Sparkles,
@@ -66,11 +67,17 @@ export default function Home() {
           </div>
         </div>
 
-        <nav className="flex items-center gap-4">
+        <nav className="flex items-center gap-3 sm:gap-4">
           <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-full bg-slate-100 text-slate-700 border border-slate-200">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             Private Beta Launch Q2 2026
           </span>
+          <Link
+            href="/login"
+            className="px-3.5 py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 hover:bg-slate-100/80 rounded-lg transition-all"
+          >
+            Sign In
+          </Link>
           <a
             href="#waitlist"
             className="px-4 py-2 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-sm transition-all"
