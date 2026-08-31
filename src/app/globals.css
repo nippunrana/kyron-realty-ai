@@ -2,17 +2,17 @@
 
 @layer base {
   :root {
-    --background: #090d16;
-    --foreground: #f1f5f9;
-    --card: #111827;
-    --card-foreground: #f8fafc;
-    --primary: #3b82f6;
+    --background: #f8fafc;
+    --foreground: #0f172a;
+    --card: #ffffff;
+    --card-foreground: #0f172a;
+    --primary: #1d4ed8;
     --primary-foreground: #ffffff;
-    --accent: #8b5cf6;
+    --accent: #4f46e5;
     --accent-foreground: #ffffff;
-    --muted: #1e293b;
-    --muted-foreground: #94a3b8;
-    --border: #1f293d;
+    --muted: #f1f5f9;
+    --muted-foreground: #64748b;
+    --border: #e2e8f0;
   }
 
   body {
@@ -23,12 +23,23 @@
   }
 }
 
-.glow-gradient {
-  background: radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.25) 0%, rgba(139, 92, 246, 0.1) 45%, transparent 70%);
+.luxury-gradient {
+  background: radial-gradient(circle at 50% 0%, rgba(219, 234, 254, 0.7) 0%, rgba(241, 245, 249, 0.4) 50%, transparent 80%);
 }
 
-.glass-card {
-  background: rgba(17, 24, 39, 0.75);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+.luxury-card {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  box-shadow: 0 10px 30px -10px rgba(15, 23, 42, 0.05), 0 4px 12px -4px rgba(15, 23, 42, 0.03);
 }
+
+.luxury-card-hover {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.luxury-card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 20px 40px -15px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(37, 99, 235, 0.15);
+}
+
