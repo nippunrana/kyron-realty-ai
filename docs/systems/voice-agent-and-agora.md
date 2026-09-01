@@ -33,7 +33,7 @@ This document outlines the real-time voice infrastructure powered by Agora's Sof
   - **Start Session**: `POST https://api.agora.io/api/conversational-ai-agent/v2/projects/{appId}/join`
   - **Stop Session**: `POST https://api.agora.io/api/conversational-ai-agent/v2/projects/{appId}/agents/{agentId}/leave`
 - **Authentication**: HTTP Basic Auth with `AGORA_CUSTOMER_ID` and `AGORA_CUSTOMER_SECRET` (or `AGORA_CONVERSATIONAL_AI_API_KEY`).
-- **LLM Brain**: Powered by Google Gemini (`gemini-2.0-flash`) via Google's OpenAI-compatible endpoint (`https://generativelanguage.googleapis.com/v1beta/openai/chat/completions`) using `GEMINI_API_KEY`, or OpenAI (`gpt-4o-mini`) via `OPENAI_API_KEY`.
+- **LLM Brain**: Powered by Google Gemini (`gemini-3.5-flash-lite`) via Google's OpenAI-compatible endpoint (`https://generativelanguage.googleapis.com/v1beta/openai/chat/completions`) using `GEMINI_API_KEY`, or OpenAI (`gpt-4o-mini`) via `OPENAI_API_KEY`.
 - **Persona**: "Sarah - Senior Leasing & Sales Advisor"
 - **Knowledge Base Injection**: Injects property specs, neighborhood notes, and categorized FAQs into the LLM system prompt.
 - **Negotiation Guardrails**: Enforces hard floor price locks and conditional concessions (e.g. 5% discount for 18-month lease).

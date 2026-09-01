@@ -226,7 +226,7 @@ RULES OF ENGAGEMENT:
   }
 
   let ttsConfig: any = null;
-  if (process.env.CARTESIA_API_KEY) {
+  if (process.env.CARTESIA_API_KEY?.trim()) {
     ttsConfig = {
       vendor: "cartesia",
       params: {
@@ -234,26 +234,26 @@ RULES OF ENGAGEMENT:
         model_id: "sonic-english",
         voice: {
           mode: "id",
-          id: process.env.CARTESIA_VOICE_ID || "a0e99841-438c-4a64-b679-ae501e7d6091",
+          id: process.env.CARTESIA_VOICE_ID?.trim() || "a0e99841-438c-4a64-b679-ae501e7d6091",
         },
       },
     };
-  } else if (process.env.ELEVENLABS_API_KEY) {
+  } else if (process.env.ELEVENLABS_API_KEY?.trim()) {
     ttsConfig = {
       vendor: "elevenlabs",
       params: {
         key: process.env.ELEVENLABS_API_KEY.trim(),
-        voice_id: process.env.ELEVENLABS_VOICE_ID || "21m00Tcm4TlvDq8ikWAM",
+        voice_id: process.env.ELEVENLABS_VOICE_ID?.trim() || "21m00Tcm4TlvDq8ikWAM",
         model_id: "eleven_turbo_v2_5",
       },
     };
-  } else if (process.env.MICROSOFT_TTS_KEY) {
+  } else if (process.env.MICROSOFT_TTS_KEY?.trim()) {
     ttsConfig = {
       vendor: "microsoft",
       params: {
         key: process.env.MICROSOFT_TTS_KEY.trim(),
-        region: process.env.MICROSOFT_TTS_REGION || "eastus",
-        voice_name: process.env.MICROSOFT_TTS_VOICE || "en-US-JennyMultilingualNeural",
+        region: process.env.MICROSOFT_TTS_REGION?.trim() || "eastus",
+        voice_name: process.env.MICROSOFT_TTS_VOICE?.trim() || "en-US-JennyMultilingualNeural",
       },
     };
   } else if (openaiApiKey) {
@@ -266,12 +266,9 @@ RULES OF ENGAGEMENT:
       },
     };
   } else {
-    ttsConfig = {
-      vendor: "microsoft",
-      params: {
-        voice_name: "en-US-JennyMultilingualNeural",
-      },
-    };
+    throw new Error(
+      "Missing TTS provider credentials in .env. Agora Conversational AI requires a real-time voice synthesis provider. Please configure MICROSOFT_TTS_KEY (and MICROSOFT_TTS_REGION), CARTESIA_API_KEY, ELEVENLABS_API_KEY, or OPENAI_API_KEY in your .env."
+    );
   }
 
   console.log(`[Agora Gateway] Dispatching agent start (v2) to channel: ${channelName}`);
@@ -306,8 +303,22 @@ RULES OF ENGAGEMENT:
   if (!response.ok) {
     const errorBody = await response.text();
     console.error(`[Agora Gateway Error ${response.status}]:`, errorBody);
+
+    let parsedDetail = "";
+    try {
+      const errJson = JSON.parse(errorBody);
+      if (errJson.detail) {
+        parsedDetail = errJson.detail;
+      }
+      if (errJson.reason === "request failed" || errJson.detail === "ErrInternal") {
+        parsedDetail += " (Downstream LLM or TTS provider rejected the connection. Check that your GEMINI_API_KEY has active billing/credits and your TTS API key is valid.)";
+      }
+    } catch {
+      // Non-JSON response
+    }
+
     throw new Error(
-      `Agora Conversational AI Gateway error (${response.status}): ${errorBody || response.statusText}`
+      `Agora Conversational AI Gateway error (${response.status}): ${parsedDetail || errorBody || response.statusText}`
     );
   }
 
