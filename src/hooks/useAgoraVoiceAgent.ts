@@ -263,7 +263,7 @@ export function useAgoraVoiceAgent(): UseAgoraVoiceAgentReturn {
     setAgentVolume(0);
   }, [basePath]);
 
-  // Send Text Message fallback in active session
+  // Send Text Message in active session
   const sendTextMessage = useCallback((text: string) => {
     if (!text.trim()) return;
     const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -276,19 +276,6 @@ export function useAgoraVoiceAgent(): UseAgoraVoiceAgentReturn {
         timestamp: now,
       },
     ]);
-
-    // Simulated conversational response if testing text mode
-    setTimeout(() => {
-      setTranscript((prev) => [
-        ...prev,
-        {
-          id: `agent-${Date.now()}`,
-          role: "assistant",
-          text: "I can confirm that for you! Would you like me to schedule a viewing for you this week?",
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        },
-      ]);
-    }, 1000);
   }, []);
 
   return {

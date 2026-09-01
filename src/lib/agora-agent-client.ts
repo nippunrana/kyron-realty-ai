@@ -19,11 +19,13 @@ export interface AgoraAgentSessionResult {
   userUid: number;
   token: string;
   greeting: string;
+  appId: string;
   message?: string;
 }
 
 /**
  * Starts an Agora Conversational AI Voice Agent session for a specific property listing.
+ * Strict Mode: Communicates directly with Agora SD-RTN & Cloud Gateway; throws on missing keys or API failures.
  */
 export async function startAgoraAgentSession(
   params: StartAgentSessionParams
@@ -36,48 +38,50 @@ export async function startAgoraAgentSession(
     agentUid = 999001,
   } = params;
 
-  const appId = process.env.AGORA_APP_ID || process.env.NEXT_PUBLIC_AGORA_APP_ID || "demo-agora-app-id";
-  const apiKey = process.env.AGORA_CONVERSATIONAL_AI_API_KEY || process.env.AGORA_API_KEY || "";
+  const appId = process.env.AGORA_APP_ID || process.env.NEXT_PUBLIC_AGORA_APP_ID;
+  const apiKey = process.env.AGORA_CONVERSATIONAL_AI_API_KEY || process.env.AGORA_API_KEY;
+
+  if (!appId || appId.trim() === "" || appId === "your_agora_app_id_here") {
+    throw new Error(
+      "Missing AGORA_APP_ID in .env. Please configure your Agora App ID from https://console.agora.io/."
+    );
+  }
 
   // 1. Fetch property, knowledge base & guardrails
   let propertyRecord: any = null;
   let kbRecord: any = null;
   let matrixRecord: any = null;
 
-  try {
-    if (propertyId) {
-      const [p] = await db.select().from(properties).where(eq(properties.id, propertyId)).limit(1);
-      propertyRecord = p;
-    } else if (propertySlug) {
-      const [p] = await db.select().from(properties).where(eq(properties.slug, propertySlug)).limit(1);
-      propertyRecord = p;
-    }
-
-    if (propertyRecord) {
-      const [kb] = await db
-        .select()
-        .from(propertyKnowledgeBases)
-        .where(eq(propertyKnowledgeBases.propertyId, propertyRecord.id))
-        .limit(1);
-      kbRecord = kb;
-
-      const [matrix] = await db
-        .select()
-        .from(negotiationMatrices)
-        .where(eq(negotiationMatrices.propertyId, propertyRecord.id))
-        .limit(1);
-      matrixRecord = matrix;
-    }
-  } catch (err) {
-    console.warn("[Agora Agent] DB lookup warning:", err);
+  if (propertyId) {
+    const [p] = await db.select().from(properties).where(eq(properties.id, propertyId)).limit(1);
+    propertyRecord = p;
+  } else if (propertySlug) {
+    const [p] = await db.select().from(properties).where(eq(properties.slug, propertySlug)).limit(1);
+    propertyRecord = p;
   }
 
-  // 2. Generate RTC Tokens for User and Agent
+  if (propertyRecord) {
+    const [kb] = await db
+      .select()
+      .from(propertyKnowledgeBases)
+      .where(eq(propertyKnowledgeBases.propertyId, propertyRecord.id))
+      .limit(1);
+    kbRecord = kb;
+
+    const [matrix] = await db
+      .select()
+      .from(negotiationMatrices)
+      .where(eq(negotiationMatrices.propertyId, propertyRecord.id))
+      .limit(1);
+    matrixRecord = matrix;
+  }
+
+  // 2. Generate Real Signed RTC Tokens for User and Agent (Throws if AGORA_APP_CERTIFICATE is missing)
   const userTokenData = generateAgoraRtcToken(channelName, userUid);
   const agentTokenData = generateAgoraRtcToken(channelName, agentUid);
 
   // 3. Build Agent System Prompt & Real Estate Persona
-  const propertyTitle = propertyRecord?.title || "Luxury Urban Residence";
+  const propertyTitle = propertyRecord?.title || "Luxury Property";
   const targetPrice = matrixRecord?.targetPrice || propertyRecord?.price || "3,450";
   const floorPrice = matrixRecord?.minFloorPrice || "3,250";
   const greeting =
@@ -97,16 +101,16 @@ You are 'Sarah', a senior leasing advisor and sales specialist representing: ${p
 Your goal is to converse naturally with prospective buyers/renters over Agora real-time voice, answer questions truthfully using the provided property knowledge base, negotiate within strict owner concession boundaries, and book viewing walkthroughs.
 
 PROPERTY OVERVIEW:
-- Address: ${propertyRecord?.address || "Marina Boulevard"}, ${propertyRecord?.city || "San Francisco"}, ${propertyRecord?.state || "CA"}
+- Address: ${propertyRecord?.address || ""}, ${propertyRecord?.city || ""}, ${propertyRecord?.state || ""}
 - Listing Type: ${propertyRecord?.listingType === "rent" ? "Rental" : "For Sale"}
 - Asking Price: $${Number(targetPrice).toLocaleString()}${propertyRecord?.listingType === "rent" ? "/month" : ""}
 - Specs: ${propertyRecord?.bedrooms || 2} Beds, ${propertyRecord?.bathrooms || 2} Baths, ${propertyRecord?.sqft || 1100} sqft
-- Description: ${propertyRecord?.description || "Modern luxury property with high-end finishes."}
+- Description: ${propertyRecord?.description || ""}
 
 POLICIES & DETAILS:
 - Pets: ${kbRecord?.petPolicyDetail || "Allowed with deposit"}
-- Parking: ${kbRecord?.parkingDetail || "1 assigned garage stall included"}
-- Utilities: ${kbRecord?.utilitiesDetail || "Water & Trash included"}
+- Parking: ${kbRecord?.parkingDetail || "Assigned stall included"}
+- Utilities: ${kbRecord?.utilitiesDetail || "Standard utilities included"}
 - Application: ${kbRecord?.applicationProcess || "Standard application with credit verification"}
 
 VERIFIED PROPERTY FAQS:
@@ -119,7 +123,7 @@ NEGOTIATION CONCESSION GUARDRAILS:
 ${concessionRulesText || "- 18-month lease: 5% monthly discount"}
 
 RULES OF ENGAGEMENT:
-1. Speak in concise, natural, spoken sentences (1-3 sentences).
+1. Speak in concise, natural, spoken sentences (1-3 sentences max).
 2. Only state facts verified in the knowledge base.
 3. Use the Exchange-of-Value principle for negotiations. If a buyer asks for a discount, offer it ONLY in exchange for an 18-month lease or immediate move-in.
 4. When the buyer is interested, proactively offer two time slots to book an in-person viewing.
@@ -127,102 +131,101 @@ RULES OF ENGAGEMENT:
 
   // 4. Register Voice Session in Database
   let voiceSessionId = `agora-sess-${Date.now()}`;
-  try {
-    const [sess] = await db
-      .insert(voiceSessions)
-      .values({
-        propertyId: propertyRecord?.id || null,
-        channelName,
-        agoraSessionId: voiceSessionId,
-        callerType: "buyer_inquiry",
-        callerIdentifier: `user-${userUid}`,
-        status: "active",
-      })
-      .returning();
-    if (sess?.id) {
-      voiceSessionId = `agora-sess-${sess.id}`;
-    }
-  } catch (err) {
-    console.warn("[Agora Agent] Could not log voice session to DB:", err);
+  const [sess] = await db
+    .insert(voiceSessions)
+    .values({
+      propertyId: propertyRecord?.id || null,
+      channelName,
+      agoraSessionId: voiceSessionId,
+      callerType: "buyer_inquiry",
+      callerIdentifier: `user-${userUid}`,
+      status: "active",
+    })
+    .returning();
+
+  if (sess?.id) {
+    voiceSessionId = `agora-sess-${sess.id}`;
   }
 
-  // 5. Call Agora Conversational AI REST Gateway (if configured)
-  if (apiKey && apiKey !== "your_agora_rest_api_key") {
-    try {
-      console.log(`[Agora Gateway] Dispatching agent start to channel: ${channelName}`);
-      const response = await fetch(
-        `https://api.agora.io/v1/projects/${appId}/rtm/conversational-ai/agents`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${apiKey}`,
+  // 5. Call Agora Conversational AI Cloud Gateway REST API
+  if (!apiKey || apiKey.trim() === "" || apiKey === "your_agora_conversational_ai_api_key_here") {
+    throw new Error(
+      "Missing AGORA_CONVERSATIONAL_AI_API_KEY in .env. Please configure your Agora Cloud Gateway API key."
+    );
+  }
+
+  console.log(`[Agora Gateway] Dispatching agent start to channel: ${channelName}`);
+  const authHeader = apiKey.startsWith("Basic ") || apiKey.startsWith("Bearer ")
+    ? apiKey
+    : (apiKey.includes(":") ? `Basic ${Buffer.from(apiKey).toString("base64")}` : `Basic ${apiKey}`);
+
+  const response = await fetch(
+    `https://api.agora.io/v1/projects/${appId}/rtm/conversational-ai/agents`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: authHeader,
+      },
+      body: JSON.stringify({
+        name: `Kyron-Realty-${propertyRecord?.slug || "Listing"}`,
+        properties: {
+          channel: channelName,
+          token: agentTokenData.token,
+          agent_rtc_uid: String(agentUid),
+          remote_rtc_uids: [String(userUid)],
+          idle_timeout: 60,
+        },
+        parameters: {
+          vad: {
+            mode: "auto",
+            prefix_padding_ms: 300,
+            silence_duration_ms: 500,
           },
-          body: JSON.stringify({
-            name: `Kyron-Realty-${propertyRecord?.slug || "Listing"}`,
-            properties: {
-              channel: channelName,
-              token: agentTokenData.token,
-              agent_rtc_uid: String(agentUid),
-              remote_rtc_uids: [String(userUid)],
-              idle_timeout: 60,
-            },
-            parameters: {
-              vad: {
-                mode: "auto",
-                prefix_padding_ms: 300,
-                silence_duration_ms: 500,
-              },
-              stt: {
-                vendor: "deepgram",
-                model: "nova-3",
-                language: "en",
-              },
-              llm: {
-                vendor: "openai",
-                model: "gpt-4o",
-                system_prompt: systemPrompt,
-                greeting: greeting,
-                temperature: 0.6,
-                max_history: 30,
-              },
-              tts: {
-                vendor: "cartesia",
-                model: "sonic-english",
-                voice_id: "a0e99841-438c-4a64-b679-ae501e7d6091",
-              },
-            },
-          }),
-        }
-      );
-
-      if (response.ok) {
-        const json = await response.json();
-        return {
-          success: true,
-          sessionId: json.data?.agent_id || voiceSessionId,
-          channelName,
-          agentUid,
-          userUid,
-          token: userTokenData.token,
-          greeting,
-        };
-      }
-    } catch (apiErr: any) {
-      console.warn("[Agora Gateway] REST API call failed, using mock agent session:", apiErr.message);
+          stt: {
+            vendor: "deepgram",
+            model: "nova-3",
+            language: "en",
+          },
+          llm: {
+            vendor: "openai",
+            model: "gpt-4o",
+            system_prompt: systemPrompt,
+            greeting: greeting,
+            temperature: 0.6,
+            max_history: 30,
+          },
+          tts: {
+            vendor: "cartesia",
+            model: "sonic-english",
+            voice_id: "a0e99841-438c-4a64-b679-ae501e7d6091",
+          },
+        },
+      }),
     }
+  );
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    console.error(`[Agora Gateway Error ${response.status}]:`, errorBody);
+    throw new Error(
+      `Agora Conversational AI Gateway error (${response.status}): ${errorBody || response.statusText}`
+    );
   }
 
-  // 6. Return Session Data (Works in both production and sandbox testing)
+  const json = await response.json();
+  const remoteAgentId = json.data?.agent_id || json.agent_id || voiceSessionId;
+
   return {
     success: true,
-    sessionId: voiceSessionId,
+    sessionId: remoteAgentId,
     channelName,
     agentUid,
     userUid,
     token: userTokenData.token,
+    appId,
     greeting,
-    message: "Agent session initialized on Agora SD-RTN.",
+    message: "Agent session initialized successfully on Agora SD-RTN.",
   };
 }
 
@@ -230,19 +233,38 @@ RULES OF ENGAGEMENT:
  * Stops an active Agora Conversational AI Agent session.
  */
 export async function stopAgoraAgentSession(sessionId: string, channelName: string) {
-  console.log(`[Agora Gateway] Stopping agent session: ${sessionId} in channel: ${channelName}`);
-  
-  try {
-    await db
-      .update(voiceSessions)
-      .set({
-        status: "completed",
-        endedAt: new Date(),
-      })
-      .where(eq(voiceSessions.agoraSessionId, sessionId));
-  } catch (err) {
-    console.warn("[Agora Gateway] Could not update session status in DB:", err);
+  const appId = process.env.AGORA_APP_ID || process.env.NEXT_PUBLIC_AGORA_APP_ID;
+  const apiKey = process.env.AGORA_CONVERSATIONAL_AI_API_KEY || process.env.AGORA_API_KEY;
+
+  if (appId && apiKey) {
+    try {
+      const authHeader = apiKey.startsWith("Basic ") || apiKey.startsWith("Bearer ")
+        ? apiKey
+        : (apiKey.includes(":") ? `Basic ${Buffer.from(apiKey).toString("base64")}` : `Basic ${apiKey}`);
+
+      await fetch(
+        `https://api.agora.io/v1/projects/${appId}/rtm/conversational-ai/agents/${sessionId}/stop`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: authHeader,
+          },
+          body: JSON.stringify({ channel: channelName }),
+        }
+      );
+    } catch (e) {
+      console.warn("[Agora Gateway] Stop request warning:", e);
+    }
   }
+
+  await db
+    .update(voiceSessions)
+    .set({
+      status: "completed",
+      endedAt: new Date(),
+    })
+    .where(eq(voiceSessions.agoraSessionId, sessionId));
 
   return { success: true, sessionId, channelName };
 }

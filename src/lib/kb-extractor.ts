@@ -64,6 +64,10 @@ function generateKebabSlug(title: string, city: string): string {
   return `${base || "property"}-${randomSuffix}`;
 }
 
+/**
+ * Synthesizes a structured property profile, voice agent knowledge base, and concession guardrails.
+ * Strict Mode: Directly invokes Gemini 2.5 and throws immediately on missing API key or generation failure.
+ */
 export async function extractPropertyKnowledgeBase(
   input: {
     markdown?: string;
@@ -80,16 +84,24 @@ export async function extractPropertyKnowledgeBase(
     .filter(Boolean)
     .join("\n\n---\n\n");
 
+  if (!contentToAnalyze.trim()) {
+    throw new Error("No property content or notes provided for AI synthesis.");
+  }
+
   const apiKey =
     process.env.GEMINI_API_KEY ||
     process.env.GOOGLE_API_KEY ||
     process.env.GOOGLE_GENAI_API_KEY;
 
-  if (apiKey) {
-    try {
-      const ai = new GoogleGenAI({ apiKey });
+  if (!apiKey || apiKey.trim() === "" || apiKey === "your_gemini_api_key_here") {
+    throw new Error(
+      "Missing GEMINI_API_KEY in .env. Please configure a valid Google Gemini API key from https://aistudio.google.com/app/apikey."
+    );
+  }
 
-      const prompt = `
+  const ai = new GoogleGenAI({ apiKey });
+
+  const prompt = `
 You are an expert real estate intelligence system and senior property manager.
 Analyze the following raw real estate listing content / owner conversation and extract an exhaustive, structured property profile, a speech-optimized knowledge base for an Agora voice sales agent, and a negotiation guardrail matrix.
 
@@ -159,154 +171,59 @@ You MUST return a valid JSON object strictly matching this TypeScript structure 
     "notesForAgent": string (internal guidelines for the voice bot)
   }
 }
-      `.trim();
+  `.trim();
 
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-        },
-      });
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+      },
+    });
 
-      const text = response.text || "";
-      const parsed = JSON.parse(text);
-
-      const title = parsed.property?.title || "Modern Urban Residence";
-      const city = parsed.property?.city || "San Francisco";
-      const slug = generateKebabSlug(title, city);
-
-      // Merge existing images if found
-      const combinedImages = Array.from(
-        new Set([
-          ...(parsed.property?.images || []),
-          ...(input.existingImages || []),
-        ])
-      ).filter(Boolean);
-
-      return {
-        property: {
-          ...parsed.property,
-          slug,
-          coverImageUrl:
-            parsed.property?.coverImageUrl ||
-            combinedImages[0] ||
-            "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80",
-          images:
-            combinedImages.length > 0
-              ? combinedImages
-              : [
-                  "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80",
-                  "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80",
-                ],
-        },
-        knowledgeBase: {
-          ...parsed.knowledgeBase,
-          rawScrapedMarkdown: input.markdown || contentToAnalyze,
-        },
-        negotiationMatrix: parsed.negotiationMatrix,
-      };
-    } catch (aiError: any) {
-      console.warn(`[GenAI] Gemini extraction failed (${aiError.message}), using heuristic synthesis.`);
+    const text = response.text || "";
+    if (!text.trim()) {
+      throw new Error("Gemini returned empty response text.");
     }
+
+    const parsed = JSON.parse(text);
+
+    const title = parsed.property?.title || "Real Estate Listing";
+    const city = parsed.property?.city || "San Francisco";
+    const slug = generateKebabSlug(title, city);
+
+    // Merge existing images if found
+    const combinedImages = Array.from(
+      new Set([
+        ...(parsed.property?.images || []),
+        ...(input.existingImages || []),
+      ])
+    ).filter(Boolean);
+
+    return {
+      property: {
+        ...parsed.property,
+        slug,
+        coverImageUrl:
+          parsed.property?.coverImageUrl ||
+          combinedImages[0] ||
+          "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80",
+        images:
+          combinedImages.length > 0
+            ? combinedImages
+            : [
+                "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80",
+              ],
+      },
+      knowledgeBase: {
+        ...parsed.knowledgeBase,
+        rawScrapedMarkdown: input.markdown || contentToAnalyze,
+      },
+      negotiationMatrix: parsed.negotiationMatrix,
+    };
+  } catch (err: any) {
+    console.error(`[Gemini Extraction Error]:`, err.message || err);
+    throw new Error(`Gemini AI extraction error: ${err.message || err}`);
   }
-
-  // Heuristic Fallback
-  const fallbackTitle = "Modern Marina Luxury Loft";
-  const fallbackCity = "San Francisco";
-  const fallbackSlug = generateKebabSlug(fallbackTitle, fallbackCity);
-
-  return {
-    property: {
-      title: fallbackTitle,
-      slug: fallbackSlug,
-      description:
-        "Stunning high-floor residence featuring panoramic views, chef's kitchen, hardwood floors, in-unit laundry, and private outdoor balcony.",
-      listingType: "rent",
-      propertyType: "apartment",
-      price: 3450,
-      securityDeposit: 3450,
-      minLeaseMonths: 12,
-      hoaFeeMonthly: 0,
-      address: "250 Marina Boulevard",
-      unitNumber: "Unit 4B",
-      city: "San Francisco",
-      state: "CA",
-      zipCode: "94123",
-      country: "USA",
-      bedrooms: 2,
-      bathrooms: 2.0,
-      sqft: 1150,
-      yearBuilt: 2021,
-      availableDate: "Immediate",
-      amenities: [
-        "In-unit Washer/Dryer",
-        "Dedicated Garage Parking",
-        "EV Charging",
-        "Private Balcony",
-        "Rooftop Terrace",
-      ],
-      features: ["Hardwood Flooring", "Quartz Countertops", "High Ceilings"],
-      coverImageUrl:
-        "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80",
-      images: [
-        "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80",
-        "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80",
-      ],
-    },
-    knowledgeBase: {
-      rawScrapedMarkdown: input.markdown || contentToAnalyze,
-      synthesizedSalesPitch:
-        "Welcome to 250 Marina Boulevard! This home offers rare panoramic bay views, in-unit laundry, and private garage parking in one of the city's most walkable neighborhoods.",
-      neighborhoodSummary:
-        "Prime Marina location with a 98 WalkScore, steps away from Chestnut Street restaurants, cafes, and the waterfront.",
-      schoolDistrictInfo: "Top-rated San Francisco Unified School District.",
-      petPolicyDetail: "Dogs and cats welcome (under 50 lbs) with $500 pet deposit and $50/month pet rent.",
-      parkingDetail: "1 assigned underground garage parking stall with EV charger included.",
-      utilitiesDetail: "Water, sewer, and trash removal are covered. Tenant is responsible for electricity and internet.",
-      applicationProcess:
-        "Online application, 680+ credit score required, gross monthly income 2.5x rent.",
-      faqs: [
-        {
-          question: "What utilities are included in the rent?",
-          answer: "Water, trash, and sewer are included. Tenant pays electric and WiFi.",
-          category: "Policies & Rules",
-        },
-        {
-          question: "Is parking included?",
-          answer: "Yes, one assigned garage parking space with Level 2 EV charging is included.",
-          category: "Amenities & Specs",
-        },
-        {
-          question: "Is the price negotiable?",
-          answer: "We can discuss a 5% discount if you are open to an 18-month lease commitment.",
-          category: "Pricing & Lease",
-        },
-      ],
-      agentTone: "warm_professional",
-      greetingMessage:
-        "Hello! Thanks for checking out 250 Marina Boulevard. Are you looking to move in this month?",
-    },
-    negotiationMatrix: {
-      allowNegotiation: true,
-      targetPrice: 3450,
-      minFloorPrice: 3250,
-      maxAllowedDiscountPct: 5.0,
-      concessionRules: [
-        {
-          condition: "18_month_lease",
-          concession: "5% discount on monthly rent ($3,277/mo)",
-          maxConcessionValue: 173,
-          requiresApproval: false,
-        },
-        {
-          condition: "move_in_under_7_days",
-          concession: "Waived first month parking fee ($200 value)",
-          maxConcessionValue: 200,
-          requiresApproval: false,
-        },
-      ],
-      notesForAgent: "Strictly adhere to the $3,250 floor price. Proactively offer tours for qualified callers.",
-    },
-  };
 }
