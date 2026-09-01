@@ -11,7 +11,7 @@ Kyron Realty AI is a modern real estate intelligence platform integrating AI cap
 - **Process Manager**: PM2 (`ecosystem.config.cjs` standalone output)
 - **Reverse Proxy**: Nginx
 - **CI/CD Pipeline**: GitHub Actions (`.github/workflows/deploy.yml`)
-- **Repository**: [nippunrana/agora-realty-ai](https://github.com/nippunrana/agora-realty-ai)
+- **Repository**: [nippunrana/kyron-realty-ai](https://github.com/nippunrana/kyron-realty-ai)
 
 ## Architecture & Directory Structure
 - `src/app/`: Next.js App Router pages, layout, and global CSS tokens.
