@@ -6,25 +6,26 @@ Kyron Realty AI is a modern real estate intelligence platform integrating AI cap
 ---
 
 ## 1. Single Sources of Truth (Read Directly)
-Before writing or modifying features, consult the canonical source files:
-- **Database Schema**: [src/db/schema.ts](file:///var/www/egnitech.com/html/wp-content/projects/kyron-realty-ai/src/db/schema.ts) — PostgreSQL models (`users`, `accounts`, `sessions`, `verificationTokens`, `properties`, `deals`).
-- **Auth & Session Config**: [src/auth.ts](file:///var/www/egnitech.com/html/wp-content/projects/kyron-realty-ai/src/auth.ts) — NextAuth v5 configuration, credentials verification, and Google OAuth handlers.
-- **Design System & UI Tokens**: [docs/design-system.md](file:///var/www/egnitech.com/html/wp-content/projects/kyron-realty-ai/docs/design-system.md) & [src/app/globals.css](file:///var/www/egnitech.com/html/wp-content/projects/kyron-realty-ai/src/app/globals.css) — Color palettes, `.luxury-card` (light) vs `.luxury-dark-card` (midnight dark) rules, and animation easing.
-- **Infrastructure & Deployment**: [docs/server-config.md](file:///var/www/egnitech.com/html/wp-content/projects/kyron-realty-ai/docs/server-config.md) — VPS architecture, PM2 cluster, PostgreSQL 17, and Nginx reverse proxy.
+Before writing or modifying features, consult the canonical source files and their dedicated system docs:
+- **Design System & UI Tokens**: [docs/systems/design-system.md](file:///var/www/egnitech.com/html/wp-content/projects/kyron-realty-ai/docs/systems/design-system.md) & [src/app/globals.css](file:///var/www/egnitech.com/html/wp-content/projects/kyron-realty-ai/src/app/globals.css)
+- **Auth & Session System**: [docs/systems/auth.md](file:///var/www/egnitech.com/html/wp-content/projects/kyron-realty-ai/docs/systems/auth.md) & [src/auth.ts](file:///var/www/egnitech.com/html/wp-content/projects/kyron-realty-ai/src/auth.ts)
+- **Database & Schemas**: [docs/systems/database.md](file:///var/www/egnitech.com/html/wp-content/projects/kyron-realty-ai/docs/systems/database.md) & [src/db/schema.ts](file:///var/www/egnitech.com/html/wp-content/projects/kyron-realty-ai/src/db/schema.ts)
+- **Architecture & Subpath Hosting**: [docs/systems/architecture-and-basepath.md](file:///var/www/egnitech.com/html/wp-content/projects/kyron-realty-ai/docs/systems/architecture-and-basepath.md)
+- **VPS Infrastructure**: [docs/server-config.md](file:///var/www/egnitech.com/html/wp-content/projects/kyron-realty-ai/docs/server-config.md)
 
 ---
 
 ## 2. Built Systems vs Roadmap
 To prevent duplicate code or assuming features that do not yet exist:
 
-| System / Feature | Status | Location | Notes |
-| :--- | :--- | :--- | :--- |
-| **Authentication** | Built | `src/app/login/page.tsx`, `src/auth.ts`, `src/app/api/auth/` | NextAuth credentials + Google OAuth fallback flow |
-| **Landing Page** | Built | `src/app/page.tsx` | Hero, social proof counter, waitlist form, feature highlights |
-| **Database Pool & ORM**| Built | `src/db/index.ts`, `src/db/schema.ts` | Drizzle ORM + PostgreSQL 17 pool connection |
-| **Design System** | Built | `docs/design-system.md`, `src/app/globals.css` | Dual-pane light/midnight luxury dark system |
-| **Property Valuation / AI Pipelines** | Roadmap | Pending implementation | Future backend services for live MLS ingestion & ML valuation |
-| **Voice Agent / Agora Real-Time** | Roadmap | Historical specs in `docs/pitch/` | Voice SDK integration planned for subsequent phase |
+| System / Feature | Status | System Spec | Code Location | Notes |
+| :--- | :--- | :--- | :--- | :--- |
+| **Authentication** | Built | [auth.md](file:///var/www/egnitech.com/html/wp-content/projects/kyron-realty-ai/docs/systems/auth.md) | `src/app/login/page.tsx`, `src/auth.ts`, `src/app/api/auth/` | NextAuth credentials + Google OAuth fallback flow |
+| **Landing Page** | Built | [architecture-and-basepath.md](file:///var/www/egnitech.com/html/wp-content/projects/kyron-realty-ai/docs/systems/architecture-and-basepath.md) | `src/app/page.tsx` | Hero, social proof counter, waitlist form, feature highlights |
+| **Database Pool & ORM**| Built | [database.md](file:///var/www/egnitech.com/html/wp-content/projects/kyron-realty-ai/docs/systems/database.md) | `src/db/index.ts`, `src/db/schema.ts` | Drizzle ORM + PostgreSQL 17 pool connection |
+| **Design System** | Built | [design-system.md](file:///var/www/egnitech.com/html/wp-content/projects/kyron-realty-ai/docs/systems/design-system.md) | `src/app/globals.css` | Dual-pane light/midnight luxury dark system |
+| **Property Valuation / AI Pipelines** | Roadmap | *Pending* | Future backend services | Live MLS ingestion & automated ML valuation models |
+| **Voice Agent / Agora Real-Time** | Roadmap | *Pending* (see `docs/pitch/`) | Future voice module | Voice SDK integration planned for subsequent phase |
 
 ---
 
