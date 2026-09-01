@@ -21,6 +21,8 @@ import {
 } from "lucide-react";
 import { LoginShowcase } from "@/components/login/LoginShowcase";
 
+const BASE_PATH = "/projects/kyron-realty-ai";
+
 function LoginFormContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -43,9 +45,11 @@ function LoginFormContent() {
   // Check auth error in URL or query params
   useEffect(() => {
     const errorParam = searchParams.get("error");
-    if (errorParam === "OAuthSignin" || errorParam === "OAuthCallback" || errorParam === "Configuration") {
+    if (errorParam === "OAuthSignin" || errorParam === "OAuthCallback") {
+      setErrorMsg("Google sign-in could not be completed. Please try again or sign in with email.");
+    } else if (errorParam === "Configuration") {
       setShowOAuthNotice(true);
-      setErrorMsg("Google OAuth is not configured yet. Please configure AUTH_GOOGLE_ID & AUTH_GOOGLE_SECRET in .env.");
+      setErrorMsg("Google OAuth is not configured properly. Please verify AUTH_GOOGLE_ID & AUTH_GOOGLE_SECRET in .env.");
     } else if (errorParam === "CredentialsSignin") {
       setErrorMsg("Invalid email or password. Please try again.");
     }
@@ -53,7 +57,7 @@ function LoginFormContent() {
 
   // Check if Google OAuth is configured via backend status check
   useEffect(() => {
-    fetch("/api/auth/status")
+    fetch(`${BASE_PATH}/api/auth/status`)
       .then((res) => res.json())
       .then((data) => {
         setGoogleOAuthConfigured(Boolean(data.googleConfigured));
@@ -97,7 +101,7 @@ function LoginFormContent() {
     try {
       if (mode === "signup") {
         // Register user via API
-        const res = await fetch("/api/auth/register", {
+        const res = await fetch(`${BASE_PATH}/api/auth/register`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password, name }),
@@ -166,9 +170,8 @@ function LoginFormContent() {
 
     setIsGoogleLoading(true);
     try {
-      await signIn("google", { callbackUrl: "/" });
+      await signIn("google", { callbackUrl: `${BASE_PATH}/` });
     } catch {
-      setShowOAuthNotice(true);
       setErrorMsg("Unable to connect to Google OAuth. Please verify credentials in .env.");
       setIsGoogleLoading(false);
     }
