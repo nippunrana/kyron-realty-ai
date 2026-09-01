@@ -508,8 +508,11 @@ function LoginFormContent() {
 export default function LoginPage() {
   return (
     <div className="min-h-screen grid grid-cols-1 lg:grid-cols-2 bg-slate-50 selection:bg-blue-100 selection:text-blue-900">
-      {/* Left Column: Minimal Authentication Interface */}
-      <div className="flex flex-col justify-center bg-slate-50 relative z-10">
+      {/* Left Column: High-Aesthetic Luxury Real Estate Intelligence Showcase */}
+      <LoginShowcase />
+
+      {/* Right Column: Minimal Clean Authentication Interface */}
+      <div className="flex flex-col justify-center bg-slate-50 relative z-10 border-t lg:border-t-0 lg:border-l border-slate-200/80 shadow-sm lg:shadow-none">
         <Suspense
           fallback={
             <div className="min-h-screen flex items-center justify-center">
@@ -520,9 +523,6 @@ export default function LoginPage() {
           <LoginFormContent />
         </Suspense>
       </div>
-
-      {/* Right Column: High-Aesthetic Luxury Real Estate Intelligence Showcase */}
-      <LoginShowcase />
     </div>
   );
 }
