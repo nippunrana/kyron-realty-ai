@@ -1,27 +1,30 @@
 import Image from "next/image";
 import { Sparkles, Zap, Star, TrendingUp } from "lucide-react";
 
+const BASE_PATH = "/projects/kyron-realty-ai";
+
 export function LoginShowcase() {
   return (
     <div className="hidden lg:flex flex-col justify-between p-10 xl:p-12 relative overflow-hidden bg-slate-950 text-white min-h-screen select-none">
       {/* High-Resolution Luxury Architectural Image Background */}
-      <div className="absolute inset-0 -z-20">
+      <div className="absolute inset-0 z-0">
         <Image
-          src="/images/luxury-architecture-twilight.jpg"
+          src={`${BASE_PATH}/images/luxury-architecture-twilight.jpg`}
           alt="Luxury Architecture at Twilight"
           fill
           priority
+          unoptimized
           sizes="(max-width: 1024px) 100vw, 50vw"
-          className="object-cover object-center opacity-40 scale-105"
+          className="object-cover object-center opacity-85"
         />
-        {/* Multi-layered dark gradient overlays for cinematic contrast & readability */}
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/85 to-slate-950/70" />
-        <div className="absolute inset-0 bg-gradient-to-r from-slate-950/80 via-transparent to-slate-950/90" />
+        {/* Subtle dark gradient vignettes for ultra-crisp text contrast while keeping the villa & pool vibrant */}
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/35 to-slate-950/65" />
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-950/65 via-transparent to-slate-950/45" />
       </div>
 
       {/* Atmospheric Ambient Glowing Orbs */}
-      <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-blue-500/15 blur-3xl pointer-events-none -z-10" />
-      <div className="absolute -bottom-24 -right-24 w-96 h-96 rounded-full bg-indigo-500/20 blur-3xl pointer-events-none -z-10" />
+      <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-blue-500/20 blur-3xl pointer-events-none z-0" />
+      <div className="absolute -bottom-24 -right-24 w-96 h-96 rounded-full bg-indigo-500/25 blur-3xl pointer-events-none z-0" />
 
       {/* Top Feature Tag & Version */}
       <div className="flex items-center justify-between relative z-10">
