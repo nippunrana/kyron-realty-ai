@@ -174,8 +174,9 @@ You MUST return a valid JSON object strictly matching this TypeScript structure 
   `.trim();
 
   try {
+    const modelName = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: modelName,
       contents: prompt,
       config: {
         responseMimeType: "application/json",

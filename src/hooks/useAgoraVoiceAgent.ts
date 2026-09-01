@@ -147,10 +147,17 @@ export function useAgoraVoiceAgent(): UseAgoraVoiceAgentReturn {
         const AgoraRTC = (await import("agora-rtc-sdk-ng")).default;
         AgoraRTC.setLogLevel(3); // Warnings & errors only
 
-        const appId =
-          process.env.NEXT_PUBLIC_AGORA_APP_ID ||
+        const appId = (
           sessionData.appId ||
-          "demo-agora-app-id";
+          process.env.NEXT_PUBLIC_AGORA_APP_ID ||
+          ""
+        ).trim();
+
+        if (!appId || appId === "demo-agora-app-id" || appId === "your_agora_app_id_here" || appId.length < 10) {
+          throw new Error(
+            "Invalid Agora App ID received. Please verify AGORA_APP_ID in .env."
+          );
+        }
 
         const client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
         clientRef.current = client;

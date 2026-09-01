@@ -147,63 +147,161 @@ RULES OF ENGAGEMENT:
     voiceSessionId = `agora-sess-${sess.id}`;
   }
 
-  // 5. Call Agora Conversational AI Cloud Gateway REST API
-  if (!apiKey || apiKey.trim() === "" || apiKey === "your_agora_conversational_ai_api_key_here") {
+  // 5. Call Agora Conversational AI Cloud Gateway REST API (v2)
+  const customerId = process.env.AGORA_CUSTOMER_ID?.trim();
+  const customerSecret = process.env.AGORA_CUSTOMER_SECRET?.trim();
+  let authHeader = "";
+
+  if (customerId && customerSecret) {
+    authHeader = `Basic ${Buffer.from(`${customerId}:${customerSecret}`).toString("base64")}`;
+  } else if (apiKey && apiKey.trim() !== "" && apiKey !== "your_agora_conversational_ai_api_key_here") {
+    authHeader = apiKey.startsWith("Basic ") || apiKey.startsWith("Bearer ")
+      ? apiKey
+      : (apiKey.includes(":") ? `Basic ${Buffer.from(apiKey.trim()).toString("base64")}` : `Basic ${apiKey.trim()}`);
+  } else {
     throw new Error(
-      "Missing AGORA_CONVERSATIONAL_AI_API_KEY in .env. Please configure your Agora Cloud Gateway API key."
+      "Missing Agora Cloud credentials in .env. Please configure AGORA_CUSTOMER_ID & AGORA_CUSTOMER_SECRET (or AGORA_CONVERSATIONAL_AI_API_KEY)."
     );
   }
 
-  console.log(`[Agora Gateway] Dispatching agent start to channel: ${channelName}`);
-  const authHeader = apiKey.startsWith("Basic ") || apiKey.startsWith("Bearer ")
-    ? apiKey
-    : (apiKey.includes(":") ? `Basic ${Buffer.from(apiKey).toString("base64")}` : `Basic ${apiKey}`);
+  // 6. Configure LLM brain (Google Gemini or OpenAI)
+  const geminiApiKey = (
+    process.env.GEMINI_API_KEY ||
+    process.env.GOOGLE_API_KEY ||
+    process.env.GOOGLE_GENAI_API_KEY ||
+    ""
+  ).trim();
+  const openaiApiKey = (process.env.OPENAI_API_KEY || "").trim();
 
-  const response = await fetch(
-    `https://api.agora.io/v1/projects/${appId}/rtm/conversational-ai/agents`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: authHeader,
+  let llmConfig: any = null;
+  if (geminiApiKey) {
+    llmConfig = {
+      url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+      api_key: geminiApiKey,
+      system_messages: [
+        {
+          role: "system",
+          content: systemPrompt,
+        },
+      ],
+      greeting_message: greeting,
+      params: {
+        model: process.env.GEMINI_MODEL || "gemini-3.5-flash-lite",
+        temperature: 0.6,
       },
-      body: JSON.stringify({
-        name: `Kyron-Realty-${propertyRecord?.slug || "Listing"}`,
-        properties: {
-          channel: channelName,
-          token: agentTokenData.token,
-          agent_rtc_uid: String(agentUid),
-          remote_rtc_uids: [String(userUid)],
-          idle_timeout: 60,
+    };
+  } else if (openaiApiKey) {
+    llmConfig = {
+      url: "https://api.openai.com/v1/chat/completions",
+      api_key: openaiApiKey,
+      system_messages: [
+        {
+          role: "system",
+          content: systemPrompt,
         },
-        parameters: {
-          vad: {
-            mode: "auto",
-            prefix_padding_ms: 300,
-            silence_duration_ms: 500,
-          },
-          stt: {
-            vendor: "deepgram",
-            model: "nova-3",
-            language: "en",
-          },
-          llm: {
-            vendor: "openai",
-            model: "gpt-4o",
-            system_prompt: systemPrompt,
-            greeting: greeting,
-            temperature: 0.6,
-            max_history: 30,
-          },
-          tts: {
-            vendor: "cartesia",
-            model: "sonic-english",
-            voice_id: "a0e99841-438c-4a64-b679-ae501e7d6091",
-          },
+      ],
+      greeting_message: greeting,
+      params: {
+        model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+        temperature: 0.6,
+      },
+    };
+  } else {
+    throw new Error(
+      "Missing LLM API key in .env. Please configure GEMINI_API_KEY or OPENAI_API_KEY for the Conversational AI Agent."
+    );
+  }
+
+  // 7. Configure ASR & TTS
+  const asrVendor = process.env.AGORA_ASR_VENDOR || "ares";
+  const asrConfig: any = {
+    language: "en-US",
+    vendor: asrVendor,
+  };
+  if (asrVendor === "deepgram" && process.env.DEEPGRAM_API_KEY) {
+    asrConfig.params = {
+      api_key: process.env.DEEPGRAM_API_KEY.trim(),
+      model: "nova-3",
+    };
+  }
+
+  let ttsConfig: any = null;
+  if (process.env.CARTESIA_API_KEY) {
+    ttsConfig = {
+      vendor: "cartesia",
+      params: {
+        api_key: process.env.CARTESIA_API_KEY.trim(),
+        model_id: "sonic-english",
+        voice: {
+          mode: "id",
+          id: process.env.CARTESIA_VOICE_ID || "a0e99841-438c-4a64-b679-ae501e7d6091",
         },
-      }),
-    }
-  );
+      },
+    };
+  } else if (process.env.ELEVENLABS_API_KEY) {
+    ttsConfig = {
+      vendor: "elevenlabs",
+      params: {
+        key: process.env.ELEVENLABS_API_KEY.trim(),
+        voice_id: process.env.ELEVENLABS_VOICE_ID || "21m00Tcm4TlvDq8ikWAM",
+        model_id: "eleven_turbo_v2_5",
+      },
+    };
+  } else if (process.env.MICROSOFT_TTS_KEY) {
+    ttsConfig = {
+      vendor: "microsoft",
+      params: {
+        key: process.env.MICROSOFT_TTS_KEY.trim(),
+        region: process.env.MICROSOFT_TTS_REGION || "eastus",
+        voice_name: process.env.MICROSOFT_TTS_VOICE || "en-US-JennyMultilingualNeural",
+      },
+    };
+  } else if (openaiApiKey) {
+    ttsConfig = {
+      vendor: "openai",
+      params: {
+        api_key: openaiApiKey,
+        model: "tts-1",
+        voice: "alloy",
+      },
+    };
+  } else {
+    ttsConfig = {
+      vendor: "microsoft",
+      params: {
+        voice_name: "en-US-JennyMultilingualNeural",
+      },
+    };
+  }
+
+  console.log(`[Agora Gateway] Dispatching agent start (v2) to channel: ${channelName}`);
+
+  const joinUrl = `https://api.agora.io/api/conversational-ai-agent/v2/projects/${appId}/join`;
+  const response = await fetch(joinUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: authHeader,
+    },
+    body: JSON.stringify({
+      name: `kyron-realty-${propertyRecord?.slug || "listing"}-${Date.now()}`,
+      properties: {
+        channel: channelName,
+        token: agentTokenData.token,
+        agent_rtc_uid: String(agentUid),
+        remote_rtc_uids: [String(userUid)],
+        idle_timeout: 120,
+        asr: asrConfig,
+        llm: llmConfig,
+        tts: ttsConfig,
+        vad: {
+          mode: "auto",
+          prefix_padding_ms: 300,
+          silence_duration_ms: 500,
+        },
+      },
+    }),
+  });
 
   if (!response.ok) {
     const errorBody = await response.text();
@@ -214,7 +312,7 @@ RULES OF ENGAGEMENT:
   }
 
   const json = await response.json();
-  const remoteAgentId = json.data?.agent_id || json.agent_id || voiceSessionId;
+  const remoteAgentId = json.agent_id || json.data?.agent_id || voiceSessionId;
 
   return {
     success: true,
@@ -230,31 +328,36 @@ RULES OF ENGAGEMENT:
 }
 
 /**
- * Stops an active Agora Conversational AI Agent session.
+ * Stops an active Agora Conversational AI Agent session (v2 API).
  */
 export async function stopAgoraAgentSession(sessionId: string, channelName: string) {
   const appId = process.env.AGORA_APP_ID || process.env.NEXT_PUBLIC_AGORA_APP_ID;
+  const customerId = process.env.AGORA_CUSTOMER_ID?.trim();
+  const customerSecret = process.env.AGORA_CUSTOMER_SECRET?.trim();
   const apiKey = process.env.AGORA_CONVERSATIONAL_AI_API_KEY || process.env.AGORA_API_KEY;
 
-  if (appId && apiKey) {
-    try {
-      const authHeader = apiKey.startsWith("Basic ") || apiKey.startsWith("Bearer ")
-        ? apiKey
-        : (apiKey.includes(":") ? `Basic ${Buffer.from(apiKey).toString("base64")}` : `Basic ${apiKey}`);
+  let authHeader = "";
+  if (customerId && customerSecret) {
+    authHeader = `Basic ${Buffer.from(`${customerId}:${customerSecret}`).toString("base64")}`;
+  } else if (apiKey && apiKey.trim() !== "") {
+    authHeader = apiKey.startsWith("Basic ") || apiKey.startsWith("Bearer ")
+      ? apiKey
+      : (apiKey.includes(":") ? `Basic ${Buffer.from(apiKey.trim()).toString("base64")}` : `Basic ${apiKey.trim()}`);
+  }
 
-      await fetch(
-        `https://api.agora.io/v1/projects/${appId}/rtm/conversational-ai/agents/${sessionId}/stop`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: authHeader,
-          },
-          body: JSON.stringify({ channel: channelName }),
-        }
-      );
+  if (appId && authHeader) {
+    try {
+      const leaveUrl = `https://api.agora.io/api/conversational-ai-agent/v2/projects/${appId}/agents/${sessionId}/leave`;
+      await fetch(leaveUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: authHeader,
+        },
+        body: JSON.stringify({ channel: channelName }),
+      });
     } catch (e) {
-      console.warn("[Agora Gateway] Stop request warning:", e);
+      console.warn("[Agora Gateway] Leave request warning:", e);
     }
   }
 
