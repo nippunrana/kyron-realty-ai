@@ -7,11 +7,15 @@ Kyron Realty AI is a modern real estate intelligence platform integrating AI cap
 
 ## 1. Single Sources of Truth (Read Directly)
 Before writing or modifying features, consult the canonical source files and their dedicated system docs:
-- **Design System & UI Tokens**: [docs/systems/design-system.md](file:///var/www/egnitech.com/html/wp-content/projects/kyron-realty-ai/docs/systems/design-system.md) & [src/app/globals.css](file:///var/www/egnitech.com/html/wp-content/projects/kyron-realty-ai/src/app/globals.css)
-- **Auth & Session System**: [docs/systems/auth.md](file:///var/www/egnitech.com/html/wp-content/projects/kyron-realty-ai/docs/systems/auth.md) & [src/auth.ts](file:///var/www/egnitech.com/html/wp-content/projects/kyron-realty-ai/src/auth.ts)
-- **Database & Schemas**: [docs/systems/database.md](file:///var/www/egnitech.com/html/wp-content/projects/kyron-realty-ai/docs/systems/database.md) & [src/db/schema.ts](file:///var/www/egnitech.com/html/wp-content/projects/kyron-realty-ai/src/db/schema.ts)
-- **Architecture & Subpath Hosting**: [docs/systems/architecture-and-basepath.md](file:///var/www/egnitech.com/html/wp-content/projects/kyron-realty-ai/docs/systems/architecture-and-basepath.md)
-- **VPS Infrastructure**: [docs/server-config.md](file:///var/www/egnitech.com/html/wp-content/projects/kyron-realty-ai/docs/server-config.md)
+- **Design System & UI Tokens**: [docs/systems/design-system.md](docs/systems/design-system.md) & [src/app/globals.css](src/app/globals.css)
+- **Auth & Session System**: [docs/systems/auth.md](docs/systems/auth.md) & [src/auth.ts](src/auth.ts)
+- **Database & Schemas**: [docs/systems/database.md](docs/systems/database.md), [docs/plan/03-database-schema.md](docs/plan/03-database-schema.md) & [src/db/schema.ts](src/db/schema.ts)
+- **Voice Agent & Agora SD-RTN**: [docs/systems/voice-agent-and-agora.md](docs/systems/voice-agent-and-agora.md)
+- **Property Onboarding & Apify**: [docs/systems/property-onboarding-and-apify.md](docs/systems/property-onboarding-and-apify.md)
+- **Public Listings & Leads**: [docs/systems/public-listings-and-leads.md](docs/systems/public-listings-and-leads.md)
+- **Master Plan & Architecture**: [docs/plan/](docs/plan/)
+- **Architecture & Subpath Hosting**: [docs/systems/architecture-and-basepath.md](docs/systems/architecture-and-basepath.md)
+- **VPS Infrastructure**: [docs/server-config.md](docs/server-config.md)
 
 ---
 
@@ -20,13 +24,14 @@ To prevent duplicate code or assuming features that do not yet exist:
 
 | System / Feature | Status | System Spec | Code Location | Notes |
 | :--- | :--- | :--- | :--- | :--- |
-| **Authentication** | Built | [auth.md](file:///var/www/egnitech.com/html/wp-content/projects/kyron-realty-ai/docs/systems/auth.md) | `src/app/login/page.tsx`, `src/auth.ts`, `src/app/api/auth/` | NextAuth credentials + Google OAuth fallback flow |
-| **User Dashboard** | Built | [architecture-and-basepath.md](file:///var/www/egnitech.com/html/wp-content/projects/kyron-realty-ai/docs/systems/architecture-and-basepath.md) | `src/app/dashboard/page.tsx`, `src/components/dashboard/` | Protected workspace with header, logout, and empty-state modules |
-| **Landing Page** | Built | [architecture-and-basepath.md](file:///var/www/egnitech.com/html/wp-content/projects/kyron-realty-ai/docs/systems/architecture-and-basepath.md) | `src/app/page.tsx` | Hero, social proof counter, waitlist form, feature highlights |
-| **Database Pool & ORM**| Built | [database.md](file:///var/www/egnitech.com/html/wp-content/projects/kyron-realty-ai/docs/systems/database.md) | `src/db/index.ts`, `src/db/schema.ts` | Drizzle ORM + PostgreSQL 17 pool connection |
-| **Design System** | Built | [design-system.md](file:///var/www/egnitech.com/html/wp-content/projects/kyron-realty-ai/docs/systems/design-system.md) | `src/app/globals.css` | Dual-pane light/midnight luxury dark system |
-| **Property Valuation / AI Pipelines** | Roadmap | *Pending* | Future backend services | Live MLS ingestion & automated ML valuation models |
-| **Voice Agent / Agora Real-Time** | Roadmap | *Pending* (see `docs/pitch/`) | Future voice module | Voice SDK integration planned for subsequent phase |
+| **Authentication** | Built | [auth.md](docs/systems/auth.md) | `src/app/login/page.tsx`, `src/auth.ts`, `src/app/api/auth/` | NextAuth credentials + Google OAuth fallback flow |
+| **User Dashboard** | Built | [architecture-and-basepath.md](docs/systems/architecture-and-basepath.md) | `src/app/dashboard/page.tsx`, `src/components/dashboard/` | Protected workspace with header, logout, and active inventory |
+| **Landing Page** | Built | [architecture-and-basepath.md](docs/systems/architecture-and-basepath.md) | `src/app/page.tsx` | Hero, social proof counter, waitlist form, feature highlights |
+| **Database Pool & ORM**| Built | [database.md](docs/systems/database.md) | `src/db/index.ts`, `src/db/schema.ts` | Drizzle ORM + PostgreSQL 17 pool connection (13 tables) |
+| **Design System** | Built | [design-system.md](docs/systems/design-system.md) | `src/app/globals.css` | Dual-pane light/midnight luxury dark system |
+| **Voice Agent / Agora Real-Time** | Built | [voice-agent-and-agora.md](docs/systems/voice-agent-and-agora.md) | `src/app/api/agora/`, `src/hooks/`, `src/components/voice/` | Agora Conversational AI Cloud Gateway + WebRTC client |
+| **Conversational Onboarding & Apify**| Built | [property-onboarding-and-apify.md](docs/systems/property-onboarding-and-apify.md) | `src/app/dashboard/properties/new`, `src/lib/apify-crawler.ts` | Split-screen studio + Apify crawler + KB synthesizer |
+| **Public Listing & QR Sales Agent** | Built | [public-listings-and-leads.md](docs/systems/public-listings-and-leads.md) | `src/app/listings/[slug]`, `src/app/api/leads/` | QR Code generator, Voice Sales Modal, Tour booking |
 
 ---
 
