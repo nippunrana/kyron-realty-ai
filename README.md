@@ -23,7 +23,7 @@ Next-generation real estate intelligence platform powered by Next.js 16, Postgre
 1. **Clone the repository:**
    ```bash
    git clone https://github.com/nippunrana/agora-realty-ai.git
-   cd agora-realty-ai
+   cd kyron-realty-ai
    ```
 
 2. **Install dependencies:**
@@ -89,7 +89,7 @@ npm run db:studio
 - **PM2 Commands**:
   ```bash
   pm2 status
-  pm2 logs agora-realty-ai
+  pm2 logs kyron-realty-ai
   pm2 reload ecosystem.config.cjs
   ```
 - **Nginx Setup**:

@@ -13,7 +13,7 @@ This document outlines the server environment, network rules, PostgreSQL 17 isol
 - **PostgreSQL**: `17.10`
 - **Nginx**: `1.28.0`
 - **PM2**: `6.0.14`
-- **Project Directory**: `/var/www/egnitech.com/html/wp-content/projects/agora-realty-ai`
+- **Project Directory**: `/var/www/egnitech.com/html/wp-content/projects/kyron-realty-ai`
 
 ---
 
@@ -178,8 +178,7 @@ module.exports = {
 ```
 Then restart PM2:
 ```bash
-pm2 delete agora-realty-ai
+pm2 delete kyron-realty-ai
 pm2 start ecosystem.config.cjs
 pm2 save
 ```
-

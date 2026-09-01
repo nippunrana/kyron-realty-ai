@@ -1,4 +1,4 @@
-# Example Nginx Reverse Proxy Configuration for Agora Realty AI
+# Example Nginx Reverse Proxy Configuration for Kyron Realty AI
 # Place or include in /etc/nginx/sites-available/your-domain.com and symlink to sites-enabled/
 
 server {
@@ -10,14 +10,14 @@ server {
 
     # Static assets cache optimization
     location /_next/static {
-        alias /var/www/egnitech.com/html/wp-content/projects/agora-realty-ai/.next/static;
+        alias /var/www/egnitech.com/html/wp-content/projects/kyron-realty-ai/.next/static;
         expires 365d;
         access_log off;
     }
 
     # Public static files
     location /public {
-        alias /var/www/egnitech.com/html/wp-content/projects/agora-realty-ai/public;
+        alias /var/www/egnitech.com/html/wp-content/projects/kyron-realty-ai/public;
         expires 30d;
         access_log off;
     }
