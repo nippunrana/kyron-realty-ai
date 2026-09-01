@@ -27,6 +27,9 @@ cp -r .next/static .next/standalone/.next/
 if [ -d public ]; then
   cp -r public .next/standalone/
 fi
+if [ -f .env ]; then
+  cp .env .next/standalone/
+fi
 
 echo "🔄 Reloading PM2 application with zero downtime..."
 if pm2 describe kyron-realty-ai > /dev/null 2>&1; then
