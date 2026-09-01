@@ -12,6 +12,7 @@ const googleClientSecret = (process.env.AUTH_GOOGLE_SECRET || process.env.GOOGLE
 const isGoogleConfigured = Boolean(googleClientId && googleClientSecret);
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  basePath: "/projects/kyron-realty-ai/api/auth",
   adapter: DrizzleAdapter(db, {
     usersTable: users,
     accountsTable: accounts,
