@@ -21,6 +21,7 @@ To prevent duplicate code or assuming features that do not yet exist:
 | System / Feature | Status | System Spec | Code Location | Notes |
 | :--- | :--- | :--- | :--- | :--- |
 | **Authentication** | Built | [auth.md](file:///var/www/egnitech.com/html/wp-content/projects/kyron-realty-ai/docs/systems/auth.md) | `src/app/login/page.tsx`, `src/auth.ts`, `src/app/api/auth/` | NextAuth credentials + Google OAuth fallback flow |
+| **User Dashboard** | Built | [architecture-and-basepath.md](file:///var/www/egnitech.com/html/wp-content/projects/kyron-realty-ai/docs/systems/architecture-and-basepath.md) | `src/app/dashboard/page.tsx`, `src/components/dashboard/` | Protected workspace with header, logout, and empty-state modules |
 | **Landing Page** | Built | [architecture-and-basepath.md](file:///var/www/egnitech.com/html/wp-content/projects/kyron-realty-ai/docs/systems/architecture-and-basepath.md) | `src/app/page.tsx` | Hero, social proof counter, waitlist form, feature highlights |
 | **Database Pool & ORM**| Built | [database.md](file:///var/www/egnitech.com/html/wp-content/projects/kyron-realty-ai/docs/systems/database.md) | `src/db/index.ts`, `src/db/schema.ts` | Drizzle ORM + PostgreSQL 17 pool connection |
 | **Design System** | Built | [design-system.md](file:///var/www/egnitech.com/html/wp-content/projects/kyron-realty-ai/docs/systems/design-system.md) | `src/app/globals.css` | Dual-pane light/midnight luxury dark system |

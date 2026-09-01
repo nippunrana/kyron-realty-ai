@@ -129,7 +129,7 @@ function LoginFormContent() {
           setSuccessMsg("Account created successfully. Please sign in with your credentials.");
           setIsLoading(false);
         } else {
-          router.push("/");
+          router.push("/dashboard");
           router.refresh();
         }
       } else {
@@ -146,8 +146,8 @@ function LoginFormContent() {
           return;
         }
 
-        setSuccessMsg("Sign in successful! Redirecting...");
-        router.push("/");
+        setSuccessMsg("Sign in successful! Redirecting to dashboard...");
+        router.push("/dashboard");
         router.refresh();
       }
     } catch (err) {
@@ -170,7 +170,7 @@ function LoginFormContent() {
 
     setIsGoogleLoading(true);
     try {
-      await signIn("google", { callbackUrl: `${BASE_PATH}/` });
+      await signIn("google", { callbackUrl: `${BASE_PATH}/dashboard` });
     } catch {
       setErrorMsg("Unable to connect to Google OAuth. Please verify credentials in .env.");
       setIsGoogleLoading(false);
