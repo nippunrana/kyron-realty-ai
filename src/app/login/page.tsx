@@ -178,13 +178,13 @@ function LoginFormContent() {
     <div className="min-h-screen flex flex-col justify-between p-6 sm:p-10 lg:p-12 max-w-lg mx-auto lg:max-w-none lg:w-full">
       {/* Top Bar / Logo */}
       <div className="flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-3 group" aria-label="Agora Realty AI Homepage">
+        <Link href="/" className="flex items-center gap-3 group" aria-label="Kyron Realty AI Homepage">
           <div className="p-2 rounded-xl bg-blue-600 text-white shadow-md shadow-blue-500/20 group-hover:bg-blue-700 transition-colors">
             <Building2 className="w-5 h-5" aria-hidden="true" />
           </div>
           <div className="flex items-center gap-2">
             <span className="text-lg font-bold tracking-tight text-slate-900">
-              Agora Realty
+              Kyron Realty
             </span>
             <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-50 text-blue-700 border border-blue-200">
               AI
@@ -441,7 +441,7 @@ function LoginFormContent() {
               </>
             ) : (
               <>
-                <span>{mode === "signin" ? "Sign In to Agora" : "Create Account"}</span>
+                <span>{mode === "signin" ? "Sign In to Kyron" : "Create Account"}</span>
                 <ArrowRight className="w-4 h-4" aria-hidden="true" />
               </>
             )}

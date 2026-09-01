@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Agora Realty AI | Next-Gen Real Estate Intelligence",
-  description: "Join the private waitlist for Agora Realty AI. Instant predictive valuations, neighborhood yield forecasting, and algorithmic deal matching.",
+  title: "Kyron Realty AI | Next-Gen Real Estate Intelligence",
+  description: "Join the private waitlist for Kyron Realty AI. Instant predictive valuations, neighborhood yield forecasting, and algorithmic deal matching.",
 };
 
 export default function RootLayout({

@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: "agora-realty-ai",
+      name: "kyron-realty-ai",
       script: "./.next/standalone/server.js",
       instances: "max",
       exec_mode: "cluster",

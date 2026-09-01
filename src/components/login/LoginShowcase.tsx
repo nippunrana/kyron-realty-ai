@@ -11,7 +11,7 @@ export function LoginShowcase() {
       <div className="flex items-center justify-between">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/90 border border-slate-200/90 text-xs font-semibold text-slate-700 shadow-sm backdrop-blur-sm">
           <Sparkles className="w-3.5 h-3.5 text-blue-600" aria-hidden="true" />
-          <span>Agora Intelligence Cloud™</span>
+          <span>Kyron Intelligence Cloud™</span>
         </div>
         <span className="text-xs font-medium text-slate-500">v1.0 Institutional Edition</span>
       </div>
@@ -80,7 +80,7 @@ export function LoginShowcase() {
             ))}
           </div>
           <p className="text-xs text-slate-700 italic leading-relaxed">
-            &ldquo;Agora gives our acquisitions team an unfair advantage in identifying undervalued off-market assets before the broader market catches on.&rdquo;
+            &ldquo;Kyron gives our acquisitions team an unfair advantage in identifying undervalued off-market assets before the broader market catches on.&rdquo;
           </p>
           <div className="mt-3 flex items-center justify-between text-[11px]">
             <div>

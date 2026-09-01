@@ -5,6 +5,6 @@ export default defineConfig({
   out: "./src/db/migrations",
   dialect: "postgresql",
   dbCredentials: {
-    url: process.env.DATABASE_URL || "postgres://postgres:postgres@localhost:5432/agora_realty",
+    url: process.env.DATABASE_URL || "postgres://postgres:postgres@localhost:5432/kyron_realty_ai",
   },
 });

@@ -1,6 +1,6 @@
-# Agora Realty AI
+# Kyron Realty AI
 
-Next-generation real estate intelligence platform powered by Next.js 16, PostgreSQL 17, Drizzle ORM, and automated AI valuations.
+Next-generation real estate intelligence platform powered by Next.js 16, PostgreSQL 17, Drizzle ORM, real-time voice agents, and automated AI valuations.
 
 ---
 

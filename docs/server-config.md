@@ -1,6 +1,6 @@
 # VPS Server & Database Infrastructure Configuration
 
-This document outlines the server environment, network rules, PostgreSQL 17 isolation, PM2 configuration, and CI/CD workflow for **Agora Realty AI**.
+This document outlines the server environment, network rules, PostgreSQL 17 isolation, PM2 configuration, and CI/CD workflow for **Kyron Realty AI**.
 
 ---
 
@@ -20,19 +20,19 @@ This document outlines the server environment, network rules, PostgreSQL 17 isol
 ## 🗄️ PostgreSQL 17 Configuration
 
 ### Database & User Details
-- **Database**: `agora_realty_ai`
-- **User**: `agora_realty_ai_user`
+- **Database**: `kyron_realty_ai`
+- **User**: `kyron_realty_ai_user`
 - **Port**: `5432`
 
 ### Security & Multi-Tenant Isolation
 The server hosts multiple applications. PostgreSQL is configured with strict per-database access control in `/etc/postgresql/17/main/pg_hba.conf`:
 
 ```text
-# Allow remote access exclusively for agora_realty_ai
-host    agora_realty_ai   agora_realty_ai_user   all             scram-sha-256
+# Allow remote access exclusively for kyron_realty_ai
+host    kyron_realty_ai   kyron_realty_ai_user   all             scram-sha-256
 ```
 
-> **Isolation Guarantee**: Only `agora_realty_ai_user` can authenticate to `agora_realty_ai` remotely. All other databases on this server (`dosiqai_app`, `gullyvision`, `truinterview`, `n8n`, etc.) remain 100% locked to `127.0.0.1` (localhost only).
+> **Isolation Guarantee**: Only `kyron_realty_ai_user` can authenticate to `kyron_realty_ai` remotely. All other databases on this server (`dosiqai_app`, `gullyvision`, `truinterview`, `n8n`, etc.) remain 100% locked to `127.0.0.1` (localhost only).
 
 ### Connection Strings Templates
 
@@ -41,7 +41,7 @@ host    agora_realty_ai   agora_realty_ai_user   all             scram-sha-256
 
 #### 1. On Local Development Machine (`.env`)
 ```env
-DATABASE_URL="postgres://agora_realty_ai_user:<YOUR_DB_PASSWORD>@72.60.26.200:5432/agora_realty_ai"
+DATABASE_URL="postgres://kyron_realty_ai_user:<YOUR_DB_PASSWORD>@72.60.26.200:5432/kyron_realty_ai"
 NODE_ENV="development"
 PORT=3000
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
@@ -49,7 +49,7 @@ NEXT_PUBLIC_APP_URL="http://localhost:3000"
 
 #### 2. On VPS Production Server (`.env`)
 ```env
-DATABASE_URL="postgres://agora_realty_ai_user:<YOUR_DB_PASSWORD>@localhost:5432/agora_realty_ai"
+DATABASE_URL="postgres://kyron_realty_ai_user:<YOUR_DB_PASSWORD>@localhost:5432/kyron_realty_ai"
 NODE_ENV="production"
 PORT=3000
 NEXT_PUBLIC_APP_URL="https://your-domain.com"
@@ -67,14 +67,14 @@ Next.js is compiled with `output: 'standalone'` and managed by PM2 via `ecosyste
 pm2 status
 
 # Monitor logs
-pm2 logs agora-realty-ai
+pm2 logs kyron-realty-ai
 
 # Reload application with zero downtime
 pm2 reload ecosystem.config.cjs --update-env
 
 # Restart / Stop
-pm2 restart agora-realty-ai
-pm2 stop agora-realty-ai
+pm2 restart kyron-realty-ai
+pm2 stop kyron-realty-ai
 ```
 
 ---
@@ -90,14 +90,14 @@ server {
 
     # Static assets cache
     location /_next/static {
-        alias /var/www/egnitech.com/html/wp-content/projects/agora-realty-ai/.next/static;
+        alias /var/www/egnitech.com/html/wp-content/projects/kyron-realty-ai/.next/static;
         expires 365d;
         access_log off;
     }
 
     # Public static files
     location /public {
-        alias /var/www/egnitech.com/html/wp-content/projects/agora-realty-ai/public;
+        alias /var/www/egnitech.com/html/wp-content/projects/kyron-realty-ai/public;
         expires 30d;
         access_log off;
     }
@@ -137,3 +137,49 @@ Navigate to **GitHub Repository** → **Settings** → **Secrets and variables**
 - **`VPS_USERNAME`**: `root` (or your deployment SSH user)
 - **`VPS_SSH_KEY`**: Your private SSH key
 - **`VPS_PORT`**: `22`
+
+---
+
+## 🔄 Optional: Infrastructure Migration Guide (`agora_realty_ai` → `kyron_realty_ai`)
+
+If you want to align backend database names and PM2 process IDs with the **Kyron Realty AI** branding, follow these steps:
+
+### 1. Rename PostgreSQL Database & User (Optional)
+On the VPS via `sudo -u postgres psql`:
+```sql
+-- Rename database
+ALTER DATABASE agora_realty_ai RENAME TO kyron_realty_ai;
+
+-- Rename user (if desired)
+ALTER USER agora_realty_ai_user RENAME TO kyron_realty_ai_user;
+```
+
+Update `/etc/postgresql/17/main/pg_hba.conf`:
+```text
+host    kyron_realty_ai   kyron_realty_ai_user   all             scram-sha-256
+```
+Then reload PostgreSQL:
+```bash
+sudo systemctl reload postgresql
+```
+
+### 2. Update PM2 Process Name
+In `ecosystem.config.cjs`:
+```javascript
+module.exports = {
+  apps: [
+    {
+      name: "kyron-realty-ai",
+      script: ".next/standalone/server.js",
+      ...
+    }
+  ]
+};
+```
+Then restart PM2:
+```bash
+pm2 delete agora-realty-ai
+pm2 start ecosystem.config.cjs
+pm2 save
+```
+

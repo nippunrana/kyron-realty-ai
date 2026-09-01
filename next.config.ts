@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
-  basePath: "/projects/agora-realty-ai",
+  basePath: "/projects/kyron-realty-ai",
   reactStrictMode: true,
 };
 

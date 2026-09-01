@@ -1,11 +1,11 @@
-# Project Context: Agora Realty AI
+# Project Context: Kyron Realty AI
 
 ## Overview
-Agora Realty AI is a modern real estate intelligence platform integrating AI capabilities for property analytics, automated valuations, and real estate workflow automation.
+Kyron Realty AI is a modern real estate intelligence platform integrating AI capabilities for property analytics, automated valuations, real estate workflow automation, and real-time voice agents (powered by Agora Voice SDK for STT/TTS).
 
 ## Technology Stack & Versions
 - **Framework**: Next.js 16 (v16.3.3) with App Router, Turbopack, React 19, TypeScript
-- **Database**: PostgreSQL 17 (DB: `agora_realty_ai`, User: `agora_realty_ai_user`)
+- **Database**: PostgreSQL 17 (DB: `kyron_realty_ai`, User: `kyron_realty_ai_user`)
 - **ORM**: Drizzle ORM (v0.40.x) + `postgres.js`
 - **Styling**: Tailwind CSS v4 + Lucide React
 - **Process Manager**: PM2 (`ecosystem.config.cjs` standalone output)
@@ -24,7 +24,7 @@ Agora Realty AI is a modern real estate intelligence platform integrating AI cap
 
 ## Development & Deployment Guidelines
 - **Database Connectivity**:
-  - **Local Machine Dev**: Connects remotely via `72.60.26.200:5432` to the isolated `agora_realty_ai` database.
+  - **Local Machine Dev**: Connects remotely via `72.60.26.200:5432` to the isolated `kyron_realty_ai` database.
   - **VPS Production**: Connects internally via `localhost:5432`.
 - **Zero Secrets in Git**: Sensitive keys and database passwords must only reside in `.env`.
 - **Standalone Build**: `next.config.ts` uses `output: 'standalone'` for minimal VPS memory footprint.

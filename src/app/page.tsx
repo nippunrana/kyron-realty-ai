@@ -59,7 +59,7 @@ export default function Home() {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-lg font-bold tracking-tight text-slate-900">
-              Agora Realty
+              Kyron Realty
             </span>
             <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-50 text-blue-700 border border-blue-200">
               AI
@@ -324,12 +324,12 @@ export default function Home() {
         <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
           <div className="flex items-center gap-2">
             <Building2 className="w-4 h-4 text-blue-600" />
-            <span className="font-semibold text-slate-800">Agora Realty AI</span>
+            <span className="font-semibold text-slate-800">Kyron Realty AI</span>
             <span>— Next-generation real estate intelligence.</span>
           </div>
 
           <div className="flex items-center gap-6">
-            <span>&copy; {new Date().getFullYear()} Agora Realty AI. All rights reserved.</span>
+            <span>&copy; {new Date().getFullYear()} Kyron Realty AI. All rights reserved.</span>
           </div>
         </div>
       </footer>
