@@ -15,7 +15,7 @@ npm ci --legacy-peer-deps || npm install
 
 echo "🛠️ Generating database migrations & applying (if any)..."
 if [ -f .env ] && grep -q "DATABASE_URL" .env; then
-  npx drizzle-kit push || echo "Database sync skipped or already up to date"
+  npx drizzle-kit migrate || echo "Database sync skipped or already up to date"
 fi
 
 echo "🏗️ Building Next.js application..."

@@ -62,6 +62,6 @@ The application runs under the subpath prefix **`/projects/kyron-realty-ai`**:
   - **VPS Production**: Connects internally via `localhost:5432`.
 - **Zero Secrets in Git**: Sensitive keys and database passwords must only reside in `.env`.
 - **Standalone Build**: `next.config.ts` uses `output: 'standalone'` for minimal VPS memory footprint.
-- **Database Migrations**: Always manage schema changes through `src/db/schema.ts` and `drizzle-kit push`.
+- **Database Migrations**: Always manage schema changes through `src/db/schema.ts`, generate migrations with `npm run db:generate`, and apply via `drizzle-kit migrate` (automated in CI/CD).
 - **CI/CD**: Pushes to `main` automatically trigger GitHub Actions to deploy to the VPS with zero downtime.
 
