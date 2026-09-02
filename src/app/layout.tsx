@@ -3,8 +3,8 @@ import { AuthProvider } from "@/components/providers/AuthProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Kyron Realty AI | Next-Gen Real Estate Intelligence",
-  description: "Join the private waitlist for Kyron Realty AI. Instant predictive valuations, neighborhood yield forecasting, and algorithmic deal matching.",
+  title: "Kyron Realty AI | 24/7 Autonomous Voice AI Leasing & Sales Associate",
+  description: "Never lose a high-value lead to voicemail again. Sub-300ms real-time voice, dynamic concession negotiation, and instant tour booking powered by Agora SD-RTN.",
 };
 
 export default function RootLayout({

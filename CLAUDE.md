@@ -129,3 +129,13 @@ Before considering a task done, verify:
 - **Questions asked first**: Ambiguity was clarified before implementing, not discovered after.
 - **Documentation synced**: If `ai-context.md` exists *and* a new feature, model, or route was built, the Built Systems table and `docs/systems/` were updated — and named in the summary.
 - **Senior Engineer Test**: The solution is the simplest one that solves the problem — nothing speculative was added.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

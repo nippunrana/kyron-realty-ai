@@ -26,7 +26,7 @@ To prevent duplicate code or assuming features that do not yet exist:
 | :--- | :--- | :--- | :--- | :--- |
 | **Authentication** | Built | [auth.md](docs/systems/auth.md) | `src/app/login/page.tsx`, `src/auth.ts`, `src/app/api/auth/` | NextAuth credentials + Google OAuth fallback flow |
 | **User Dashboard** | Built | [architecture-and-basepath.md](docs/systems/architecture-and-basepath.md) | `src/app/dashboard/page.tsx`, `src/components/dashboard/` | Protected workspace with header, logout, and active inventory |
-| **Landing Page** | Built | [architecture-and-basepath.md](docs/systems/architecture-and-basepath.md) | `src/app/page.tsx` | Hero, social proof counter, waitlist form, feature highlights |
+| **Landing Page** | Built | [architecture-and-basepath.md](docs/systems/architecture-and-basepath.md) | `src/app/page.tsx`, `src/components/home/` | Light-mode luxury: Hero voice simulator, speed-to-lead comparison, 3-step engine, negotiation matrix, demo listing, Agora modal |
 | **Database Pool & ORM**| Built | [database.md](docs/systems/database.md) | `src/db/index.ts`, `src/db/schema.ts` | Drizzle ORM + PostgreSQL 17 pool connection (13 tables) |
 | **Design System** | Built | [design-system.md](docs/systems/design-system.md) | `src/app/globals.css` | Dual-pane light/midnight luxury dark system |
 | **Voice Agent / Agora Real-Time** | Built | [voice-agent-and-agora.md](docs/systems/voice-agent-and-agora.md) | `src/app/api/agora/`, `src/hooks/`, `src/components/voice/` | Agora Conversational AI Cloud Gateway + WebRTC client |
