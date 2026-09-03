@@ -5,106 +5,60 @@ import { ConversationalPanel } from "./ConversationalPanel";
 import { LivePropertyInspector } from "./LivePropertyInspector";
 import { PublishSuccessModal } from "./PublishSuccessModal";
 import { ExtractedPropertyPayload } from "@/lib/kb-extractor";
-import { ArrowLeft, Building2, Sparkles } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
-const initialDraftState: ExtractedPropertyPayload = {
+const emptyInitialDraftState: ExtractedPropertyPayload = {
   property: {
-    title: "Luxury 2-Bedroom Marina Loft with Golden Gate Views",
-    slug: "luxury-marina-loft-san-francisco",
-    description:
-      "Stunning high-floor residence featuring panoramic views, chef's kitchen, hardwood floors, in-unit laundry, and private outdoor balcony.",
-    listingType: "rent",
+    title: "",
+    slug: "",
+    description: "",
+    listingType: "" as any,
     propertyType: "apartment",
-    price: 3450,
-    securityDeposit: 3450,
+    price: 0,
+    securityDeposit: 0,
     minLeaseMonths: 12,
     hoaFeeMonthly: 0,
-    address: "250 Marina Boulevard",
-    unitNumber: "Unit 4B",
-    city: "San Francisco",
-    state: "CA",
-    zipCode: "94123",
+    address: "",
+    unitNumber: "",
+    city: "",
+    state: "",
+    zipCode: "",
     country: "USA",
-    bedrooms: 2,
-    bathrooms: 2.0,
-    sqft: 1150,
-    yearBuilt: 2021,
-    availableDate: "Immediate",
-    amenities: [
-      "In-unit Washer/Dryer",
-      "Dedicated Garage Parking",
-      "EV Charging",
-      "Private Balcony",
-      "Rooftop Terrace",
-    ],
-    features: ["Hardwood Flooring", "Quartz Countertops", "High Ceilings"],
-    coverImageUrl:
-      "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80",
-    images: [
-      "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80",
-      "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80",
-      "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1200&q=80",
-    ],
+    bedrooms: 0,
+    bathrooms: 0,
+    sqft: 0,
+    yearBuilt: 0,
+    amenities: [],
+    features: [],
+    coverImageUrl: "",
+    images: [],
   },
   knowledgeBase: {
     rawScrapedMarkdown: "",
-    synthesizedSalesPitch:
-      "Welcome to 250 Marina Boulevard! This home offers rare panoramic bay views, in-unit laundry, and private garage parking in one of the city's most walkable neighborhoods.",
-    neighborhoodSummary:
-      "Prime Marina location with a 98 WalkScore, steps away from Chestnut Street restaurants, cafes, and the waterfront.",
-    schoolDistrictInfo: "Top-rated San Francisco Unified School District.",
-    petPolicyDetail: "Dogs and cats welcome (under 50 lbs) with $500 pet deposit and $50/month pet rent.",
-    parkingDetail: "1 assigned underground garage parking stall with EV charger included.",
-    utilitiesDetail: "Water, sewer, and trash removal are covered. Tenant is responsible for electricity and internet.",
-    applicationProcess:
-      "Online application, 680+ credit score required, gross monthly income 2.5x rent.",
-    faqs: [
-      {
-        question: "What utilities are included in the rent?",
-        answer: "Water, trash, and sewer are included. Tenant pays electric and WiFi.",
-        category: "Policies & Rules",
-      },
-      {
-        question: "Is parking included?",
-        answer: "Yes, one assigned garage parking space with Level 2 EV charging is included.",
-        category: "Amenities & Specs",
-      },
-      {
-        question: "Is the price negotiable?",
-        answer: "We can discuss a 5% discount if you are open to an 18-month lease commitment.",
-        category: "Pricing & Lease",
-      },
-    ],
+    synthesizedSalesPitch: "",
+    neighborhoodSummary: "",
+    schoolDistrictInfo: "",
+    petPolicyDetail: "",
+    parkingDetail: "",
+    utilitiesDetail: "",
+    applicationProcess: "",
+    faqs: [],
     agentTone: "warm_professional",
-    greetingMessage:
-      "Hello! Thanks for checking out 250 Marina Boulevard. Are you looking to move in this month?",
+    greetingMessage: "",
   },
   negotiationMatrix: {
     allowNegotiation: true,
-    targetPrice: 3450,
-    minFloorPrice: 3250,
+    targetPrice: 0,
+    minFloorPrice: 0,
     maxAllowedDiscountPct: 5.0,
-    concessionRules: [
-      {
-        condition: "18_month_lease",
-        concession: "5% discount on monthly rent ($3,277/mo)",
-        maxConcessionValue: 173,
-        requiresApproval: false,
-      },
-      {
-        condition: "move_in_under_7_days",
-        concession: "Waived first month parking fee ($200 value)",
-        maxConcessionValue: 200,
-        requiresApproval: false,
-      },
-    ],
-    notesForAgent: "Strictly adhere to the $3,250 floor price. Proactively offer tours for qualified callers.",
+    concessionRules: [],
+    notesForAgent: "",
   },
 };
 
 export function OnboardingStudio() {
-  const [data, setData] = useState<ExtractedPropertyPayload>(initialDraftState);
+  const [data, setData] = useState<ExtractedPropertyPayload>(emptyInitialDraftState);
   const [isProcessing, setIsProcessing] = useState(false);
   const [activePipelineStep, setActivePipelineStep] = useState<string | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
@@ -122,6 +76,27 @@ export function OnboardingStudio() {
     setData((prev) => ({
       ...prev,
       property: { ...prev.property, ...updates },
+      negotiationMatrix: updates.price
+        ? {
+            ...prev.negotiationMatrix,
+            targetPrice: updates.price,
+            minFloorPrice: Math.round(updates.price * 0.94),
+          }
+        : prev.negotiationMatrix,
+    }));
+  };
+
+  const handleQuickUpdate = (updates: Partial<ExtractedPropertyPayload["property"]>) => {
+    setData((prev) => ({
+      ...prev,
+      property: { ...prev.property, ...updates },
+      negotiationMatrix: updates.price
+        ? {
+            ...prev.negotiationMatrix,
+            targetPrice: updates.price,
+            minFloorPrice: Math.round(updates.price * 0.94),
+          }
+        : prev.negotiationMatrix,
     }));
   };
 
@@ -168,6 +143,7 @@ export function OnboardingStudio() {
           url,
           markdown: scrapedData?.markdown || "",
           existingImages: scrapedData?.images || [],
+          currentPropertyState: data,
         }),
       });
 
@@ -186,7 +162,7 @@ export function OnboardingStudio() {
   // Conversational Chat Update Handler
   const handleSendMessage = async (text: string) => {
     setIsProcessing(true);
-    setActivePipelineStep("Updating knowledge base & guardrails from your instructions...");
+    setActivePipelineStep("Updating knowledge base & guardrails with AI...");
 
     try {
       const res = await fetch(`${basePath}/api/onboarding/extract`, {
@@ -196,12 +172,26 @@ export function OnboardingStudio() {
           conversationText: text,
           markdown: data.knowledgeBase.rawScrapedMarkdown || "",
           existingImages: data.property.images,
+          currentPropertyState: data,
         }),
       });
 
       const json = await res.json();
       if (json.success && json.data) {
-        setData(json.data);
+        setData((prev) => ({
+          property: {
+            ...prev.property,
+            ...json.data.property,
+            price: json.data.property.price || prev.property.price,
+            bedrooms: json.data.property.bedrooms || prev.property.bedrooms,
+            bathrooms: json.data.property.bathrooms || prev.property.bathrooms,
+            sqft: json.data.property.sqft || prev.property.sqft,
+            address: json.data.property.address || prev.property.address,
+            listingType: json.data.property.listingType || prev.property.listingType,
+          },
+          knowledgeBase: json.data.knowledgeBase,
+          negotiationMatrix: json.data.negotiationMatrix,
+        }));
       }
     } catch (err) {
       console.error("Chat update error:", err);
@@ -279,8 +269,10 @@ export function OnboardingStudio() {
           <ConversationalPanel
             onIngestUrl={handleIngestUrl}
             onSendMessage={handleSendMessage}
+            onQuickUpdate={handleQuickUpdate}
             isProcessing={isProcessing}
             activePipelineStep={activePipelineStep}
+            currentProperty={data.property}
           />
         </div>
 

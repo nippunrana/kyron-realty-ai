@@ -18,6 +18,10 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { property, knowledgeBase, negotiationMatrix } = body || {};
 
+    if (property && !property.title && property.address) {
+      property.title = `${property.bedrooms ? `${property.bedrooms}-Bedroom ` : ""}Residence at ${property.address}`;
+    }
+
     if (!property || !property.title || !property.price || !property.address) {
       return NextResponse.json(
         { error: "Property title, price, and address are required." },

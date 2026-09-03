@@ -4,7 +4,7 @@ import { extractPropertyKnowledgeBase } from "@/lib/kb-extractor";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { markdown, conversationText, url, existingImages } = body || {};
+    const { markdown, conversationText, url, existingImages, currentPropertyState } = body || {};
 
     if (!markdown && !conversationText && !url) {
       return NextResponse.json(
@@ -18,6 +18,7 @@ export async function POST(req: NextRequest) {
       conversationText,
       url,
       existingImages,
+      currentPropertyState,
     });
 
     return NextResponse.json({
