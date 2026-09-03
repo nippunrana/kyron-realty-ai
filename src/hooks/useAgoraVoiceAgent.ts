@@ -49,25 +49,58 @@ export function useAgoraVoiceAgent(): UseAgoraVoiceAgentReturn {
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animFrameRef = useRef<number | null>(null);
+  const isStartingRef = useRef<boolean>(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "/projects/kyron-realty-ai";
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+      // Abort any in-flight startCall connection
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+      isStartingRef.current = false;
+
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+        animFrameRef.current = null;
+      }
       if (localAudioTrackRef.current) {
         localAudioTrackRef.current.stop();
         localAudioTrackRef.current.close();
+        localAudioTrackRef.current = null;
       }
       if (clientRef.current) {
-        clientRef.current.leave();
+        clientRef.current.leave().catch(() => {});
+        clientRef.current = null;
       }
-      if (audioContextRef.current) {
-        audioContextRef.current.close();
+      if (audioContextRef.current && audioContextRef.current.state !== "closed") {
+        audioContextRef.current.close().catch(() => {});
+        audioContextRef.current = null;
+      }
+
+      // If a session was active or initialized, tell server to stop it
+      if (sessionIdRef.current && channelNameRef.current) {
+        const sid = sessionIdRef.current;
+        const cname = channelNameRef.current;
+        sessionIdRef.current = null;
+        channelNameRef.current = null;
+        try {
+          fetch(`${basePath}/api/agora/session/stop`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sessionId: sid, channelName: cname }),
+            keepalive: true,
+          }).catch(() => {});
+        } catch {
+          // ignore background teardown error
+        }
       }
     };
-  }, []);
+  }, [basePath]);
 
   // Real-time Audio Frequency Visualizer Loop
   const startFrequencyVisualizer = (mediaStreamTrack?: MediaStreamTrack) => {
@@ -108,9 +141,23 @@ export function useAgoraVoiceAgent(): UseAgoraVoiceAgentReturn {
     }
   };
 
-  // Start Call
+  // Start Call (Single-flight protected)
   const startCall = useCallback(
     async (propertySlug?: string, propertyId?: number) => {
+      // Prevent duplicate or overlapping starts
+      if (isStartingRef.current) {
+        console.warn("[Agora Voice Agent] Call is already starting, ignoring duplicate startCall request.");
+        return;
+      }
+      isStartingRef.current = true;
+
+      // Create new abort controller for this call attempt
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      const abortController = new AbortController();
+      abortControllerRef.current = abortController;
+
       setErrorMessage(null);
       setCallState("connecting");
 
@@ -120,11 +167,29 @@ export function useAgoraVoiceAgent(): UseAgoraVoiceAgentReturn {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ propertySlug, propertyId }),
+          signal: abortController.signal,
         });
+
+        if (abortController.signal.aborted) return;
 
         const sessionData = await sessionRes.json();
         if (!sessionData.success) {
           throw new Error(sessionData.error || "Failed to initialize Agora Agent session.");
+        }
+
+        if (abortController.signal.aborted) {
+          // If aborted while fetching, stop the created remote session
+          if (sessionData.sessionId && sessionData.channelName) {
+            fetch(`${basePath}/api/agora/session/stop`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                sessionId: sessionData.sessionId,
+                channelName: sessionData.channelName,
+              }),
+            }).catch(() => {});
+          }
+          return;
         }
 
         const { channelName, token, userUid, agentUid, sessionId, greeting } = sessionData;
@@ -146,6 +211,8 @@ export function useAgoraVoiceAgent(): UseAgoraVoiceAgentReturn {
         // Step 2: Dynamic import of Agora RTC SDK (Browser only)
         const AgoraRTC = (await import("agora-rtc-sdk-ng")).default;
         AgoraRTC.setLogLevel(3); // Warnings & errors only
+
+        if (abortController.signal.aborted) return;
 
         const appId = (
           sessionData.appId ||
@@ -205,10 +272,22 @@ export function useAgoraVoiceAgent(): UseAgoraVoiceAgentReturn {
           ANS: true, // Automatic Noise Suppression
           AGC: true, // Automatic Gain Control
         });
+
+        if (abortController.signal.aborted) {
+          localAudioTrack.stop();
+          localAudioTrack.close();
+          return;
+        }
+
         localAudioTrackRef.current = localAudioTrack;
 
         // Step 4: Join RTC Channel and Publish Track
         await client.join(appId, channelName, token || null, userUid);
+        if (abortController.signal.aborted) {
+          await client.leave();
+          return;
+        }
+
         await client.publish(localAudioTrack);
 
         // Start local visualizer
@@ -217,9 +296,15 @@ export function useAgoraVoiceAgent(): UseAgoraVoiceAgentReturn {
 
         setCallState("connected");
       } catch (err: any) {
+        if (err.name === "AbortError" || abortController.signal.aborted) {
+          console.log("[Agora Voice Agent] Call startup aborted.");
+          return;
+        }
         console.error("Agora voice agent error:", err);
         setErrorMessage(err.message || "Failed to establish real-time voice call.");
         setCallState("error");
+      } finally {
+        isStartingRef.current = false;
       }
     },
     [basePath]
@@ -236,7 +321,17 @@ export function useAgoraVoiceAgent(): UseAgoraVoiceAgentReturn {
 
   // End Call
   const endCall = useCallback(async () => {
-    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    // Abort any in-progress startCall
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    isStartingRef.current = false;
+
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
+    }
 
     if (localAudioTrackRef.current) {
       localAudioTrackRef.current.stop();
@@ -245,18 +340,36 @@ export function useAgoraVoiceAgent(): UseAgoraVoiceAgentReturn {
     }
 
     if (clientRef.current) {
-      await clientRef.current.leave();
+      try {
+        await clientRef.current.leave();
+      } catch (e) {
+        console.warn("Error leaving Agora client:", e);
+      }
       clientRef.current = null;
     }
 
-    if (sessionIdRef.current && channelNameRef.current) {
+    if (audioContextRef.current && audioContextRef.current.state !== "closed") {
+      try {
+        await audioContextRef.current.close();
+      } catch (e) {
+        // ignore
+      }
+      audioContextRef.current = null;
+    }
+
+    const currentSessionId = sessionIdRef.current;
+    const currentChannelName = channelNameRef.current;
+    sessionIdRef.current = null;
+    channelNameRef.current = null;
+
+    if (currentSessionId && currentChannelName) {
       try {
         await fetch(`${basePath}/api/agora/session/stop`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            sessionId: sessionIdRef.current,
-            channelName: channelNameRef.current,
+            sessionId: currentSessionId,
+            channelName: currentChannelName,
           }),
         });
       } catch (e) {

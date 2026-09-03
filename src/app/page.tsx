@@ -123,11 +123,13 @@ export default function Home() {
       </main>
 
       {/* Live Voice Sales Modal for Agora Calls */}
-      <VoiceSalesAgentModal
-        isOpen={isCallModalOpen}
-        onClose={() => setIsCallModalOpen(false)}
-        property={demoProperty}
-      />
+      {isCallModalOpen && (
+        <VoiceSalesAgentModal
+          isOpen={isCallModalOpen}
+          onClose={() => setIsCallModalOpen(false)}
+          property={demoProperty}
+        />
+      )}
 
       {/* Footer */}
       <footer className="w-full border-t border-slate-200/80 bg-white/70 backdrop-blur-md py-10 mt-12">
