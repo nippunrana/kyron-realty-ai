@@ -266,9 +266,25 @@ RULES OF ENGAGEMENT:
       },
     };
   } else {
-    throw new Error(
-      "Missing TTS provider credentials in .env. Agora Conversational AI requires a real-time voice synthesis provider. Please configure MICROSOFT_TTS_KEY (and MICROSOFT_TTS_REGION), CARTESIA_API_KEY, ELEVENLABS_API_KEY, or OPENAI_API_KEY in your .env."
+    // Transparent auto-fallback to Agora Managed TTS (No 3rd-party vendor key required)
+    console.log(
+      "[Agora Gateway] No BYOK TTS key detected in .env. Using Agora Managed TTS (MiniMax speech-2.6-turbo / English_captivating_female1)."
     );
+    ttsConfig = {
+      credential_mode: "managed",
+      vendor: "minimax",
+      params: {
+        url: "wss://api.minimax.io/ws/v1/t2a_v2",
+        model: "speech-2.6-turbo",
+        voice_setting: {
+          voice_id: "English_captivating_female1",
+          speed: 1.0,
+        },
+        audio_setting: {
+          sample_rate: 24000,
+        },
+      },
+    };
   }
 
   console.log(`[Agora Gateway] Dispatching agent start (v2) to channel: ${channelName}`);
@@ -302,8 +318,6 @@ RULES OF ENGAGEMENT:
 
   if (!response.ok) {
     const errorBody = await response.text();
-    console.error(`[Agora Gateway Error ${response.status}]:`, errorBody);
-
     let parsedDetail = "";
     try {
       const errJson = JSON.parse(errorBody);
@@ -311,14 +325,16 @@ RULES OF ENGAGEMENT:
         parsedDetail = errJson.detail;
       }
       if (errJson.reason === "request failed" || errJson.detail === "ErrInternal") {
-        parsedDetail += " (Downstream LLM or TTS provider rejected the connection. Check that your GEMINI_API_KEY has active billing/credits and your TTS API key is valid.)";
+        parsedDetail += " (Downstream LLM or TTS provider rejected the connection. Check that your GEMINI_API_KEY has active billing/credits and your credentials are valid.)";
       }
     } catch {
       // Non-JSON response
     }
 
+    console.error(`[Agora Gateway Error ${response.status}]:`, parsedDetail || response.statusText);
+
     throw new Error(
-      `Agora Conversational AI Gateway error (${response.status}): ${parsedDetail || errorBody || response.statusText}`
+      `Agora Conversational AI Gateway error (${response.status}): ${parsedDetail || response.statusText}`
     );
   }
 

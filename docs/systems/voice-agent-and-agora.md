@@ -13,8 +13,8 @@ This document outlines the real-time voice infrastructure powered by Agora's Sof
         ▼                                                              ▼
 [ Next.js API Routes ] ─── POST /join (v2) ───────────────────► [ Agora Cloud Gateway v2 ]
 • /api/agora/token                                            • ASR: Agora Ares / Deepgram Nova-3
-• /api/agora/session/start                                    • LLM: Google Gemini 2.0 Flash (via OpenAI endpoint)
-• /api/agora/session/stop                                     • TTS: Microsoft / Cartesia / ElevenLabs
+• /api/agora/session/start                                    • LLM: Google Gemini 3.5 Flash-Lite (via OpenAI endpoint)
+• /api/agora/session/stop                                     • TTS: Agora Managed Mode (MiniMax) / BYOK (ElevenLabs/Cartesia/Azure)
 ```
 
 ---
