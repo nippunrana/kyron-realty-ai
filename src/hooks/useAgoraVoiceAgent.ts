@@ -281,7 +281,7 @@ export function useAgoraVoiceAgent(): UseAgoraVoiceAgentReturn {
 
         // Step 2: Initialize Agora RTM and log in BEFORE RTC join
         const AgoraRTM = (await import("agora-rtm")).default;
-        const { AgoraVoiceAI, AgoraVoiceAIEvents, TurnStatus } = await import(
+        const { AgoraVoiceAI, AgoraVoiceAIEvents, TurnStatus, TranscriptHelperMode } = await import(
           "agora-agent-client-toolkit"
         );
 
@@ -294,6 +294,7 @@ export function useAgoraVoiceAgent(): UseAgoraVoiceAgentReturn {
         // Step 3: Initialize Agora RTC client and AgoraVoiceAI Toolkit
         const AgoraRTC = (await import("agora-rtc-sdk-ng")).default;
         AgoraRTC.setLogLevel(3); // Warnings & errors only
+        (AgoraRTC as any).setParameter?.("ENABLE_AUDIO_PTS_METADATA", true);
 
         if (abortController.signal.aborted) return;
 
@@ -303,19 +304,41 @@ export function useAgoraVoiceAgent(): UseAgoraVoiceAgentReturn {
         const ai = await AgoraVoiceAI.init({
           rtcEngine: client,
           rtmEngine: rtmClient,
+          renderMode: TranscriptHelperMode.TEXT,
+          enableLog: true,
+          enableRenderModeFallback: true,
         });
         voiceAiRef.current = ai;
 
-        // Attach live transcript updates BEFORE opening channel subscription
+        // Render initial greeting if provided
+        if (sessionData.greeting) {
+          const greetingMsg: VoiceMessage = {
+            id: `greeting-${Date.now()}`,
+            role: "assistant",
+            text: sessionData.greeting,
+            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          };
+          mappedRemoteRef.current = [greetingMsg];
+          setTranscript([greetingMsg]);
+        }
+
+        // Attach live transcript updates
         ai.on(AgoraVoiceAIEvents.TRANSCRIPT_UPDATED, (transcriptions: any[]) => {
           if (!transcriptions || !Array.isArray(transcriptions)) return;
 
           const mapped: VoiceMessage[] = transcriptions
             .filter((item: any) => (item.text || "").trim().length > 0)
             .map((item: any, idx: number) => {
-              const isUser = String(item.uid) === stringUserUid;
+              const uidStr = String(item.uid ?? "");
+              const isUser =
+                uidStr === "0" ||
+                uidStr === stringUserUid ||
+                uidStr === String(userUidRef.current) ||
+                item.metadata?.object === "user.transcription" ||
+                item.object === "user.transcription";
+
               return {
-                id: `turn-${item.turn_id ?? idx}-${item.uid ?? "agent"}`,
+                id: `turn-${item.turn_id ?? idx}-${isUser ? "user" : "agent"}`,
                 role: isUser ? "user" : "assistant",
                 text: (item.text || "").trim(),
                 timestamp: new Date(item._time || Date.now()).toLocaleTimeString([], {
@@ -330,22 +353,138 @@ export function useAgoraVoiceAgent(): UseAgoraVoiceAgentReturn {
           localMessagesRef.current = localMessagesRef.current.filter(
             (local) => !mapped.some((remote) => remote.role === "user" && remote.text.toLowerCase() === local.text.toLowerCase())
           );
-          setTranscript([...mapped, ...localMessagesRef.current]);
 
-          // Deduplicated checklist extraction for completed user turns
+          // Preserve initial greeting if remote transcript doesn't repeat it yet
+          const fullList = sessionData.greeting && !mapped.some((m) => m.role === "assistant")
+            ? [{ id: "init-greeting", role: "assistant" as const, text: sessionData.greeting, timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }, ...mapped, ...localMessagesRef.current]
+            : [...mapped, ...localMessagesRef.current];
+
+          setTranscript(fullList);
+
+          // Deduplicated checklist extraction for user turns
           for (const item of transcriptions) {
-            const isUser = String(item.uid) === stringUserUid;
-            if (isUser && item.status === TurnStatus.END && item.turn_id != null) {
-              if (!processedTurnIdsRef.current.has(item.turn_id)) {
-                processedTurnIdsRef.current.add(item.turn_id);
-                const spokenText = (item.text || "").trim();
-                if (spokenText && onSpeechDetectedRef.current) {
+            const uidStr = String(item.uid ?? "");
+            const isUser =
+              uidStr === "0" ||
+              uidStr === stringUserUid ||
+              uidStr === String(userUidRef.current) ||
+              item.metadata?.object === "user.transcription" ||
+              item.object === "user.transcription";
+
+            const spokenText = (item.text || "").trim();
+            if (isUser && spokenText.length > 0) {
+              const isFinished =
+                item.status === TurnStatus.END ||
+                item.status === 1 ||
+                item.final === true ||
+                item.metadata?.final === true;
+
+              const turnKey = `${item.turn_id ?? "turn"}_${spokenText.toLowerCase()}`;
+              if (isFinished && !processedTurnIdsRef.current.has(turnKey as any)) {
+                processedTurnIdsRef.current.add(turnKey as any);
+                console.log("[Agora Voice Agent] Verified user speech turn:", spokenText);
+                if (onSpeechDetectedRef.current) {
                   onSpeechDetectedRef.current(spokenText);
                 }
               }
             }
           }
         });
+
+        // Direct RTM message listener fallback
+        const handleDirectRtmMessage = (event: any) => {
+          try {
+            const raw =
+              typeof event.message === "string"
+                ? event.message
+                : new TextDecoder().decode(event.message);
+            const parsed = JSON.parse(raw);
+
+            if (parsed.text && typeof parsed.text === "string" && parsed.text.trim()) {
+              const text = parsed.text.trim();
+              const isUser =
+                parsed.object === "user.transcription" ||
+                String(event.publisher) === "0" ||
+                String(event.publisher) === stringUserUid;
+
+              const turnId = parsed.turn_id || Date.now();
+              const newMsg: VoiceMessage = {
+                id: `rtm-${turnId}-${isUser ? "user" : "assistant"}`,
+                role: isUser ? "user" : "assistant",
+                text,
+                timestamp: new Date().toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                }),
+              };
+
+              setTranscript((prev) => {
+                const exists = prev.some(
+                  (m) => m.id === newMsg.id || (m.role === newMsg.role && m.text === newMsg.text)
+                );
+                return exists ? prev : [...prev, newMsg];
+              });
+
+              if (isUser && (parsed.final || parsed.status === 1 || parsed.turn_status === 1)) {
+                const key = `${turnId}_${text.toLowerCase()}`;
+                if (!processedTurnIdsRef.current.has(key as any)) {
+                  processedTurnIdsRef.current.add(key as any);
+                  console.log("[Direct RTM User Speech]", text);
+                  if (onSpeechDetectedRef.current) {
+                    onSpeechDetectedRef.current(text);
+                  }
+                }
+              }
+            }
+          } catch {}
+        };
+        rtmClient.addEventListener("message", handleDirectRtmMessage);
+
+        // Direct RTC stream message listener fallback
+        const handleDirectRtcStream = (uid: number, stream: Uint8Array) => {
+          try {
+            const text = new TextDecoder("utf-8").decode(stream);
+            const parsed = JSON.parse(text);
+
+            if (parsed.text && typeof parsed.text === "string" && parsed.text.trim()) {
+              const strText = parsed.text.trim();
+              const isUser =
+                parsed.object === "user.transcription" ||
+                String(uid) === "0" ||
+                String(uid) === stringUserUid;
+
+              const turnId = parsed.turn_id || Date.now();
+              const newMsg: VoiceMessage = {
+                id: `rtc-${turnId}-${isUser ? "user" : "assistant"}`,
+                role: isUser ? "user" : "assistant",
+                text: strText,
+                timestamp: new Date().toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                }),
+              };
+
+              setTranscript((prev) => {
+                const exists = prev.some(
+                  (m) => m.id === newMsg.id || (m.role === newMsg.role && m.text === newMsg.text)
+                );
+                return exists ? prev : [...prev, newMsg];
+              });
+
+              if (isUser && (parsed.final || parsed.status === 1 || parsed.turn_status === 1)) {
+                const key = `${turnId}_${strText.toLowerCase()}`;
+                if (!processedTurnIdsRef.current.has(key as any)) {
+                  processedTurnIdsRef.current.add(key as any);
+                  console.log("[Direct RTC User Speech]", strText);
+                  if (onSpeechDetectedRef.current) {
+                    onSpeechDetectedRef.current(strText);
+                  }
+                }
+              }
+            }
+          } catch {}
+        };
+        client.on("stream-message", handleDirectRtcStream);
 
         ai.on(AgoraVoiceAIEvents.AGENT_STATE_CHANGED, (_agentUserId: string, event: any) => {
           if (event?.state === "speaking") {
@@ -360,10 +499,6 @@ export function useAgoraVoiceAgent(): UseAgoraVoiceAgentReturn {
             setCallState("connected");
           }
         });
-
-        // Attach toolkit listeners to channel, then subscribe RTM channel
-        ai.subscribeMessage(channelName);
-        await rtmClient.subscribe(channelName);
 
         // Enable volume indicators for VAD turn detection
         client.enableAudioVolumeIndicator();
@@ -417,7 +552,7 @@ export function useAgoraVoiceAgent(): UseAgoraVoiceAgentReturn {
 
         localAudioTrackRef.current = localAudioTrack;
 
-        // Step 5: Join RTC Channel and Publish Track
+        // Step 5: Join RTC Channel and Publish Track FIRST
         await client.join(appId, channelName, token || null, userUid);
         if (abortController.signal.aborted) {
           await client.leave();
@@ -425,6 +560,10 @@ export function useAgoraVoiceAgent(): UseAgoraVoiceAgentReturn {
         }
 
         await client.publish(localAudioTrack);
+
+        // Step 6: Subscribe to messages in channel (after joining RTC channel per toolkit spec)
+        ai.subscribeMessage(channelName);
+        await rtmClient.subscribe(channelName);
 
         // Start local visualizer
         const mediaStreamTrack = localAudioTrack.getMediaStreamTrack();

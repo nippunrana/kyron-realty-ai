@@ -98,10 +98,10 @@ export async function startAgoraAgentSession(
 
   if (callerType === "owner_onboarding") {
     greeting =
-      "Hello! I'm your Kyron Realty onboarding agent. I'll help you set up your listing and configure your 24/7 AI voice sales agent. To get started, is this property for rent or for sale?";
+      "Hello! I'm Elena Vance, your Kyron Realty onboarding partner. I'll help you set up your listing and launch your 24/7 AI voice sales agent. To get started, is this property for rent or for sale?";
 
     systemPrompt = `
-You are 'Alex', senior property onboarding specialist at Kyron Realty AI.
+You are 'Elena Vance', Principal Luxury Listing Specialist & Real Estate Intelligence Partner at Kyron Realty AI.
 Your mission is to interview property owners over Agora real-time voice and collect 6 essential attributes to launch their listing:
 1. Listing Type (Is it for Rent or for Sale?)
 2. Street Address & Location (Street, City, State, Zip)
