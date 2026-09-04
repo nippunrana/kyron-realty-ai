@@ -25,9 +25,8 @@ This document outlines the real-time voice infrastructure powered by Agora's Sof
 ## 2. Dynamic Token Service
 - **Source**: `src/lib/agora-token.ts`
 - **Algorithms**:
-  - `RtcTokenBuilder.buildTokenWithUid`: Issues signed RTC tokens for user media tracks.
+  - `RtcTokenBuilder.buildTokenWithUid`: Issues signed RTC tokens for user media tracks and agent bot channel joining (`properties.token`).
   - `RtmTokenBuilder.buildToken`: Issues signed RTM tokens for user transcript stream & chat.
-  - `ConvoAITokenBuilder.buildToken`: Issues unified tokens carrying RTC, RTM, and ConvoAI permissions for the agent bot.
 - **TTL**: 3600 seconds (1 hour).
 - **UID Conventions**: Client Caller (`1001`), Voice Agent (`999001`).
 

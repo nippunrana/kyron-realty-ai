@@ -1,7 +1,6 @@
 import {
   generateAgoraRtcToken,
   generateAgoraRtmToken,
-  generateAgoraConvoAiAgentToken,
 } from "./agora-token";
 import { db } from "@/db";
 import { properties, propertyKnowledgeBases, negotiationMatrices, voiceSessions } from "@/db/schema";
@@ -83,10 +82,11 @@ export async function startAgoraAgentSession(
     matrixRecord = matrix;
   }
 
-  // 2. Generate Real Signed RTC and RTM Tokens for User and Multi-Service Token for Agent
+  // 2. Generate Real Signed RTC and RTM Tokens for User, and RTC Publisher Token for Agent
   const userTokenData = generateAgoraRtcToken(channelName, userUid);
   const userRtmTokenData = generateAgoraRtmToken(String(userUid));
-  const agentToken = generateAgoraConvoAiAgentToken(channelName, agentUid);
+  const agentTokenData = generateAgoraRtcToken(channelName, agentUid);
+  const agentToken = agentTokenData.token;
 
   // 3. Build Agent System Prompt & Real Estate Persona
   const propertyTitle = propertyRecord?.title || "Property";
@@ -367,14 +367,9 @@ RULES OF ENGAGEMENT:
     let parsedDetail = "";
     try {
       const errJson = JSON.parse(errorBody);
-      if (errJson.detail) {
-        parsedDetail = errJson.detail;
-      }
-      if (errJson.reason === "request failed" || errJson.detail === "ErrInternal") {
-        parsedDetail += " (Downstream LLM or TTS provider rejected the connection. Check that your GEMINI_API_KEY has active billing/credits and your credentials are valid.)";
-      }
+      parsedDetail = [errJson.detail, errJson.reason, errJson.message].filter(Boolean).join(" - ");
     } catch {
-      // Non-JSON response
+      parsedDetail = errorBody;
     }
 
     console.error(`[Agora Gateway Error ${response.status}]:`, parsedDetail || response.statusText);
