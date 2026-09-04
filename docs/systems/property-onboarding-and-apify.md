@@ -9,12 +9,16 @@ This document outlines the dual-path property ingestion pipeline, split-screen o
 - **Controller**: `src/components/dashboard/onboarding/OnboardingStudio.tsx`
 - **Design Mode**: Product Mode with Light Theme and high-contrast sapphire/emerald accents.
 - **Left Pane (`ConversationalPanel.tsx`)**:
-  - Tab 1: Instant URL scraping via Apify.
-  - Tab 2: Interactive Voice & Text Interview with browser speech recognition.
+  - URL Listing Scraper (Apify web ingestion).
+  - Elena Vance AI Agent Persona Card (Principal Luxury Listing Specialist).
+  - Real-time animated soundwave pill with dynamic speaking/listening state transitions.
+  - Compact scrollable dialogue stream container for live turns.
+  - Agora SD-RTN call controls (Connect, Mute, End Call).
 - **Right Pane (`LivePropertyInspector.tsx`)**:
-  - Live photo gallery with status badges.
-  - Click-to-edit primary metric inputs (Price, Beds, Baths, Sqft).
-  - 3-tab deep inspector (Specs & Amenities, Voice Agent Brain, Concession Guardrails).
+  - Real-time dynamic parameter revelation (Discovered Specs & Synthesized Intelligence).
+  - No empty static prefilled forms; parameters appear dynamically upon detection.
+  - 6-Point dynamic verification checklist and circular progress indicator.
+  - Sticky deployment action button unlocking at 6/6 verified attributes.
 
 ---
 

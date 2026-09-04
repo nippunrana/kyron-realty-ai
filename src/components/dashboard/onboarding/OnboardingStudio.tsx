@@ -257,7 +257,7 @@ export function OnboardingStudio() {
             </span>
           </h1>
           <p className="text-xs sm:text-sm text-slate-600 mt-1">
-            Create or import a listing to auto-generate verified knowledge bases and deploy a 24/7 Agora Voice Sales Agent.
+            Converse naturally with Elena Vance or import a listing URL to dynamically extract property specs and deploy a 24/7 Voice Sales Agent.
           </p>
         </div>
       </div>
