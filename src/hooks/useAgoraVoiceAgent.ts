@@ -563,7 +563,10 @@ export function useAgoraVoiceAgent(): UseAgoraVoiceAgentReturn {
 
         // Step 6: Subscribe to messages in channel (after joining RTC channel per toolkit spec)
         ai.subscribeMessage(channelName);
-        await rtmClient.subscribe(channelName);
+        await rtmClient.subscribe(channelName, {
+          withMessage: true,
+          withPresence: true,
+        });
 
         // Start local visualizer
         const mediaStreamTrack = localAudioTrack.getMediaStreamTrack();

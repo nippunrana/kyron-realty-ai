@@ -1,6 +1,7 @@
 import {
   generateAgoraRtcToken,
   generateAgoraRtmToken,
+  generateAgoraAgentCombinedToken,
 } from "./agora-token";
 import { db } from "@/db";
 import { properties, propertyKnowledgeBases, negotiationMatrices, voiceSessions } from "@/db/schema";
@@ -82,10 +83,10 @@ export async function startAgoraAgentSession(
     matrixRecord = matrix;
   }
 
-  // 2. Generate Real Signed RTC and RTM Tokens for User, and RTC Publisher Token for Agent
+  // 2. Generate Real Signed RTC and RTM Tokens for User, and ConvoAI Combined Token for Agent
   const userTokenData = generateAgoraRtcToken(channelName, userUid);
   const userRtmTokenData = generateAgoraRtmToken(String(userUid));
-  const agentTokenData = generateAgoraRtcToken(channelName, agentUid);
+  const agentTokenData = generateAgoraAgentCombinedToken(channelName, agentUid);
   const agentToken = agentTokenData.token;
 
   // 3. Build Agent System Prompt & Real Estate Persona
