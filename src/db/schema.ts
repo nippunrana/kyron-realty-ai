@@ -32,9 +32,9 @@ export const properties = pgTable("properties", {
   // Physical Specifications
   address: text("address").notNull(),
   unitNumber: text("unit_number"),
-  city: text("city").notNull(),
-  state: text("state").notNull(),
-  zipCode: text("zip_code").notNull(),
+  city: text("city"),
+  state: text("state"),
+  zipCode: text("zip_code"),
   country: text("country").default("USA"),
   bedrooms: integer("bedrooms"),
   bathrooms: numeric("bathrooms", { precision: 3, scale: 1 }),

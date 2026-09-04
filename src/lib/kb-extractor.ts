@@ -88,21 +88,12 @@ export function extractHeuristicAttributes(
 
   // 1. Listing Type
   if (
-    lower.includes("for rent") ||
-    lower.includes("to rent") ||
-    lower.includes("rental") ||
-    lower.includes("lease") ||
-    lower.includes("/mo") ||
-    lower.includes("per month") ||
-    lower.includes("monthly")
+    /\b(?:for rent|to rent|rental|for lease|to lease)\b/i.test(lower) ||
+    /\b(?:renting|rent is|per month|\/mo|a month)\b/i.test(lower)
   ) {
     updates.listingType = "rent";
   } else if (
-    lower.includes("for sale") ||
-    lower.includes("to buy") ||
-    lower.includes("selling") ||
-    lower.includes("purchase") ||
-    lower.includes("asking price")
+    /\b(?:for sale|to buy|selling|purchase|asking price|to purchase)\b/i.test(lower)
   ) {
     updates.listingType = "sale";
   }
@@ -172,7 +163,7 @@ export function extractHeuristicAttributes(
     updates.sqft = Number(sqftMatch[1].replace(/,/g, ""));
   }
 
-  // 6. Street Address
+  // 6. Street Address & Location
   // Looks for street numbers followed by name and suffix
   const streetRegex =
     /(?:\bat\s+)?([0-9]{1,5}\s+[A-Za-z\s]+?\s+(?:Street|St|Avenue|Ave|Boulevard|Blvd|Road|Rd|Drive|Dr|Lane|Ln|Way|Court|Ct|Place|Pl|Terrace|Ter|Circle|Cir)\b)/i;
@@ -187,15 +178,24 @@ export function extractHeuristicAttributes(
     }
   }
 
-  // Auto-generate title if address and beds are found
+  // Capture 5-digit zip code if present anywhere in the text
+  const zipMatch = text.match(/\b([0-9]{5})\b/);
+  if (zipMatch && zipMatch[1]) {
+    updates.zipCode = zipMatch[1];
+  }
+
+  // Auto-generate title only if address is found; do not assume "for rent"
   const effectiveBeds = updates.bedrooms ?? prevProperty?.bedrooms;
   const effectiveAddress = updates.address ?? prevProperty?.address;
-  const effectiveType = updates.listingType ?? prevProperty?.listingType ?? "rent";
+  const effectiveType = updates.listingType ?? prevProperty?.listingType;
 
   if (effectiveAddress && !prevProperty?.title) {
-    updates.title = `${effectiveBeds ? `${effectiveBeds}-Bedroom ` : ""}${
-      effectiveType === "rent" ? "Residence for Rent" : "Residence for Sale"
-    } at ${effectiveAddress}`;
+    const typeLabel = effectiveType
+      ? effectiveType === "rent"
+        ? "Residence for Rent"
+        : "Residence for Sale"
+      : "Residence";
+    updates.title = `${effectiveBeds ? `${effectiveBeds}-Bedroom ` : ""}${typeLabel} at ${effectiveAddress}`;
   }
 
   return updates;
@@ -244,67 +244,47 @@ export async function extractPropertyKnowledgeBase(
   if (!apiKey || apiKey.trim() === "" || apiKey === "your_gemini_api_key_here") {
     console.warn("GEMINI_API_KEY missing, using deterministic heuristic fallback.");
     const heuristic = extractHeuristicAttributes(input.conversationText || input.markdown || "", current);
-    const targetPrice = heuristic.price || current?.price || 3200;
-    const floorPrice = Math.round(targetPrice * 0.94);
+    const targetPrice = heuristic.price || current?.price || 0;
+    const floorPrice = targetPrice > 0 ? Math.round(targetPrice * 0.94) : 0;
 
     return {
       property: {
-        title: heuristic.title || current?.title || "Modern Real Estate Listing",
-        slug: generateKebabSlug(heuristic.title || "property", heuristic.city || "sf"),
-        description:
-          current?.description ||
-          "Stunning residence featuring an open-concept layout, modern finishes, and prime accessibility.",
-        listingType: heuristic.listingType || current?.listingType || "rent",
+        title: heuristic.title || current?.title || (heuristic.address ? `Residence at ${heuristic.address}` : ""),
+        slug: generateKebabSlug(heuristic.title || heuristic.address || "property", heuristic.city || ""),
+        description: current?.description || "",
+        listingType: heuristic.listingType || current?.listingType || ("" as any),
         propertyType: current?.propertyType || "apartment",
         price: targetPrice,
-        securityDeposit: targetPrice,
-        minLeaseMonths: 12,
-        hoaFeeMonthly: 0,
-        address: heuristic.address || current?.address || "Address Pending",
+        securityDeposit: current?.securityDeposit || 0,
+        minLeaseMonths: current?.minLeaseMonths || 12,
+        hoaFeeMonthly: current?.hoaFeeMonthly || 0,
+        address: heuristic.address || current?.address || "",
         unitNumber: current?.unitNumber || "",
-        city: heuristic.city || current?.city || "San Francisco",
-        state: heuristic.state || current?.state || "CA",
-        zipCode: current?.zipCode || "94101",
+        city: heuristic.city || current?.city || "",
+        state: heuristic.state || current?.state || "",
+        zipCode: heuristic.zipCode || current?.zipCode || "",
         country: "USA",
-        bedrooms: heuristic.bedrooms ?? current?.bedrooms ?? 2,
-        bathrooms: heuristic.bathrooms ?? current?.bathrooms ?? 2,
-        sqft: heuristic.sqft ?? current?.sqft ?? 1100,
-        yearBuilt: current?.yearBuilt || 2022,
-        amenities: current?.amenities || ["In-unit Laundry", "Garage Parking", "EV Ready"],
-        features: current?.features || ["Hardwood Floors", "Modern Kitchen"],
+        bedrooms: heuristic.bedrooms ?? current?.bedrooms ?? 0,
+        bathrooms: heuristic.bathrooms ?? current?.bathrooms ?? 0,
+        sqft: heuristic.sqft ?? current?.sqft ?? 0,
+        yearBuilt: current?.yearBuilt || 0,
+        amenities: current?.amenities || [],
+        features: current?.features || [],
         coverImageUrl: current?.coverImageUrl || "",
         images: current?.images || [],
       },
       knowledgeBase: {
         rawScrapedMarkdown: input.markdown || "",
-        synthesizedSalesPitch:
-          "Welcome! This home offers exceptional natural light, modern appliances, and a prime central location.",
-        neighborhoodSummary: "Quiet, walkable neighborhood close to transit, dining, and shopping.",
-        schoolDistrictInfo: "Top-rated local school district.",
-        petPolicyDetail: "Pets welcome with an additional deposit.",
-        parkingDetail: "Designated parking space included.",
-        utilitiesDetail: "Water, sewer, and trash removal included in rent.",
-        applicationProcess: "Standard online application with background and credit check.",
-        faqs: [
-          {
-            question: "What utilities are included?",
-            answer: "Water, sewer, and trash removal are covered by the owner. Tenants handle electricity and internet.",
-            category: "Policies & Rules",
-          },
-          {
-            question: "Is parking included?",
-            answer: "Yes, dedicated parking is included with the home.",
-            category: "Amenities & Specs",
-          },
-          {
-            question: "What if I have a question about something not in the listing?",
-            answer: "I don't have that specific detail in our verified records, but I can have our licensed broker follow up with you directly today.",
-            category: "Policies & Rules",
-          },
-        ],
+        synthesizedSalesPitch: currentKb?.synthesizedSalesPitch || "",
+        neighborhoodSummary: currentKb?.neighborhoodSummary || "",
+        schoolDistrictInfo: currentKb?.schoolDistrictInfo || "",
+        petPolicyDetail: currentKb?.petPolicyDetail || "",
+        parkingDetail: currentKb?.parkingDetail || "",
+        utilitiesDetail: currentKb?.utilitiesDetail || "",
+        applicationProcess: currentKb?.applicationProcess || "",
+        faqs: currentKb?.faqs || [],
         agentTone: "warm_professional",
-        greetingMessage:
-          "Hello! Thanks for your interest in this property. Are you looking to move in this month?",
+        greetingMessage: currentKb?.greetingMessage || "",
         unknownFallbackPolicy:
           "Offer licensed broker follow-up rather than guessing unverified property specs.",
       },
@@ -313,21 +293,8 @@ export async function extractPropertyKnowledgeBase(
         targetPrice,
         minFloorPrice: floorPrice,
         maxAllowedDiscountPct: 6.0,
-        concessionRules: [
-          {
-            condition: "18_month_lease",
-            concession: "5% discount on monthly rent",
-            maxConcessionValue: Math.round(targetPrice * 0.05),
-            requiresApproval: false,
-          },
-          {
-            condition: "move_in_under_7_days",
-            concession: "Waived first month parking fee ($200 value)",
-            maxConcessionValue: 200,
-            requiresApproval: false,
-          },
-        ],
-        notesForAgent: `Strict floor price lock at $${floorPrice}. Offer concessions strictly in exchange for value (longer lease or prompt move-in).`,
+        concessionRules: currentMatrix?.concessionRules || [],
+        notesForAgent: floorPrice > 0 ? `Strict floor price lock at $${floorPrice}.` : "",
       },
     };
   }
@@ -335,21 +302,31 @@ export async function extractPropertyKnowledgeBase(
   const ai = new GoogleGenAI({ apiKey });
 
   const systemPrompt = `
-You are the Industry Gold-Standard Real Estate Intelligence Synthesizer for Kyron Realty AI.
-Extract an exhaustive, verified property profile, a speech-optimized knowledge base for an Agora Conversational Voice Agent, and negotiation guardrails.
+You are the Real Estate Intelligence Synthesizer for Kyron Realty AI.
+Analyze the provided property input (URL markdown, owner dialogue notes, or verified state) and extract structured listing data, a conversational voice agent knowledge base, and concession guardrails.
 
-CORE REAL ESTATE VOICE AI PRINCIPLES:
-1. GROUND-TRUTH FACTUAL DATA ("FILING CABINET"):
-   - Extract atomic facts: listing type (rent/sale), address, target price, bedrooms, bathrooms, sqft, utilities breakdown, pet policy, parking/EV, and neighborhood notes.
-2. SPOKEN-OPTIMIZED FAQS FOR VOICE AI:
-   - Provide concise 1-2 sentence answers suited for sub-second text-to-speech audio delivery.
-   - NEVER use markdown bullet points, asterisks, emojis, or robotic lists. Phrasing must sound natural when read aloud.
-   - Include a SAFE FALLBACK FAQ for unknown details:
+CORE ZERO-HALLUCINATION & FACT-VS-COPY PRINCIPLES:
+1. ATOMIC PROPERTY FACTS (STRICT EXTRACTION ONLY):
+   - Extract: listingType ("rent" | "sale"), address, city, state, zipCode, price, bedrooms, bathrooms, sqft, yearBuilt.
+   - ZERO-HALLUCINATION RULE: ONLY extract facts that are EXPLICITLY stated in the input.
+   - If an atomic fact has not been stated, you MUST return 0 for numeric fields and "" for text fields.
+   - NEVER invent or guess street addresses, prices, bedroom/bathroom counts, or square footage (e.g. NEVER output "123 Main Street" or fictional rents).
+   - If analyzing a conversation transcript between an owner and the assistant, extract facts ONLY from what the owner states, NEVER from assistant suggestions, examples, or greetings.
+
+2. SEMI-FACTUAL POLICIES & LOCAL DETAILS:
+   - For petPolicyDetail, parkingDetail, utilitiesDetail, neighborhoodSummary, and schoolDistrictInfo:
+   - ONLY include details explicitly mentioned by the owner or in the listing markdown.
+   - If not mentioned, set them to empty string "". NEVER assume utilities are included or invent pet policies.
+
+3. CONVERSATIONAL COPY (GROUNDED SYNTHESIS):
+   - synthesizedSalesPitch: A punchy 1-2 sentence conversational hook designed for natural spoken audio. Ground this strictly in the verified facts (address, price, specs). If no core specs are known yet, leave it empty "".
+   - faqs: Include concise 1-2 sentence spoken answers grounded in verified facts. Always include this safe fallback FAQ:
      Q: "What if a caller asks about something not listed in the knowledge base?"
      A: "I don't have that specific detail in our verified records, but I can have our licensed broker follow up with you directly today. Would you like me to note your contact info?"
-3. NEGOTIATION GUARDRAILS:
-   - Floor price lock: Set minFloorPrice strictly at 5% to 7% below target price.
-   - Concession rules: Exchange-of-value triggers (e.g. 18-month lease commitment or move-in under 7 days in exchange for 5% off or waived fees).
+
+4. NEGOTIATION CONCESSION GUARDRAILS:
+   - If price > 0, set targetPrice = price, and minFloorPrice = Math.round(price * 0.94).
+   - If price === 0, set targetPrice = 0, minFloorPrice = 0, and concessionRules = [].
 
 INPUT DATA:
 ${contentToAnalyze}
@@ -360,7 +337,7 @@ Return a strictly valid JSON object matching this schema:
   "property": {
     "title": string,
     "description": string,
-    "listingType": "rent" | "sale",
+    "listingType": "rent" | "sale" | "",
     "propertyType": "apartment" | "single_family" | "condo" | "townhouse" | "commercial",
     "price": number,
     "securityDeposit": number,
@@ -383,7 +360,7 @@ Return a strictly valid JSON object matching this schema:
     "images": string[]
   },
   "knowledgeBase": {
-    "synthesizedSalesPitch": string (punchy 2-sentence conversational hook designed to be spoken aloud naturally),
+    "synthesizedSalesPitch": string,
     "neighborhoodSummary": string,
     "schoolDistrictInfo": string,
     "petPolicyDetail": string,
@@ -435,21 +412,23 @@ Return a strictly valid JSON object matching this schema:
     // Apply heuristic overrides for any explicitly spoken details
     const heuristic = extractHeuristicAttributes(input.conversationText || "", current);
 
-    const price = heuristic.price || parsed.property?.price || current?.price || 0;
-    const bedrooms = heuristic.bedrooms ?? parsed.property?.bedrooms ?? current?.bedrooms ?? 0;
-    const bathrooms = heuristic.bathrooms ?? parsed.property?.bathrooms ?? current?.bathrooms ?? 0;
-    const sqft = heuristic.sqft ?? parsed.property?.sqft ?? current?.sqft ?? 0;
-    const address = heuristic.address || parsed.property?.address || current?.address || "";
+    const price = parsed.property?.price || heuristic.price || current?.price || 0;
+    const bedrooms = parsed.property?.bedrooms ?? heuristic.bedrooms ?? current?.bedrooms ?? 0;
+    const bathrooms = parsed.property?.bathrooms ?? heuristic.bathrooms ?? current?.bathrooms ?? 0;
+    const sqft = parsed.property?.sqft ?? heuristic.sqft ?? current?.sqft ?? 0;
+    const address = parsed.property?.address || heuristic.address || current?.address || "";
     const listingType =
-      heuristic.listingType || parsed.property?.listingType || current?.listingType || "rent";
+      parsed.property?.listingType || heuristic.listingType || current?.listingType || "";
+    const city = parsed.property?.city || heuristic.city || current?.city || "";
+    const state = parsed.property?.state || heuristic.state || current?.state || "";
+    const zipCode = parsed.property?.zipCode || heuristic.zipCode || current?.zipCode || "";
 
     const title =
       parsed.property?.title ||
       heuristic.title ||
       current?.title ||
       (address ? `${bedrooms ? `${bedrooms}-Bedroom ` : ""}Residence at ${address}` : "Real Estate Listing");
-    const city = heuristic.city || parsed.property?.city || current?.city || "San Francisco";
-    const slug = generateKebabSlug(title, city);
+    const slug = generateKebabSlug(title, city || "property");
 
     // Merge existing images if found
     const combinedImages = Array.from(
@@ -478,7 +457,8 @@ Return a strictly valid JSON object matching this schema:
         sqft,
         address,
         city,
-        state: heuristic.state || parsed.property?.state || current?.state || "CA",
+        state,
+        zipCode,
         coverImageUrl:
           parsed.property?.coverImageUrl ||
           current?.coverImageUrl ||
@@ -504,67 +484,47 @@ Return a strictly valid JSON object matching this schema:
     console.error(`[Gemini Extraction Error]:`, err.message || err);
     // Graceful fallback to heuristic extraction to ensure uninterrupted onboarding flow
     const heuristic = extractHeuristicAttributes(input.conversationText || input.markdown || "", current);
-    const targetPrice = heuristic.price || current?.price || 3200;
-    const floorPrice = Math.round(targetPrice * 0.94);
+    const targetPrice = heuristic.price || current?.price || 0;
+    const floorPrice = targetPrice > 0 ? Math.round(targetPrice * 0.94) : 0;
 
     return {
       property: {
-        title: heuristic.title || current?.title || "Modern Real Estate Listing",
-        slug: generateKebabSlug(heuristic.title || "property", heuristic.city || "sf"),
-        description:
-          current?.description ||
-          "Stunning residence featuring an open-concept layout, modern finishes, and prime accessibility.",
-        listingType: heuristic.listingType || current?.listingType || "rent",
+        title: heuristic.title || current?.title || (heuristic.address ? `Residence at ${heuristic.address}` : ""),
+        slug: generateKebabSlug(heuristic.title || heuristic.address || "property", heuristic.city || ""),
+        description: current?.description || "",
+        listingType: heuristic.listingType || current?.listingType || ("" as any),
         propertyType: current?.propertyType || "apartment",
         price: targetPrice,
-        securityDeposit: targetPrice,
-        minLeaseMonths: 12,
-        hoaFeeMonthly: 0,
+        securityDeposit: current?.securityDeposit || 0,
+        minLeaseMonths: current?.minLeaseMonths || 12,
+        hoaFeeMonthly: current?.hoaFeeMonthly || 0,
         address: heuristic.address || current?.address || "",
         unitNumber: current?.unitNumber || "",
-        city: heuristic.city || current?.city || "San Francisco",
-        state: heuristic.state || current?.state || "CA",
-        zipCode: current?.zipCode || "94101",
+        city: heuristic.city || current?.city || "",
+        state: heuristic.state || current?.state || "",
+        zipCode: heuristic.zipCode || current?.zipCode || "",
         country: "USA",
         bedrooms: heuristic.bedrooms ?? current?.bedrooms ?? 0,
         bathrooms: heuristic.bathrooms ?? current?.bathrooms ?? 0,
         sqft: heuristic.sqft ?? current?.sqft ?? 0,
-        yearBuilt: current?.yearBuilt || 2022,
-        amenities: current?.amenities || ["In-unit Laundry", "Garage Parking"],
-        features: current?.features || ["Hardwood Floors", "Modern Kitchen"],
+        yearBuilt: current?.yearBuilt || 0,
+        amenities: current?.amenities || [],
+        features: current?.features || [],
         coverImageUrl: current?.coverImageUrl || "",
         images: current?.images || [],
       },
       knowledgeBase: {
         rawScrapedMarkdown: input.markdown || "",
-        synthesizedSalesPitch:
-          "Welcome! This residence offers an open layout, verified amenities, and prompt access to transportation.",
-        neighborhoodSummary: "Desirable residential neighborhood close to dining, shopping, and transit.",
-        schoolDistrictInfo: "Top-rated local school district.",
-        petPolicyDetail: "Pets welcome with deposit.",
-        parkingDetail: "Designated parking space included.",
-        utilitiesDetail: "Water, sewer, and trash removal included.",
-        applicationProcess: "Online application with credit check.",
-        faqs: [
-          {
-            question: "What utilities are included?",
-            answer: "Water, sewer, and trash removal are covered by the owner.",
-            category: "Policies & Rules",
-          },
-          {
-            question: "Is parking included?",
-            answer: "Yes, dedicated parking is included with the home.",
-            category: "Amenities & Specs",
-          },
-          {
-            question: "What if I have a question about something not in the listing?",
-            answer: "I don't have that specific detail in our verified records, but I can have our licensed broker follow up with you directly today.",
-            category: "Policies & Rules",
-          },
-        ],
+        synthesizedSalesPitch: currentKb?.synthesizedSalesPitch || "",
+        neighborhoodSummary: currentKb?.neighborhoodSummary || "",
+        schoolDistrictInfo: currentKb?.schoolDistrictInfo || "",
+        petPolicyDetail: currentKb?.petPolicyDetail || "",
+        parkingDetail: currentKb?.parkingDetail || "",
+        utilitiesDetail: currentKb?.utilitiesDetail || "",
+        applicationProcess: currentKb?.applicationProcess || "",
+        faqs: currentKb?.faqs || [],
         agentTone: "warm_professional",
-        greetingMessage:
-          "Hello! Thanks for your interest in this property. Are you looking to move in this month?",
+        greetingMessage: currentKb?.greetingMessage || "",
         unknownFallbackPolicy:
           "Offer licensed broker follow-up rather than guessing unverified property specs.",
       },
@@ -573,15 +533,8 @@ Return a strictly valid JSON object matching this schema:
         targetPrice,
         minFloorPrice: floorPrice,
         maxAllowedDiscountPct: 6.0,
-        concessionRules: [
-          {
-            condition: "18_month_lease",
-            concession: "5% discount on monthly rent",
-            maxConcessionValue: Math.round(targetPrice * 0.05),
-            requiresApproval: false,
-          },
-        ],
-        notesForAgent: `Strict floor price lock at $${floorPrice}.`,
+        concessionRules: currentMatrix?.concessionRules || [],
+        notesForAgent: floorPrice > 0 ? `Strict floor price lock at $${floorPrice}.` : "",
       },
     };
   }

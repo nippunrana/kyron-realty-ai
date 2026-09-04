@@ -37,7 +37,11 @@ export interface UseAgoraVoiceAgentReturn {
   sendTextMessage: (text: string) => void;
 }
 
-export function useAgoraVoiceAgent(): UseAgoraVoiceAgentReturn {
+export interface UseAgoraVoiceAgentOptions {
+  onCallEnd?: (transcript: VoiceMessage[]) => void;
+}
+
+export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgoraVoiceAgentReturn {
   const [callState, setCallState] = useState<CallState>("idle");
   const [isMuted, setIsMuted] = useState(false);
   const [isAgentSpeaking, setIsAgentSpeaking] = useState(false);
@@ -60,6 +64,8 @@ export function useAgoraVoiceAgent(): UseAgoraVoiceAgentReturn {
   const callActiveRef = useRef<boolean>(false);
   const isMutedRef = useRef<boolean>(false);
   const onSpeechDetectedRef = useRef<((text: string) => void) | undefined>(undefined);
+  const onCallEndRef = useRef<((transcript: VoiceMessage[]) => void) | undefined>(options?.onCallEnd);
+  onCallEndRef.current = options?.onCallEnd;
   const rtmClientRef = useRef<any>(null);
   const voiceAiRef = useRef<any>(null);
   const agentUidRef = useRef<number>(999001);
@@ -603,12 +609,17 @@ export function useAgoraVoiceAgent(): UseAgoraVoiceAgentReturn {
 
   // End Call
   const endCall = useCallback(async () => {
+    const finalTranscript = [...mappedRemoteRef.current, ...localMessagesRef.current];
     await teardownResources();
     setCallState("idle");
     setIsAgentSpeaking(false);
     setUserVolume(0);
     setAgentVolume(0);
     setAudioFrequencies(new Array(16).fill(10));
+
+    if (onCallEndRef.current && finalTranscript.some((m) => m.role === "user")) {
+      onCallEndRef.current(finalTranscript);
+    }
   }, [teardownResources]);
 
   // Send Text Message in active session (routed via RTM to Agora agent)

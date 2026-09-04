@@ -22,9 +22,9 @@ export async function POST(req: NextRequest) {
       property.title = `${property.bedrooms ? `${property.bedrooms}-Bedroom ` : ""}Residence at ${property.address}`;
     }
 
-    if (!property || !property.title || !property.price || !property.address) {
+    if (!property || !property.title || !property.price || !property.address || !property.listingType) {
       return NextResponse.json(
-        { error: "Property title, price, and address are required." },
+        { error: "Property title, price, address, and listing type are required." },
         { status: 400 }
       );
     }
@@ -67,24 +67,24 @@ export async function POST(req: NextRequest) {
         slug,
         title: property.title,
         description: property.description || "",
-        listingType: property.listingType || "rent",
+        listingType: property.listingType,
         propertyType: property.propertyType || "apartment",
         status: "active",
         price: String(property.price),
-        securityDeposit: property.securityDeposit ? String(property.securityDeposit) : String(property.price),
-        minLeaseMonths: property.minLeaseMonths ? Number(property.minLeaseMonths) : 12,
+        securityDeposit: property.securityDeposit ? String(property.securityDeposit) : null,
+        minLeaseMonths: property.minLeaseMonths ? Number(property.minLeaseMonths) : null,
         hoaFeeMonthly: property.hoaFeeMonthly ? String(property.hoaFeeMonthly) : "0",
         address: property.address,
         unitNumber: property.unitNumber || null,
-        city: property.city || "San Francisco",
-        state: property.state || "CA",
-        zipCode: property.zipCode || "94123",
+        city: property.city || null,
+        state: property.state || null,
+        zipCode: property.zipCode || null,
         country: property.country || "USA",
-        bedrooms: property.bedrooms ? Number(property.bedrooms) : 2,
-        bathrooms: property.bathrooms ? String(property.bathrooms) : "2.0",
-        sqft: property.sqft ? Number(property.sqft) : 1100,
-        yearBuilt: property.yearBuilt ? Number(property.yearBuilt) : 2020,
-        availableDate: property.availableDate ? new Date(property.availableDate) : new Date(),
+        bedrooms: property.bedrooms ? Number(property.bedrooms) : null,
+        bathrooms: property.bathrooms ? String(property.bathrooms) : null,
+        sqft: property.sqft ? Number(property.sqft) : null,
+        yearBuilt: property.yearBuilt ? Number(property.yearBuilt) : null,
+        availableDate: property.availableDate ? new Date(property.availableDate) : null,
         coverImageUrl: property.coverImageUrl || (property.images && property.images[0]) || null,
         images: property.images || [],
         amenities: property.amenities || [],

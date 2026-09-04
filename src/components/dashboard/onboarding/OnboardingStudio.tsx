@@ -80,7 +80,6 @@ export function OnboardingStudio() {
         ? {
             ...prev.negotiationMatrix,
             targetPrice: updates.price,
-            minFloorPrice: Math.round(updates.price * 0.94),
           }
         : prev.negotiationMatrix,
     }));
@@ -94,7 +93,6 @@ export function OnboardingStudio() {
         ? {
             ...prev.negotiationMatrix,
             targetPrice: updates.price,
-            minFloorPrice: Math.round(updates.price * 0.94),
           }
         : prev.negotiationMatrix,
     }));
@@ -159,10 +157,12 @@ export function OnboardingStudio() {
     }
   };
 
-  // Conversational Chat Update Handler
+  // Conversational Extraction Handler (invoked at call completion with owner dialogue)
   const handleSendMessage = async (text: string) => {
+    if (!text || !text.trim()) return;
+
     setIsProcessing(true);
-    setActivePipelineStep("Updating knowledge base & guardrails with AI...");
+    setActivePipelineStep("Synthesizing voice intelligence & knowledge base...");
 
     try {
       const res = await fetch(`${basePath}/api/onboarding/extract`, {
@@ -178,20 +178,64 @@ export function OnboardingStudio() {
 
       const json = await res.json();
       if (json.success && json.data) {
-        setData((prev) => ({
-          property: {
-            ...prev.property,
-            ...json.data.property,
-            price: json.data.property.price || prev.property.price,
-            bedrooms: json.data.property.bedrooms || prev.property.bedrooms,
-            bathrooms: json.data.property.bathrooms || prev.property.bathrooms,
-            sqft: json.data.property.sqft || prev.property.sqft,
-            address: json.data.property.address || prev.property.address,
-            listingType: json.data.property.listingType || prev.property.listingType,
-          },
-          knowledgeBase: json.data.knowledgeBase,
-          negotiationMatrix: json.data.negotiationMatrix,
-        }));
+        setData((prev) => {
+          const newProp = json.data.property || {};
+          const newKb = json.data.knowledgeBase || {};
+          const newMatrix = json.data.negotiationMatrix || {};
+
+          return {
+            property: {
+              ...prev.property,
+              title: newProp.title || prev.property.title,
+              slug: newProp.slug || prev.property.slug,
+              description: newProp.description || prev.property.description,
+              listingType: newProp.listingType || prev.property.listingType,
+              propertyType: newProp.propertyType || prev.property.propertyType,
+              price: newProp.price || prev.property.price,
+              securityDeposit: newProp.securityDeposit || prev.property.securityDeposit,
+              minLeaseMonths: newProp.minLeaseMonths || prev.property.minLeaseMonths,
+              hoaFeeMonthly: newProp.hoaFeeMonthly || prev.property.hoaFeeMonthly,
+              address: newProp.address || prev.property.address,
+              unitNumber: newProp.unitNumber || prev.property.unitNumber,
+              city: newProp.city || prev.property.city,
+              state: newProp.state || prev.property.state,
+              zipCode: newProp.zipCode || prev.property.zipCode,
+              country: newProp.country || prev.property.country,
+              bedrooms: newProp.bedrooms || prev.property.bedrooms,
+              bathrooms: newProp.bathrooms || prev.property.bathrooms,
+              sqft: newProp.sqft || prev.property.sqft,
+              yearBuilt: newProp.yearBuilt || prev.property.yearBuilt,
+              availableDate: newProp.availableDate || prev.property.availableDate,
+              amenities: (newProp.amenities && newProp.amenities.length > 0) ? newProp.amenities : prev.property.amenities,
+              features: (newProp.features && newProp.features.length > 0) ? newProp.features : prev.property.features,
+              coverImageUrl: newProp.coverImageUrl || prev.property.coverImageUrl,
+              images: (newProp.images && newProp.images.length > 0) ? newProp.images : prev.property.images,
+            },
+            knowledgeBase: {
+              ...prev.knowledgeBase,
+              rawScrapedMarkdown: newKb.rawScrapedMarkdown || prev.knowledgeBase.rawScrapedMarkdown,
+              synthesizedSalesPitch: newKb.synthesizedSalesPitch || prev.knowledgeBase.synthesizedSalesPitch,
+              neighborhoodSummary: newKb.neighborhoodSummary || prev.knowledgeBase.neighborhoodSummary,
+              schoolDistrictInfo: newKb.schoolDistrictInfo || prev.knowledgeBase.schoolDistrictInfo,
+              petPolicyDetail: newKb.petPolicyDetail || prev.knowledgeBase.petPolicyDetail,
+              parkingDetail: newKb.parkingDetail || prev.knowledgeBase.parkingDetail,
+              utilitiesDetail: newKb.utilitiesDetail || prev.knowledgeBase.utilitiesDetail,
+              applicationProcess: newKb.applicationProcess || prev.knowledgeBase.applicationProcess,
+              faqs: (newKb.faqs && newKb.faqs.length > 0) ? newKb.faqs : prev.knowledgeBase.faqs,
+              agentTone: newKb.agentTone || prev.knowledgeBase.agentTone,
+              greetingMessage: newKb.greetingMessage || prev.knowledgeBase.greetingMessage,
+              unknownFallbackPolicy: newKb.unknownFallbackPolicy || prev.knowledgeBase.unknownFallbackPolicy,
+            },
+            negotiationMatrix: {
+              ...prev.negotiationMatrix,
+              targetPrice: newMatrix.targetPrice || prev.negotiationMatrix.targetPrice,
+              minFloorPrice: newMatrix.minFloorPrice || prev.negotiationMatrix.minFloorPrice,
+              maxAllowedDiscountPct: newMatrix.maxAllowedDiscountPct || prev.negotiationMatrix.maxAllowedDiscountPct,
+              concessionRules: (newMatrix.concessionRules && newMatrix.concessionRules.length > 0) ? newMatrix.concessionRules : prev.negotiationMatrix.concessionRules,
+              notesForAgent: newMatrix.notesForAgent || prev.negotiationMatrix.notesForAgent,
+            },
+          };
+        });
       }
     } catch (err) {
       console.error("Chat update error:", err);

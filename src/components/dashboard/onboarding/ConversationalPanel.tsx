@@ -42,6 +42,22 @@ export function ConversationalPanel({
 
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "/projects/kyron-realty-ai";
 
+  const handleCallEnd = useCallback(
+    (finalTranscript: any[]) => {
+      // Filter to user/owner statements only to prevent assistant example contamination
+      const userUtterances = finalTranscript
+        .filter((m) => m.role === "user")
+        .map((m) => m.text)
+        .filter(Boolean)
+        .join("\n");
+
+      if (userUtterances.trim()) {
+        onSendMessage(userUtterances);
+      }
+    },
+    [onSendMessage]
+  );
+
   const {
     callState,
     isMuted,
@@ -52,7 +68,7 @@ export function ConversationalPanel({
     startCall,
     toggleMute,
     endCall,
-  } = useAgoraVoiceAgent();
+  } = useAgoraVoiceAgent({ onCallEnd: handleCallEnd });
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const currentPropertyRef = useRef(currentProperty);
@@ -94,15 +110,8 @@ export function ConversationalPanel({
       if (Object.keys(quickAttrs).length > 0 && onQuickUpdate) {
         onQuickUpdate(quickAttrs);
       }
-
-      // 2. Asynchronous deep extraction with Gemini
-      try {
-        await onSendMessage(trimmed);
-      } catch (err) {
-        console.error("Hands-free property extraction error:", err);
-      }
     },
-    [onQuickUpdate, onSendMessage]
+    [onQuickUpdate]
   );
 
   const handleUrlSubmit = async (e: React.FormEvent) => {

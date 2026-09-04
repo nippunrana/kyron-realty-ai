@@ -274,7 +274,11 @@ export function LivePropertyInspector({
             {/* Badges */}
             <div className="absolute top-3 left-3 flex items-center gap-2">
               <span className="px-2.5 py-1 rounded-lg bg-slate-950/80 backdrop-blur-md text-white text-[11px] font-bold uppercase tracking-wider border border-white/20">
-                {property.listingType === "rent" ? "For Rent" : "For Sale"}
+                {property.listingType === "rent"
+                  ? "For Rent"
+                  : property.listingType === "sale"
+                  ? "For Sale"
+                  : "Type Pending"}
               </span>
               <span className="px-2.5 py-1 rounded-lg bg-emerald-500/90 backdrop-blur-md text-white text-[11px] font-bold uppercase tracking-wider">
                 {property.propertyType || "Property"}

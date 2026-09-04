@@ -28,8 +28,9 @@ This document outlines the dual-path property ingestion pipeline, split-screen o
   - Extracts clean markdown, page content, and high-resolution images.
   - Built-in direct HTTP and demo fallbacks for offline testing.
 - **Gemini Synthesizer (`src/lib/kb-extractor.ts`)**:
-  - Uses `@google/genai` (Gemini 2.5) with structured JSON output schema.
-  - Generates speech-optimized elevator pitch, categorized FAQs, and negotiation matrices.
+  - Uses `@google/genai` (Gemini 2.5) with strict Fact vs. Copy split and zero-fabrication constraints.
+  - Live conversational turns use instant deterministic heuristics (<10ms).
+  - Post-call synthesis runs once against accumulated dialogue transcript to generate speech-optimized elevator pitch, categorized FAQs, and concession matrices without inventing unstated lease terms or specs.
 
 ---
 
