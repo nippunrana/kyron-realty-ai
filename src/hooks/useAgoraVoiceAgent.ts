@@ -380,8 +380,6 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
             const spokenText = (item.text || "").trim();
             if (isUser && spokenText.length > 0) {
               const isFinished =
-                item.status === TurnStatus.END ||
-                item.status === 1 ||
                 item.final === true ||
                 item.metadata?.final === true;
 
@@ -396,101 +394,6 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
             }
           }
         });
-
-        // Direct RTM message listener fallback
-        const handleDirectRtmMessage = (event: any) => {
-          try {
-            const raw =
-              typeof event.message === "string"
-                ? event.message
-                : new TextDecoder().decode(event.message);
-            const parsed = JSON.parse(raw);
-
-            if (parsed.text && typeof parsed.text === "string" && parsed.text.trim()) {
-              const text = parsed.text.trim();
-              const isUser =
-                parsed.object === "user.transcription" ||
-                String(event.publisher) === "0" ||
-                String(event.publisher) === stringUserUid;
-
-              const turnId = parsed.turn_id || Date.now();
-              const newMsg: VoiceMessage = {
-                id: `rtm-${turnId}-${isUser ? "user" : "assistant"}`,
-                role: isUser ? "user" : "assistant",
-                text,
-                timestamp: new Date().toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                }),
-              };
-
-              setTranscript((prev) => {
-                const exists = prev.some(
-                  (m) => m.id === newMsg.id || (m.role === newMsg.role && m.text === newMsg.text)
-                );
-                return exists ? prev : [...prev, newMsg];
-              });
-
-              if (isUser && (parsed.final || parsed.status === 1 || parsed.turn_status === 1)) {
-                const key = `${turnId}_${text.toLowerCase()}`;
-                if (!processedTurnIdsRef.current.has(key as any)) {
-                  processedTurnIdsRef.current.add(key as any);
-                  console.log("[Direct RTM User Speech]", text);
-                  if (onSpeechDetectedRef.current) {
-                    onSpeechDetectedRef.current(text);
-                  }
-                }
-              }
-            }
-          } catch {}
-        };
-        rtmClient.addEventListener("message", handleDirectRtmMessage);
-
-        // Direct RTC stream message listener fallback
-        const handleDirectRtcStream = (uid: number, stream: Uint8Array) => {
-          try {
-            const text = new TextDecoder("utf-8").decode(stream);
-            const parsed = JSON.parse(text);
-
-            if (parsed.text && typeof parsed.text === "string" && parsed.text.trim()) {
-              const strText = parsed.text.trim();
-              const isUser =
-                parsed.object === "user.transcription" ||
-                String(uid) === "0" ||
-                String(uid) === stringUserUid;
-
-              const turnId = parsed.turn_id || Date.now();
-              const newMsg: VoiceMessage = {
-                id: `rtc-${turnId}-${isUser ? "user" : "assistant"}`,
-                role: isUser ? "user" : "assistant",
-                text: strText,
-                timestamp: new Date().toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                }),
-              };
-
-              setTranscript((prev) => {
-                const exists = prev.some(
-                  (m) => m.id === newMsg.id || (m.role === newMsg.role && m.text === newMsg.text)
-                );
-                return exists ? prev : [...prev, newMsg];
-              });
-
-              if (isUser && (parsed.final || parsed.status === 1 || parsed.turn_status === 1)) {
-                const key = `${turnId}_${strText.toLowerCase()}`;
-                if (!processedTurnIdsRef.current.has(key as any)) {
-                  processedTurnIdsRef.current.add(key as any);
-                  console.log("[Direct RTC User Speech]", strText);
-                  if (onSpeechDetectedRef.current) {
-                    onSpeechDetectedRef.current(strText);
-                  }
-                }
-              }
-            }
-          } catch {}
-        };
-        client.on("stream-message", handleDirectRtcStream);
 
         ai.on(AgoraVoiceAIEvents.AGENT_STATE_CHANGED, (_agentUserId: string, event: any) => {
           if (event?.state === "speaking") {

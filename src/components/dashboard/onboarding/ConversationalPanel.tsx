@@ -73,6 +73,8 @@ export function ConversationalPanel({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const currentPropertyRef = useRef(currentProperty);
   currentPropertyRef.current = currentProperty;
+  const transcriptRef = useRef(transcript);
+  transcriptRef.current = transcript;
   const recentExtractionsRef = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
@@ -102,10 +104,17 @@ export function ConversationalPanel({
         }
       }
 
+      // Find the last assistant utterance to provide active question context
+      const lastAssistantMsg = [...transcriptRef.current]
+        .reverse()
+        .find((m) => m.role === "assistant");
+      const lastAssistantQuestion = lastAssistantMsg?.text;
+
       // 1. Instant deterministic extraction (<10ms)
       const quickAttrs = extractHeuristicAttributes(
         trimmed,
-        currentPropertyRef.current
+        currentPropertyRef.current,
+        lastAssistantQuestion
       );
       if (Object.keys(quickAttrs).length > 0 && onQuickUpdate) {
         onQuickUpdate(quickAttrs);

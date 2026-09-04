@@ -73,27 +73,107 @@ function generateKebabSlug(title: string, city: string): string {
   return `${base || "property"}-${randomSuffix}`;
 }
 
+function getQuestionFocus(
+  question?: string
+): "rent_or_sale" | "price" | "bedrooms" | "bathrooms" | "sqft" | "address" | null {
+  if (!question || typeof question !== "string") return null;
+
+  // Split into sentences / clauses and inspect the trailing clause
+  const clauses = question
+    .split(/[?.!]\s*|\n+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  const target = (clauses[clauses.length - 1] || question).toLowerCase();
+
+  // 1. Price / Rent amount questions
+  if (
+    /\b(?:monthly\s*rent|asking\s*price|target\s*price|price\b|how\s*much|cost\b|budget\b|rate\b)\b/i.test(target)
+  ) {
+    return "price";
+  }
+
+  // 2. Listing type questions (Rent vs Sale)
+  if (
+    /\b(?:for\s*rent\s*or\s*(?:for\s*)?sale|rent\s*or\s*sale|renting\s*or\s*selling|rent\s*or\s*buy)\b/i.test(target) ||
+    (/\b(?:rent|sale)\b/i.test(target) && /\b(?:is\s*(?:this|the\s*property)\s*for)\b/i.test(target))
+  ) {
+    return "rent_or_sale";
+  }
+
+  // 3. Bathrooms
+  if (/\b(?:bathroom|bathrooms|baths|bath|toilets|toilet|washroom|washrooms|restroom|restrooms)\b/i.test(target)) {
+    return "bathrooms";
+  }
+
+  // 4. Bedrooms
+  if (/\b(?:bedroom|bedrooms|beds|bed|br)\b/i.test(target)) {
+    return "bedrooms";
+  }
+
+  // 5. Sqft / Size
+  if (/\b(?:square\s*feet|square\s*foot|sqft|sq\s*ft|footage|size|area|how\s*big|square)\b/i.test(target)) {
+    return "sqft";
+  }
+
+  // 6. Address / Location
+  if (/\b(?:address|location|where\s*is|street|located|where's|neighborhood|city)\b/i.test(target)) {
+    return "address";
+  }
+
+  return null;
+}
+
+function parseSpokenNumber(text: string): number | null {
+  const cleaned = text.toLowerCase().trim().replace(/[,.]/g, "");
+  const digitMatch = cleaned.match(/\b([0-9]+)\b/);
+  if (digitMatch) return Number(digitMatch[1]);
+
+  const wordMap: Record<string, number> = {
+    zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5,
+    six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+    eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15,
+    sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20,
+    thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70,
+    eighty: 80, ninety: 90,
+  };
+
+  if (wordMap[cleaned] !== undefined) return wordMap[cleaned];
+
+  if (cleaned.includes("thousand")) {
+    const parts = cleaned.split("thousand").map((p) => p.trim());
+    const base = wordMap[parts[0]] || 1;
+    const rem = parts[1] && wordMap[parts[1]] ? wordMap[parts[1]] : 0;
+    return base * 1000 + rem;
+  }
+
+  return null;
+}
+
 /**
  * Deterministic real-time attribute extractor for instantaneous (<10ms) hands-free voice updates.
- * Parses listing type, price, beds, baths, sqft, and address from spoken user text.
+ * Parses listing type, price, beds, baths, sqft, and address from spoken user text with question context.
  */
 export function extractHeuristicAttributes(
   text: string,
-  prevProperty?: Partial<ExtractedPropertyPayload["property"]>
+  prevProperty?: Partial<ExtractedPropertyPayload["property"]>,
+  lastAssistantQuestion?: string
 ): Partial<ExtractedPropertyPayload["property"]> {
   const updates: Partial<ExtractedPropertyPayload["property"]> = {};
   if (!text || typeof text !== "string") return updates;
 
-  const lower = text.toLowerCase();
+  const lower = text.toLowerCase().trim();
+  const focus = getQuestionFocus(lastAssistantQuestion);
 
   // 1. Listing Type
   if (
     /\b(?:for rent|to rent|rental|for lease|to lease)\b/i.test(lower) ||
-    /\b(?:renting|rent is|per month|\/mo|a month)\b/i.test(lower)
+    /\b(?:renting|rent is|per month|\/mo|a month)\b/i.test(lower) ||
+    (focus === "rent_or_sale" && /\brent\b/i.test(lower) && !/\bsale\b/i.test(lower))
   ) {
     updates.listingType = "rent";
   } else if (
-    /\b(?:for sale|to buy|selling|purchase|asking price|to purchase)\b/i.test(lower)
+    /\b(?:for sale|to buy|selling|purchase|asking price|to purchase)\b/i.test(lower) ||
+    (focus === "rent_or_sale" && /\bsale\b/i.test(lower) && !/\brent\b/i.test(lower))
   ) {
     updates.listingType = "sale";
   }
@@ -105,10 +185,23 @@ export function extractHeuristicAttributes(
     parsedPrice = Number(dollarMatch[1].replace(/,/g, ""));
   } else {
     const wordPriceMatch = text.match(
-      /\b([0-9]{1,3}(?:,[0-9]{3})+|[0-9]{3,7})\s*(?:dollars|per\s*month|\/mo|\/month|monthly|a\s*month)\b/i
+      /\b([0-9]{1,3}(?:,[0-9]{3})+|[0-9]{3,7})\s*(?:dollars|bucks|per\s*month|\/mo|\/month|monthly|a\s*month)\b/i
     );
     if (wordPriceMatch && wordPriceMatch[1]) {
       parsedPrice = Number(wordPriceMatch[1].replace(/,/g, ""));
+    } else if (focus === "price") {
+      // Standalone number or spoken amount when answering a price question
+      const standaloneNumMatch = text.match(
+        /(?:^|\b)(?:it's|it is|about|around)?\s*([0-9]{1,3}(?:,[0-9]{3})+|[0-9]{3,7})\b/i
+      );
+      if (standaloneNumMatch && standaloneNumMatch[1]) {
+        parsedPrice = Number(standaloneNumMatch[1].replace(/,/g, ""));
+      } else {
+        const spokenVal = parseSpokenNumber(text);
+        if (spokenVal && spokenVal >= 100) {
+          parsedPrice = spokenVal;
+        }
+      }
     }
   }
   if (parsedPrice && parsedPrice >= 100) {
@@ -134,11 +227,16 @@ export function extractHeuristicAttributes(
     if (bedMatch && bedMatch[1]) {
       const word = bedMatch[1].toLowerCase();
       updates.bedrooms = bedWordMap[word] !== undefined ? bedWordMap[word] : Number(word);
+    } else if (focus === "bedrooms") {
+      const num = parseSpokenNumber(text);
+      if (num !== null && num >= 0 && num <= 20) {
+        updates.bedrooms = num;
+      }
     }
   }
 
   // 4. Bathrooms
-  // Matches "2 baths", "2.5 bathrooms", "two baths", "1.5 ba"
+  // Matches "2 baths", "2.5 bathrooms", "two baths", "1.5 ba", "2 toilets", "2 washrooms"
   const bathWordMap: Record<string, number> = {
     one: 1,
     two: 2,
@@ -147,41 +245,82 @@ export function extractHeuristicAttributes(
     five: 5,
   };
   const bathRegex =
-    /\b([0-9]+(?:\.[0-9]+)?|one|two|three|four|five)\s*(?:bath|baths|bathroom|bathrooms|ba)\b/i;
+    /\b([0-9]+(?:\.[0-9]+)?|one|two|three|four|five)\s*(?:bath|baths|bathroom|bathrooms|ba|toilet|toilets|washroom|washrooms|restroom|restrooms|powder\s*room)\b/i;
   const bathMatch = text.match(bathRegex);
   if (bathMatch && bathMatch[1]) {
     const word = bathMatch[1].toLowerCase();
     updates.bathrooms = bathWordMap[word] !== undefined ? bathWordMap[word] : Number(word);
-  }
-
-  // 5. Square footage / Size
-  // Matches "1,200 sqft", "1200 square feet", "850 sf", "1,500 sq ft"
-  const sqftRegex =
-    /\b([0-9]{1,3}(?:,[0-9]{3})+|[0-9]{3,5})\s*(?:sq\s*ft|sqft|square\s*feet|square\s*foot|sf)\b/i;
-  const sqftMatch = text.match(sqftRegex);
-  if (sqftMatch && sqftMatch[1]) {
-    updates.sqft = Number(sqftMatch[1].replace(/,/g, ""));
-  }
-
-  // 6. Street Address & Location
-  // Looks for street numbers followed by name and suffix
-  const streetRegex =
-    /(?:\bat\s+)?([0-9]{1,5}\s+[A-Za-z\s]+?\s+(?:Street|St|Avenue|Ave|Boulevard|Blvd|Road|Rd|Drive|Dr|Lane|Ln|Way|Court|Ct|Place|Pl|Terrace|Ter|Circle|Cir)\b)/i;
-  const streetMatch = text.match(streetRegex);
-  if (streetMatch && streetMatch[1]) {
-    updates.address = streetMatch[1].trim();
-    const afterAddress = text.substring((streetMatch.index || 0) + streetMatch[0].length);
-    const cityMatch = afterAddress.match(/,\s*([A-Za-z\s]+?)(?:,\s*([A-Z]{2}))?(?:\s+[0-9]{5})?(?:[.,]|$)/);
-    if (cityMatch && cityMatch[1]) {
-      updates.city = cityMatch[1].trim();
-      if (cityMatch[2]) updates.state = cityMatch[2].trim();
+  } else if (focus === "bathrooms") {
+    const num = parseSpokenNumber(text);
+    if (num !== null && num >= 1 && num <= 15) {
+      updates.bathrooms = num;
     }
   }
 
-  // Capture 5-digit zip code if present anywhere in the text
-  const zipMatch = text.match(/\b([0-9]{5})\b/);
-  if (zipMatch && zipMatch[1]) {
-    updates.zipCode = zipMatch[1];
+  // 5. Square footage / Size
+  // Matches "1,200 sqft", "1200 square feet", "850 sf", "1,500 sq ft", "1100 square"
+  const sqftRegex =
+    /\b([0-9]{1,3}(?:,[0-9]{3})+|[0-9]{3,5})\s*(?:sq\s*ft|sqft|square\s*feet|square\s*foot|sf|square)\b/i;
+  const sqftMatch = text.match(sqftRegex);
+  if (sqftMatch && sqftMatch[1]) {
+    updates.sqft = Number(sqftMatch[1].replace(/,/g, ""));
+  } else if (focus === "sqft") {
+    const standaloneSqft = text.match(/\b([0-9]{1,3}(?:,[0-9]{3})+|[0-9]{3,5})\b/);
+    if (standaloneSqft && standaloneSqft[1]) {
+      updates.sqft = Number(standaloneSqft[1].replace(/,/g, ""));
+    }
+  }
+
+  // 6. Street Address & Location
+  if (focus === "address") {
+    // Strip common leading conversational phrases
+    const cleanAddr = text
+      .replace(/^(?:it's|it is|the address is|address is|located at|at)\s+/i, "")
+      .replace(/[.]+$/, "")
+      .trim();
+
+    if (cleanAddr.length > 3) {
+      const parts = cleanAddr.split(",").map((p) => p.trim()).filter(Boolean);
+      if (parts.length >= 2) {
+        updates.city = parts[parts.length - 1];
+        updates.address = parts.slice(0, parts.length - 1).join(", ");
+      } else {
+        updates.address = cleanAddr;
+      }
+    }
+  } else {
+    // Regex fallback for US street addresses in unprompted utterances
+    const streetRegex =
+      /(?:\bat\s+)?([0-9]{1,5}\s+[A-Za-z\s]+?\s+(?:Street|St|Avenue|Ave|Boulevard|Blvd|Road|Rd|Drive|Dr|Lane|Ln|Way|Court|Ct|Place|Pl|Terrace|Ter|Circle|Cir)\b)/i;
+    const streetMatch = text.match(streetRegex);
+    if (streetMatch && streetMatch[1]) {
+      updates.address = streetMatch[1].trim();
+      const afterAddress = text.substring((streetMatch.index || 0) + streetMatch[0].length);
+      const cityMatch = afterAddress.match(/,\s*([A-Za-z\s]+?)(?:,\s*([A-Z]{2}))?(?:\s+[0-9]{5})?(?:[.,]|$)/);
+      if (cityMatch && cityMatch[1]) {
+        updates.city = cityMatch[1].trim();
+        if (cityMatch[2]) updates.state = cityMatch[2].trim();
+      }
+    }
+  }
+
+  // 7. Zip code extraction (PROTECTED AGAINST PRICE/RENT COLLISION)
+  // Never extract 5-digit number as zip if answering price, or if number equals parsedPrice
+  if (focus !== "price") {
+    const zipMatch = text.match(/\b([0-9]{5})\b/);
+    if (zipMatch && zipMatch[1]) {
+      const candidateZip = zipMatch[1];
+      if (parsedPrice === null || Number(candidateZip) !== parsedPrice) {
+        // Only treat as zip if in address context or explicitly preceded by zip/state
+        if (
+          focus === "address" ||
+          /\b(?:zip|zipcode|postal)\b/i.test(text) ||
+          /[A-Z]{2}\s+[0-9]{5}\b/.test(text)
+        ) {
+          updates.zipCode = candidateZip;
+        }
+      }
+    }
   }
 
   // Auto-generate title only if address is found; do not assume "for rent"
