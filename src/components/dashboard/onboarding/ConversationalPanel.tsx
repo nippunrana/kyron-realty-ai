@@ -55,25 +55,44 @@ export function ConversationalPanel({
     toggleMute,
     endCall,
     sendTextMessage,
-    addAssistantResponse,
   } = useAgoraVoiceAgent();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const currentPropertyRef = useRef(currentProperty);
   currentPropertyRef.current = currentProperty;
+  const recentExtractionsRef = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [transcript, isProcessing]);
 
-  // Handler for hands-free speech captured via Agora WebRTC / SpeechRecognition
+  // Handler for speech captured via Agora SD-RTN live transcripts
   const handleHandsFreeSpeech = useCallback(
     async (spokenText: string) => {
-      if (!spokenText.trim()) return;
+      const trimmed = spokenText.trim();
+      if (!trimmed) return;
+
+      // Deduplicate recent extractions to prevent double processing when typed text is echoed
+      const normalized = trimmed.toLowerCase();
+      const now = Date.now();
+      const lastRun = recentExtractionsRef.current.get(normalized);
+      if (lastRun && now - lastRun < 15000) {
+        return;
+      }
+      recentExtractionsRef.current.set(normalized, now);
+
+      // Clean up old entries if map grows
+      if (recentExtractionsRef.current.size > 50) {
+        for (const [key, timestamp] of recentExtractionsRef.current.entries()) {
+          if (now - timestamp > 60000) {
+            recentExtractionsRef.current.delete(key);
+          }
+        }
+      }
 
       // 1. Instant deterministic extraction (<10ms) to tick off checklist items in real time
       const quickAttrs = extractHeuristicAttributes(
-        spokenText,
+        trimmed,
         currentPropertyRef.current
       );
       if (Object.keys(quickAttrs).length > 0 && onQuickUpdate) {
@@ -82,27 +101,12 @@ export function ConversationalPanel({
 
       // 2. Asynchronous deep extraction with Gemini for complete Knowledge Base
       try {
-        await onSendMessage(spokenText);
-
-        // Generate intelligent conversational voice acknowledgment
-        const lower = spokenText.toLowerCase();
-        let reply = "Got it! I've noted that in your listing.";
-        if (lower.includes("rent")) {
-          reply = "Understood, this listing is for rent! What is the street address and location?";
-        } else if (lower.includes("sale")) {
-          reply = "Excellent, listing for sale! What is the street address and location?";
-        } else if (lower.includes("street") || lower.includes("blvd") || lower.includes("ave") || lower.includes("road")) {
-          reply = "Great location! What are the monthly rent or asking price, and the bedroom count?";
-        } else if (lower.includes("bed") || lower.includes("bath") || lower.includes("sqft")) {
-          reply = "Perfect specs recorded! Any special amenities, pet policies, or parking details to include?";
-        }
-
-        addAssistantResponse(reply);
+        await onSendMessage(trimmed);
       } catch (err) {
-        console.error("Hands-free processing error:", err);
+        console.error("Hands-free property extraction error:", err);
       }
     },
-    [onQuickUpdate, onSendMessage, addAssistantResponse]
+    [onQuickUpdate, onSendMessage]
   );
 
   // Switch modes: when user clicks "Voice & Chat", connect directly to Agora Voice Agent

@@ -35,7 +35,6 @@ export interface UseAgoraVoiceAgentReturn {
   toggleMute: () => void;
   endCall: () => Promise<void>;
   sendTextMessage: (text: string) => void;
-  addAssistantResponse: (text: string) => void;
 }
 
 export function useAgoraVoiceAgent(): UseAgoraVoiceAgentReturn {
@@ -61,69 +60,103 @@ export function useAgoraVoiceAgent(): UseAgoraVoiceAgentReturn {
   const callActiveRef = useRef<boolean>(false);
   const isMutedRef = useRef<boolean>(false);
   const onSpeechDetectedRef = useRef<((text: string) => void) | undefined>(undefined);
-  const speechRecognitionRef = useRef<any>(null);
+  const rtmClientRef = useRef<any>(null);
+  const voiceAiRef = useRef<any>(null);
+  const agentUidRef = useRef<number>(999001);
+  const userUidRef = useRef<number>(1001);
+  const processedTurnIdsRef = useRef<Set<number>>(new Set());
+  const localMessagesRef = useRef<VoiceMessage[]>([]);
+  const mappedRemoteRef = useRef<VoiceMessage[]>([]);
 
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "/projects/kyron-realty-ai";
+
+  // Centralized Resource Teardown
+  const teardownResources = useCallback(async () => {
+    callActiveRef.current = false;
+    isStartingRef.current = false;
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+
+    if (channelNameRef.current && rtmClientRef.current) {
+      try {
+        await rtmClientRef.current.unsubscribe(channelNameRef.current);
+      } catch {}
+    }
+
+    if (voiceAiRef.current) {
+      try {
+        voiceAiRef.current.destroy();
+      } catch {}
+      voiceAiRef.current = null;
+    }
+
+    if (rtmClientRef.current) {
+      try {
+        await rtmClientRef.current.logout();
+      } catch {}
+      rtmClientRef.current = null;
+    }
+
+    localMessagesRef.current = [];
+    mappedRemoteRef.current = [];
+    processedTurnIdsRef.current.clear();
+
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
+    }
+
+    if (localAudioTrackRef.current) {
+      localAudioTrackRef.current.stop();
+      localAudioTrackRef.current.close();
+      localAudioTrackRef.current = null;
+    }
+
+    if (clientRef.current) {
+      try {
+        await clientRef.current.leave();
+      } catch {}
+      clientRef.current = null;
+    }
+
+    if (audioContextRef.current && audioContextRef.current.state !== "closed") {
+      try {
+        await audioContextRef.current.close();
+      } catch {}
+      audioContextRef.current = null;
+    }
+
+    // Stop remote session on backend if active
+    const currentSessionId = sessionIdRef.current;
+    const currentChannelName = channelNameRef.current;
+    sessionIdRef.current = null;
+    channelNameRef.current = null;
+
+    if (currentSessionId && currentChannelName) {
+      try {
+        await fetch(`${basePath}/api/agora/session/stop`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sessionId: currentSessionId,
+            channelName: currentChannelName,
+          }),
+        });
+      } catch {
+        // Ignore background teardown error
+      }
+    }
+  }, [basePath]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      callActiveRef.current = false;
-
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-        abortControllerRef.current = null;
-      }
-      isStartingRef.current = false;
-
-      if (speechRecognitionRef.current) {
-        try {
-          speechRecognitionRef.current.stop();
-        } catch {}
-        speechRecognitionRef.current = null;
-      }
-
-      if (typeof window !== "undefined" && "speechSynthesis" in window) {
-        window.speechSynthesis.cancel();
-      }
-
-      if (animFrameRef.current) {
-        cancelAnimationFrame(animFrameRef.current);
-        animFrameRef.current = null;
-      }
-      if (localAudioTrackRef.current) {
-        localAudioTrackRef.current.stop();
-        localAudioTrackRef.current.close();
-        localAudioTrackRef.current = null;
-      }
-      if (clientRef.current) {
-        clientRef.current.leave().catch(() => {});
-        clientRef.current = null;
-      }
-      if (audioContextRef.current && audioContextRef.current.state !== "closed") {
-        audioContextRef.current.close().catch(() => {});
-        audioContextRef.current = null;
-      }
-
-      // If a session was active or initialized, tell server to stop it
-      if (sessionIdRef.current && channelNameRef.current) {
-        const sid = sessionIdRef.current;
-        const cname = channelNameRef.current;
-        sessionIdRef.current = null;
-        channelNameRef.current = null;
-        try {
-          fetch(`${basePath}/api/agora/session/stop`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ sessionId: sid, channelName: cname }),
-            keepalive: true,
-          }).catch(() => {});
-        } catch {
-          // ignore background teardown error
-        }
-      }
+      teardownResources();
     };
-  }, [basePath]);
+  }, [teardownResources]);
 
   // Real-time Audio Frequency Visualizer Loop
   const startFrequencyVisualizer = (mediaStreamTrack?: MediaStreamTrack) => {
@@ -221,47 +254,18 @@ export function useAgoraVoiceAgent(): UseAgoraVoiceAgentReturn {
           return;
         }
 
-        const { channelName, token, userUid, agentUid, sessionId, greeting } = sessionData;
+        const { channelName, token, rtmToken, userUid, agentUid, sessionId } = sessionData;
         sessionIdRef.current = sessionId;
         channelNameRef.current = channelName;
+        agentUidRef.current = Number(agentUid) || 999001;
+        userUidRef.current = Number(userUid) || 1001;
+        processedTurnIdsRef.current.clear();
+        localMessagesRef.current = [];
+        mappedRemoteRef.current = [];
 
-        // Add greeting message to transcript and speak out loud
-        if (greeting) {
-          setTranscript([
-            {
-              id: `agent-greeting-${Date.now()}`,
-              role: "assistant",
-              text: greeting,
-              timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-            },
-          ]);
-
-          if (typeof window !== "undefined" && "speechSynthesis" in window) {
-            try {
-              window.speechSynthesis.cancel();
-              const utterance = new SpeechSynthesisUtterance(greeting);
-              utterance.rate = 1.0;
-              utterance.pitch = 1.0;
-              utterance.onstart = () => {
-                setIsAgentSpeaking(true);
-                setCallState("agent_speaking");
-              };
-              utterance.onend = () => {
-                setIsAgentSpeaking(false);
-                setCallState("connected");
-              };
-              window.speechSynthesis.speak(utterance);
-            } catch (e) {
-              console.warn("Speech synthesis error for greeting:", e);
-            }
-          }
+        if (!rtmToken || rtmToken.trim() === "") {
+          throw new Error("Missing RTM token from Agora session response. Please verify AGORA_APP_CERTIFICATE.");
         }
-
-        // Step 2: Dynamic import of Agora RTC SDK (Browser only)
-        const AgoraRTC = (await import("agora-rtc-sdk-ng")).default;
-        AgoraRTC.setLogLevel(3); // Warnings & errors only
-
-        if (abortController.signal.aborted) return;
 
         const appId = (
           sessionData.appId ||
@@ -275,8 +279,91 @@ export function useAgoraVoiceAgent(): UseAgoraVoiceAgentReturn {
           );
         }
 
+        // Step 2: Initialize Agora RTM and log in BEFORE RTC join
+        const AgoraRTM = (await import("agora-rtm")).default;
+        const { AgoraVoiceAI, AgoraVoiceAIEvents, TurnStatus } = await import(
+          "agora-agent-client-toolkit"
+        );
+
+        const stringUserUid = String(userUid);
+        const rtmClient = new AgoraRTM.RTM(appId, stringUserUid);
+        rtmClientRef.current = rtmClient;
+
+        await rtmClient.login({ token: rtmToken });
+
+        // Step 3: Initialize Agora RTC client and AgoraVoiceAI Toolkit
+        const AgoraRTC = (await import("agora-rtc-sdk-ng")).default;
+        AgoraRTC.setLogLevel(3); // Warnings & errors only
+
+        if (abortController.signal.aborted) return;
+
         const client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
         clientRef.current = client;
+
+        const ai = await AgoraVoiceAI.init({
+          rtcEngine: client,
+          rtmEngine: rtmClient,
+        });
+        voiceAiRef.current = ai;
+
+        // Attach live transcript updates BEFORE opening channel subscription
+        ai.on(AgoraVoiceAIEvents.TRANSCRIPT_UPDATED, (transcriptions: any[]) => {
+          if (!transcriptions || !Array.isArray(transcriptions)) return;
+
+          const mapped: VoiceMessage[] = transcriptions
+            .filter((item: any) => (item.text || "").trim().length > 0)
+            .map((item: any, idx: number) => {
+              const isUser = String(item.uid) === stringUserUid;
+              return {
+                id: `turn-${item.turn_id ?? idx}-${item.uid ?? "agent"}`,
+                role: isUser ? "user" : "assistant",
+                text: (item.text || "").trim(),
+                timestamp: new Date(item._time || Date.now()).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                }),
+              };
+            });
+
+          mappedRemoteRef.current = mapped;
+          // Reconcile and keep pending local typed messages until confirmed in remote transcript
+          localMessagesRef.current = localMessagesRef.current.filter(
+            (local) => !mapped.some((remote) => remote.role === "user" && remote.text.toLowerCase() === local.text.toLowerCase())
+          );
+          setTranscript([...mapped, ...localMessagesRef.current]);
+
+          // Deduplicated checklist extraction for completed user turns
+          for (const item of transcriptions) {
+            const isUser = String(item.uid) === stringUserUid;
+            if (isUser && item.status === TurnStatus.END && item.turn_id != null) {
+              if (!processedTurnIdsRef.current.has(item.turn_id)) {
+                processedTurnIdsRef.current.add(item.turn_id);
+                const spokenText = (item.text || "").trim();
+                if (spokenText && onSpeechDetectedRef.current) {
+                  onSpeechDetectedRef.current(spokenText);
+                }
+              }
+            }
+          }
+        });
+
+        ai.on(AgoraVoiceAIEvents.AGENT_STATE_CHANGED, (_agentUserId: string, event: any) => {
+          if (event?.state === "speaking") {
+            setIsAgentSpeaking(true);
+            setCallState("agent_speaking");
+          } else if (
+            event?.state === "listening" ||
+            event?.state === "thinking" ||
+            event?.state === "idle"
+          ) {
+            setIsAgentSpeaking(false);
+            setCallState("connected");
+          }
+        });
+
+        // Attach toolkit listeners to channel, then subscribe RTM channel
+        ai.subscribeMessage(channelName);
+        await rtmClient.subscribe(channelName);
 
         // Enable volume indicators for VAD turn detection
         client.enableAudioVolumeIndicator();
@@ -315,7 +402,7 @@ export function useAgoraVoiceAgent(): UseAgoraVoiceAgentReturn {
           }
         });
 
-        // Step 3: Capture local microphone
+        // Step 4: Capture local microphone
         const localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack({
           AEC: true, // Acoustic Echo Cancellation
           ANS: true, // Automatic Noise Suppression
@@ -330,7 +417,7 @@ export function useAgoraVoiceAgent(): UseAgoraVoiceAgentReturn {
 
         localAudioTrackRef.current = localAudioTrack;
 
-        // Step 4: Join RTC Channel and Publish Track
+        // Step 5: Join RTC Channel and Publish Track
         await client.join(appId, channelName, token || null, userUid);
         if (abortController.signal.aborted) {
           await client.leave();
@@ -345,77 +432,21 @@ export function useAgoraVoiceAgent(): UseAgoraVoiceAgentReturn {
 
         callActiveRef.current = true;
         setCallState("connected");
-
-        // Step 5: Continuous hands-free speech recognition for owner onboarding
-        if (typeof window !== "undefined") {
-          const SpeechRec =
-            (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-          if (SpeechRec) {
-            try {
-              const recognition = new SpeechRec();
-              recognition.continuous = true;
-              recognition.interimResults = false;
-              recognition.lang = "en-US";
-
-              recognition.onresult = (event: any) => {
-                const results = event.results;
-                const lastResult = results[results.length - 1];
-                if (lastResult && lastResult[0]) {
-                  const spokenText = lastResult[0].transcript.trim();
-                  if (spokenText) {
-                    const now = new Date().toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    });
-                    setTranscript((prev) => [
-                      ...prev,
-                      {
-                        id: `user-speech-${Date.now()}`,
-                        role: "user",
-                        text: spokenText,
-                        timestamp: now,
-                      },
-                    ]);
-                    if (onSpeechDetectedRef.current) {
-                      onSpeechDetectedRef.current(spokenText);
-                    }
-                  }
-                }
-              };
-
-              recognition.onend = () => {
-                // Auto-restart if call is still active and not muted
-                if (callActiveRef.current && !isMutedRef.current && speechRecognitionRef.current) {
-                  try {
-                    recognition.start();
-                  } catch {}
-                }
-              };
-
-              recognition.onerror = (e: any) => {
-                console.warn("[Agora Voice Agent] Speech recognition notice:", e.error);
-              };
-
-              recognition.start();
-              speechRecognitionRef.current = recognition;
-            } catch (err) {
-              console.warn("Could not start continuous speech recognition:", err);
-            }
-          }
-        }
       } catch (err: any) {
         if (err.name === "AbortError" || abortController.signal.aborted) {
           console.log("[Agora Voice Agent] Call startup aborted.");
+          await teardownResources();
           return;
         }
         console.error("Agora voice agent error:", err);
+        await teardownResources();
         setErrorMessage(err.message || "Failed to establish real-time voice call.");
         setCallState("error");
       } finally {
         isStartingRef.current = false;
       }
     },
-    [basePath]
+    [basePath, teardownResources]
   );
 
   // Toggle Mute
@@ -425,141 +456,59 @@ export function useAgoraVoiceAgent(): UseAgoraVoiceAgentReturn {
       localAudioTrackRef.current.setEnabled(!nextMuted);
       setIsMuted(nextMuted);
       isMutedRef.current = nextMuted;
-
-      if (nextMuted && speechRecognitionRef.current) {
-        try {
-          speechRecognitionRef.current.stop();
-        } catch {}
-      } else if (!nextMuted && speechRecognitionRef.current && callActiveRef.current) {
-        try {
-          speechRecognitionRef.current.start();
-        } catch {}
-      }
     }
   }, [isMuted]);
 
   // End Call
   const endCall = useCallback(async () => {
-    callActiveRef.current = false;
-    isStartingRef.current = false;
-
-    // Abort any in-progress startCall
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
-
-    if (speechRecognitionRef.current) {
-      try {
-        speechRecognitionRef.current.stop();
-      } catch {}
-      speechRecognitionRef.current = null;
-    }
-
-    if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-    }
-
-    if (animFrameRef.current) {
-      cancelAnimationFrame(animFrameRef.current);
-      animFrameRef.current = null;
-    }
-
-    if (localAudioTrackRef.current) {
-      localAudioTrackRef.current.stop();
-      localAudioTrackRef.current.close();
-      localAudioTrackRef.current = null;
-    }
-
-    if (clientRef.current) {
-      try {
-        await clientRef.current.leave();
-      } catch (e) {
-        console.warn("Error leaving Agora client:", e);
-      }
-      clientRef.current = null;
-    }
-
-    if (audioContextRef.current && audioContextRef.current.state !== "closed") {
-      try {
-        await audioContextRef.current.close();
-      } catch (e) {}
-      audioContextRef.current = null;
-    }
-
-    const currentSessionId = sessionIdRef.current;
-    const currentChannelName = channelNameRef.current;
-    sessionIdRef.current = null;
-    channelNameRef.current = null;
-
-    if (currentSessionId && currentChannelName) {
-      try {
-        await fetch(`${basePath}/api/agora/session/stop`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            sessionId: currentSessionId,
-            channelName: currentChannelName,
-          }),
-        });
-      } catch (e) {
-        console.warn("Could not notify server of session stop:", e);
-      }
-    }
-
+    await teardownResources();
     setCallState("idle");
     setIsAgentSpeaking(false);
     setUserVolume(0);
     setAgentVolume(0);
     setAudioFrequencies(new Array(16).fill(10));
-  }, [basePath]);
+  }, [teardownResources]);
 
-  // Send Text Message in active session
-  const sendTextMessage = useCallback((text: string) => {
-    if (!text.trim()) return;
+  // Send Text Message in active session (routed via RTM to Agora agent)
+  const sendTextMessage = useCallback(async (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+
+    if (!voiceAiRef.current || !callActiveRef.current) {
+      setErrorMessage("Voice agent is not connected. Connect to the session to send messages.");
+      return;
+    }
+
     const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    setTranscript((prev) => [
-      ...prev,
-      {
-        id: `user-${Date.now()}`,
-        role: "user",
-        text: text.trim(),
-        timestamp: now,
-      },
-    ]);
-  }, []);
+    const localMsg: VoiceMessage = {
+      id: `local-text-${Date.now()}`,
+      role: "user",
+      text: trimmed,
+      timestamp: now,
+    };
 
-  // Add Assistant Response (and speak aloud)
-  const addAssistantResponse = useCallback((text: string) => {
-    if (!text.trim()) return;
-    const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    setTranscript((prev) => [
-      ...prev,
-      {
-        id: `agent-${Date.now()}`,
-        role: "assistant",
-        text: text.trim(),
-        timestamp: now,
-      },
-    ]);
+    // Optimistically render pending local message
+    localMessagesRef.current = [...localMessagesRef.current, localMsg];
+    setTranscript([...mappedRemoteRef.current, ...localMessagesRef.current]);
 
-    if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      try {
-        const utterance = new SpeechSynthesisUtterance(text.trim());
-        utterance.rate = 1.0;
-        utterance.pitch = 1.0;
-        utterance.onstart = () => {
-          setIsAgentSpeaking(true);
-          setCallState("agent_speaking");
-        };
-        utterance.onend = () => {
-          setIsAgentSpeaking(false);
-          setCallState("connected");
-        };
-        window.speechSynthesis.speak(utterance);
-      } catch (e) {
-        console.warn("Speech synthesis error:", e);
-      }
+    try {
+      const { ChatMessageType, ChatMessagePriority } = await import(
+        "agora-agent-client-toolkit"
+      );
+      await voiceAiRef.current.sendText(String(agentUidRef.current), {
+        messageType: ChatMessageType.TEXT,
+        priority: ChatMessagePriority.INTERRUPTED,
+        responseInterruptable: true,
+        text: trimmed,
+      });
+    } catch (sendErr: any) {
+      console.error("[Agora Voice Agent] Could not send text message over RTM:", sendErr);
+      // Remove local message from UI to prevent fake success
+      localMessagesRef.current = localMessagesRef.current.filter((msg) => msg.id !== localMsg.id);
+      setTranscript([...mappedRemoteRef.current, ...localMessagesRef.current]);
+      setErrorMessage(
+        `Failed to deliver message to voice agent: ${sendErr?.message || "RTM communication failure"}`
+      );
     }
   }, []);
 
@@ -576,6 +525,5 @@ export function useAgoraVoiceAgent(): UseAgoraVoiceAgentReturn {
     toggleMute,
     endCall,
     sendTextMessage,
-    addAssistantResponse,
   };
 }

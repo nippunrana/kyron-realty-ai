@@ -1,4 +1,8 @@
-import { generateAgoraRtcToken } from "./agora-token";
+import {
+  generateAgoraRtcToken,
+  generateAgoraRtmToken,
+  generateAgoraConvoAiAgentToken,
+} from "./agora-token";
 import { db } from "@/db";
 import { properties, propertyKnowledgeBases, negotiationMatrices, voiceSessions } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -19,6 +23,7 @@ export interface AgoraAgentSessionResult {
   agentUid: number;
   userUid: number;
   token: string;
+  rtmToken: string;
   greeting: string;
   appId: string;
   message?: string;
@@ -78,9 +83,10 @@ export async function startAgoraAgentSession(
     matrixRecord = matrix;
   }
 
-  // 2. Generate Real Signed RTC Tokens for User and Agent (Throws if AGORA_APP_CERTIFICATE is missing)
+  // 2. Generate Real Signed RTC and RTM Tokens for User and Multi-Service Token for Agent
   const userTokenData = generateAgoraRtcToken(channelName, userUid);
-  const agentTokenData = generateAgoraRtcToken(channelName, agentUid);
+  const userRtmTokenData = generateAgoraRtmToken(String(userUid));
+  const agentToken = generateAgoraConvoAiAgentToken(channelName, agentUid);
 
   // 3. Build Agent System Prompt & Real Estate Persona
   const propertyTitle = propertyRecord?.title || "Property";
@@ -333,7 +339,7 @@ RULES OF ENGAGEMENT:
       name: `kyron-realty-${propertyRecord?.slug || "listing"}-${Date.now()}`,
       properties: {
         channel: channelName,
-        token: agentTokenData.token,
+        token: agentToken,
         agent_rtc_uid: String(agentUid),
         remote_rtc_uids: [String(userUid)],
         idle_timeout: 120,
@@ -344,6 +350,13 @@ RULES OF ENGAGEMENT:
           mode: "auto",
           prefix_padding_ms: 300,
           silence_duration_ms: 500,
+        },
+        advanced_features: {
+          enable_rtm: true,
+        },
+        parameters: {
+          data_channel: "rtm",
+          enable_error_message: true,
         },
       },
     }),
@@ -364,20 +377,24 @@ RULES OF ENGAGEMENT:
       // Non-JSON response
     }
 
-    console.warn(`[Agora Gateway Error ${response.status}]:`, parsedDetail || response.statusText);
+    console.error(`[Agora Gateway Error ${response.status}]:`, parsedDetail || response.statusText);
 
-    // In demo / fallback environments, ensure the caller can still connect to Agora SD-RTN WebRTC
-    return {
-      success: true,
-      sessionId: voiceSessionId,
-      channelName,
-      agentUid,
-      userUid,
-      token: userTokenData.token,
-      appId,
-      greeting,
-      message: "Agent session initialized on Agora SD-RTN.",
-    };
+    // Update voiceSession record to failed
+    try {
+      await db
+        .update(voiceSessions)
+        .set({
+          status: "failed",
+          endedAt: new Date(),
+        })
+        .where(eq(voiceSessions.agoraSessionId, voiceSessionId));
+    } catch (dbErr) {
+      console.warn("[Agora Voice Session] DB update to failed warning:", dbErr);
+    }
+
+    throw new Error(
+      `Agora Conversational AI Gateway error (${response.status}): ${parsedDetail || response.statusText || "Failed to start agent"}`
+    );
   }
 
   const json = await response.json();
@@ -390,6 +407,7 @@ RULES OF ENGAGEMENT:
     agentUid,
     userUid,
     token: userTokenData.token,
+    rtmToken: userRtmTokenData.token,
     appId,
     greeting,
     message: "Agent session initialized successfully on Agora SD-RTN.",
