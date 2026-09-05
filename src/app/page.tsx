@@ -14,21 +14,10 @@ import { NegotiationSimulator } from "@/components/home/NegotiationSimulator";
 import { DemoListingCard } from "@/components/home/DemoListingCard";
 import { AgencyMetricsAndWaitlist } from "@/components/home/AgencyMetricsAndWaitlist";
 import { VoiceSalesAgentModal } from "@/components/voice/VoiceSalesAgentModal";
+import { DEMO_LISTING } from "@/lib/demo-listing";
 
 export default function Home() {
   const [isCallModalOpen, setIsCallModalOpen] = useState<boolean>(false);
-
-  // Demo property payload for instant Agora voice agent session
-  const demoProperty = {
-    id: 1,
-    title: "Luxury 2-Bedroom Marina Loft with Golden Gate Views",
-    slug: "marina-luxury-loft",
-    price: "3450",
-    listingType: "rent",
-    address: "250 Marina Boulevard, Unit 4B",
-    city: "San Francisco, CA",
-    coverImageUrl: "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80",
-  };
 
   return (
     <div className="min-h-screen flex flex-col justify-between bg-slate-50 text-slate-900 selection:bg-blue-100 selection:text-blue-900 relative overflow-x-hidden">
@@ -123,7 +112,7 @@ export default function Home() {
         <VoiceSalesAgentModal
           isOpen={isCallModalOpen}
           onClose={() => setIsCallModalOpen(false)}
-          property={demoProperty}
+          property={DEMO_LISTING}
         />
       )}
 

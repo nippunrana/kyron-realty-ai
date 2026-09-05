@@ -6,6 +6,8 @@ import {
 import { db } from "@/db";
 import { properties, propertyKnowledgeBases, negotiationMatrices, voiceSessions, users } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
+import { computeFloorPrice } from "./listing-helpers";
+import { DEMO_LISTING, DEMO_LISTING_SLUG } from "./demo-listing";
 
 export interface StartAgentSessionParams {
   channelName: string;
@@ -126,9 +128,12 @@ export async function startAgoraAgentSession(
   const agentToken = agentTokenData.token;
 
   // 3. Build Agent System Prompt & Real Estate Persona
-  const propertyTitle = propertyRecord?.title || "Property";
-  const targetPrice = matrixRecord?.targetPrice || propertyRecord?.price || "3,450";
-  const floorPrice = matrixRecord?.minFloorPrice || "3,250";
+  // The homepage demo has no DB row; it is the only case that may use non-DB facts.
+  const demo = !propertyRecord && propertySlug === DEMO_LISTING_SLUG ? DEMO_LISTING : null;
+  const propertyTitle = propertyRecord?.title || demo?.title || "this listing";
+  const targetPrice = Number(matrixRecord?.targetPrice || propertyRecord?.price || demo?.price || 0) || 0;
+  const floorPrice =
+    Number(matrixRecord?.minFloorPrice) || demo?.minFloorPrice || computeFloorPrice(targetPrice);
 
   let greeting = "";
   let systemPrompt = "";
@@ -202,43 +207,58 @@ VOICE DELIVERY GUIDELINES:
       .map((f: any) => `Q: ${f.question}\nA: ${f.answer}`)
       .join("\n\n");
 
-    const concessionRulesText = (matrixRecord?.concessionRules || [])
-      .map((r: any) => `- Condition: ${r.condition} -> Concession: ${r.concession}`)
+    const concessionRules: Array<{ condition: string; concession: string }> =
+      matrixRecord?.concessionRules?.length ? matrixRecord.concessionRules : demo ? [...demo.concessionRules] : [];
+    const concessionRulesText = concessionRules
+      .map((r) => `- Condition: ${r.condition} -> Concession: ${r.concession}`)
       .join("\n");
 
     const contactEmail = ownerUserRecord?.email || "";
+    const listing = propertyRecord || demo;
+    const NOT_SPECIFIED = "Not specified in the verified listing";
+    const spec = (value: unknown, suffix = "") =>
+      value === null || value === undefined || value === "" ? NOT_SPECIFIED : `${value}${suffix}`;
+    const detail = (value?: string | null) => (value && value.trim() ? value : NOT_SPECIFIED);
+    const fullAddress = [listing?.address, listing?.city, listing?.state].filter(Boolean).join(", ");
+    const isRental = listing?.listingType === "rent";
+    const priceLine =
+      targetPrice > 0 ? `$${targetPrice.toLocaleString()}${isRental ? "/month" : ""}` : `${NOT_SPECIFIED} - never quote a price`;
 
     systemPrompt = `
 You are 'Sarah', a senior leasing advisor and sales specialist representing: ${propertyTitle}.
 Your goal is to converse naturally with prospective buyers/renters over Agora real-time voice, answer questions truthfully using the provided property knowledge base, negotiate within strict owner concession boundaries, and book viewing walkthroughs.
 
 PROPERTY OVERVIEW:
-- Address: ${propertyRecord?.address || ""}, ${propertyRecord?.city || ""}, ${propertyRecord?.state || ""}
-- Listing Type: ${propertyRecord?.listingType === "rent" ? "Rental" : "For Sale"}
-- Asking Price: $${Number(targetPrice).toLocaleString()}${propertyRecord?.listingType === "rent" ? "/month" : ""}
-- Specs: ${propertyRecord?.bedrooms || 2} Beds, ${propertyRecord?.bathrooms || 2} Baths, ${propertyRecord?.sqft || 1100} sqft
-- Description: ${propertyRecord?.description || ""}
+- Address: ${fullAddress || NOT_SPECIFIED}
+- Listing Type: ${listing?.listingType ? (isRental ? "Rental" : "For Sale") : NOT_SPECIFIED}
+- Asking Price: ${priceLine}
+- Specs: ${spec(listing?.bedrooms, " Beds")}, ${spec(listing?.bathrooms, " Baths")}, ${spec(listing?.sqft, " sqft")}
+- Description: ${detail(listing?.description)}
 
 POLICIES & DETAILS:
-- Pets: ${kbRecord?.petPolicyDetail || "Allowed with deposit"}
-- Parking: ${kbRecord?.parkingDetail || "Assigned stall included"}
-- Utilities: ${kbRecord?.utilitiesDetail || "Standard utilities included"}
-- Application: ${kbRecord?.applicationProcess || "Standard application with credit verification"}
+- Pets: ${detail(kbRecord?.petPolicyDetail || demo?.petPolicyDetail)}
+- Parking: ${detail(kbRecord?.parkingDetail || demo?.parkingDetail)}
+- Utilities: ${detail(kbRecord?.utilitiesDetail)}
+- Application: ${detail(kbRecord?.applicationProcess)}
 ${contactEmail ? `- Listing Contact Email: ${contactEmail}` : ""}
 
 VERIFIED PROPERTY FAQS:
 ${faqsText || "No additional custom FAQs."}
 
 NEGOTIATION CONCESSION GUARDRAILS:
-- Target Price: $${Number(targetPrice).toLocaleString()}
+${
+  targetPrice > 0
+    ? `- Target Price: $${targetPrice.toLocaleString()}
 - Minimum Floor Price: $${Number(floorPrice).toLocaleString()} (ABSOLUTE BOTTOM - NEVER GO BELOW)
 - Allowed Concessions:
-${concessionRulesText || "- 18-month lease: 5% monthly discount"}
+${concessionRulesText || "- None authorized. Do not offer any discount; refer pricing questions to the licensed broker."}`
+    : "- Pricing is not verified. Do not quote or negotiate a price; refer pricing questions to the licensed broker."
+}
 
 RULES OF ENGAGEMENT:
 1. Speak in concise, natural, spoken sentences (1-3 sentences max).
-2. Only state facts verified in the knowledge base.
-3. Use the Exchange-of-Value principle for negotiations. If a buyer asks for a discount, offer it ONLY in exchange for an 18-month lease or immediate move-in.
+2. Only state facts verified in the knowledge base. Whenever a detail above reads "${NOT_SPECIFIED}", say you do not have it verified and offer to have the licensed broker follow up; never guess or invent a policy, spec, or price.
+3. Use the Exchange-of-Value principle for negotiations. If a buyer asks for a discount, offer it ONLY in exchange for a listed concession condition.
 4. When the buyer is interested, proactively offer two time slots to book an in-person viewing.
 ${contactEmail ? `5. If asked for direct owner or leasing office contact, provide the verified contact email: ${contactEmail}.` : ""}
     `.trim();

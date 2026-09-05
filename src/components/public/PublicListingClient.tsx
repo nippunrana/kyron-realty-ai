@@ -71,6 +71,13 @@ export function PublicListingClient({
 
   const currentHeroImage = images[activeImageIdx] || images[0];
 
+  // Never invent a spec the owner did not verify
+  const spec = (value: unknown, unit: string) =>
+    value === null || value === undefined || value === "" ? "Not listed" : `${value} ${unit}`;
+  const availability = property.availableDate
+    ? new Date(property.availableDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })
+    : "Not listed";
+
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(shareUrl);
@@ -288,7 +295,7 @@ export function PublicListingClient({
                       Bedrooms
                     </span>
                     <span className="text-sm font-extrabold text-slate-900">
-                      {property.bedrooms || 2} Beds
+                      {spec(property.bedrooms, "Beds")}
                     </span>
                   </div>
                 </div>
@@ -302,7 +309,7 @@ export function PublicListingClient({
                       Bathrooms
                     </span>
                     <span className="text-sm font-extrabold text-slate-900">
-                      {property.bathrooms || 2.0} Baths
+                      {spec(property.bathrooms, "Baths")}
                     </span>
                   </div>
                 </div>
@@ -316,7 +323,7 @@ export function PublicListingClient({
                       Square Feet
                     </span>
                     <span className="text-sm font-extrabold text-slate-900">
-                      {property.sqft || 1100} sqft
+                      {spec(property.sqft, "sqft")}
                     </span>
                   </div>
                 </div>
@@ -330,7 +337,7 @@ export function PublicListingClient({
                       Availability
                     </span>
                     <span className="text-sm font-extrabold text-slate-900">
-                      Immediate
+                      {availability}
                     </span>
                   </div>
                 </div>
@@ -522,7 +529,7 @@ export function PublicListingClient({
                 <div>
                   <h4 className="text-xs font-bold text-slate-900">Pet Policy</h4>
                   <p className="text-xs text-slate-600 mt-0.5">
-                    {knowledgeBase?.petPolicyDetail || "Cats & small dogs permitted with deposit."}
+                    {knowledgeBase?.petPolicyDetail || "Not specified by the owner. Ask the voice agent to arrange a broker follow-up."}
                   </p>
                 </div>
               </div>
@@ -534,7 +541,7 @@ export function PublicListingClient({
                 <div>
                   <h4 className="text-xs font-bold text-slate-900">Parking</h4>
                   <p className="text-xs text-slate-600 mt-0.5">
-                    {knowledgeBase?.parkingDetail || "1 reserved garage stall included."}
+                    {knowledgeBase?.parkingDetail || "Not specified by the owner."}
                   </p>
                 </div>
               </div>
@@ -546,7 +553,7 @@ export function PublicListingClient({
                 <div>
                   <h4 className="text-xs font-bold text-slate-900">Included Utilities</h4>
                   <p className="text-xs text-slate-600 mt-0.5">
-                    {knowledgeBase?.utilitiesDetail || "Water, trash, and sewer covered."}
+                    {knowledgeBase?.utilitiesDetail || "Not specified by the owner."}
                   </p>
                 </div>
               </div>

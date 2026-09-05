@@ -204,17 +204,17 @@ export default async function DashboardPage() {
                         <div className="flex items-center gap-3 text-xs text-slate-600 pb-3 border-b border-slate-100 font-medium">
                           <span className="flex items-center gap-1">
                             <Bed className="w-3.5 h-3.5 text-slate-400" />
-                            <span>{prop.bedrooms || 2} Beds</span>
+                            <span>{prop.bedrooms ?? "—"} Beds</span>
                           </span>
                           <span>•</span>
                           <span className="flex items-center gap-1">
                             <Bath className="w-3.5 h-3.5 text-slate-400" />
-                            <span>{prop.bathrooms || 2} Baths</span>
+                            <span>{prop.bathrooms ?? "—"} Baths</span>
                           </span>
                           <span>•</span>
                           <span className="flex items-center gap-1">
                             <Maximize className="w-3.5 h-3.5 text-slate-400" />
-                            <span>{prop.sqft || 1000} sf</span>
+                            <span>{prop.sqft ?? "—"} sf</span>
                           </span>
                         </div>
                       </div>
