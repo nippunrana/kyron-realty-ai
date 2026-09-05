@@ -2,55 +2,16 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { BASE_PATH } from "@/lib/base-path";
-
-export type CallState =
-  | "idle"
-  | "connecting"
-  | "connected"
-  | "user_speaking"
-  | "agent_speaking"
-  | "error";
-
-export interface VoiceMessage {
-  id: string;
-  role: "user" | "assistant" | "system";
-  text: string;
-  timestamp: string;
-}
-
-export interface OwnerContext {
-  name?: string | null;
-  email?: string | null;
-  userId?: string | null;
-}
-
-export interface UseAgoraVoiceAgentReturn {
-  callState: CallState;
-  isMuted: boolean;
-  isAgentSpeaking: boolean;
-  audioFrequencies: number[];
-  transcript: VoiceMessage[];
-  errorMessage: string | null;
-  startCall: (
-    propertySlug?: string,
-    propertyId?: number,
-    callerType?: "buyer_inquiry" | "owner_onboarding",
-    ownerContext?: OwnerContext
-  ) => Promise<void>;
-  toggleMute: () => void;
-  endCall: () => Promise<void>;
-  sendTextMessage: (text: string, priority?: "INTERRUPTED" | "APPEND") => void;
-}
-
-export interface UseAgoraVoiceAgentOptions {
-  onCallEnd?: (transcript: VoiceMessage[]) => void;
-  onAgentTurnComplete?: (transcript: VoiceMessage[]) => void;
-  onAgentSpeakingChanged?: (isSpeaking: boolean) => void;
-  onUIAction?: (action: "open_review_modal" | "close_review_modal") => void;
-}
-
-const formatTimestamp = (ms?: number) =>
-  new Date(ms ?? Date.now()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+import type {
+  CallState,
+  OwnerContext,
+  UseAgoraVoiceAgentOptions,
+  UseAgoraVoiceAgentReturn,
+  VoiceMessage,
+} from "./voice-agent-types";
+import { findNewAssistantTurn, formatTimestamp, isUserTranscriptionItem, mapTranscriptionsToMessages } from "./voice-transcript";
+import { startFrequencyVisualizer } from "./audio-visualizer";
+import { detectAssistantModalIntent, detectUserModalIntent } from "./voice-intents";
 
 export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgoraVoiceAgentReturn {
   const [callState, setCallState] = useState<CallState>("idle");
@@ -194,71 +155,13 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
     };
   }, [teardownResources]);
 
-  // Real-time Audio Frequency Visualizer Loop
-  const startFrequencyVisualizer = (mediaStreamTrack?: MediaStreamTrack) => {
-    try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      if (!AudioCtx) return;
-
-      const audioCtx = new AudioCtx();
-      audioContextRef.current = audioCtx;
-
-      const analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 64;
-
-      if (mediaStreamTrack) {
-        const stream = new MediaStream([mediaStreamTrack]);
-        const source = audioCtx.createMediaStreamSource(stream);
-        source.connect(analyser);
-      }
-
-      const bufferLength = analyser.frequencyBinCount;
-      const dataArray = new Uint8Array(bufferLength);
-
-      const render = () => {
-        analyser.getByteFrequencyData(dataArray);
-        const sampled: number[] = [];
-        for (let i = 0; i < 16; i++) {
-          const val = dataArray[i * 2] || 0;
-          sampled.push(Math.max(12, Math.min(100, Math.round((val / 255) * 100))));
-        }
-        setAudioFrequencies(sampled);
-        animFrameRef.current = requestAnimationFrame(render);
-      };
-
-      render();
-    } catch (e) {
-      console.warn("Could not start Web Audio visualizer:", e);
-    }
-  };
-
   // Turn Extraction Dispatcher with Deduplication & Sliding Window
   const triggerTurnExtraction = useCallback(() => {
     const fullTranscript = transcriptRef.current;
-    if (!fullTranscript || fullTranscript.length === 0) return;
-
-    // Must have at least one user utterance
-    const hasUserMessage = fullTranscript.some(
-      (m) => m.role === "user" && m.text && m.text.trim().length > 0
-    );
-    if (!hasUserMessage) return;
-
-    // Find the latest assistant message
-    const assistantMessages = fullTranscript.filter(
-      (m) => m.role === "assistant" && m.text && m.text.trim().length > 0
-    );
-    if (assistantMessages.length === 0) return;
-    const latestAssistant = assistantMessages[assistantMessages.length - 1];
-
-    // Deduplicate: Don't extract again for the exact same assistant turn text
-    if (latestAssistant.text.trim() === lastExtractedAssistantTextRef.current) {
-      return;
-    }
-    lastExtractedAssistantTextRef.current = latestAssistant.text.trim();
-
-    if (onAgentTurnCompleteRef.current) {
-      onAgentTurnCompleteRef.current(fullTranscript);
-    }
+    const newAssistantText = findNewAssistantTurn(fullTranscript, lastExtractedAssistantTextRef.current);
+    if (newAssistantText === null) return;
+    lastExtractedAssistantTextRef.current = newAssistantText;
+    onAgentTurnCompleteRef.current?.(fullTranscript);
   }, []);
 
   // Start Call (Single-flight protected)
@@ -392,33 +295,14 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
           setTranscript([greetingMsg]);
         }
 
-        const isUserTranscription = (item: any) => {
-          const uidStr = String(item.uid ?? "");
-          return (
-            uidStr === "0" ||
-            uidStr === stringUserUid ||
-            uidStr === String(userUidRef.current) ||
-            item.metadata?.object === "user.transcription" ||
-            item.object === "user.transcription"
-          );
-        };
+        const isUserTranscription = (item: any) =>
+          isUserTranscriptionItem(item, [stringUserUid, String(userUidRef.current)]);
 
         // Attach live transcript updates
         ai.on(AgoraVoiceAIEvents.TRANSCRIPT_UPDATED, (transcriptions: any[]) => {
           if (!transcriptions || !Array.isArray(transcriptions)) return;
 
-          const mapped: VoiceMessage[] = transcriptions
-            .filter((item: any) => (item.text || "").trim().length > 0)
-            .map((item: any, idx: number) => {
-              const isUser = isUserTranscription(item);
-
-              return {
-                id: `turn-${item.turn_id ?? idx}-${isUser ? "user" : "agent"}`,
-                role: isUser ? "user" : "assistant",
-                text: (item.text || "").trim(),
-                timestamp: formatTimestamp(item._time || undefined),
-              };
-            });
+          const mapped = mapTranscriptionsToMessages(transcriptions, isUserTranscription);
 
           mappedRemoteRef.current = mapped;
           // Reconcile and keep pending local typed messages until confirmed in remote transcript
@@ -448,23 +332,13 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
               if (isFinished && !processedTurnIdsRef.current.has(turnKey as any)) {
                 processedTurnIdsRef.current.add(turnKey as any);
                 // Fast verbal UI modal intent matching
-                const OPEN_MODAL_REGEX = /(pull|bring|open|show|display|pop|bring back|pull back|pull it back|bring it back).*(card|modal|pop[- ]?up|review|summary|details|specs)/i;
-                const CLOSE_MODAL_REGEX = /(close|hide|dismiss|minimize|shut).*(card|modal|pop[- ]?up|review|summary)/i;
-                const APPROVE_PROCEED_REGEX = /(looks good|all looks good|look good|we can proceed|proceed further|let's proceed|let's move on|that's right|confirmed|continue)/i;
-
-                if (OPEN_MODAL_REGEX.test(spokenText)) {
-                  onUIActionRef.current?.("open_review_modal");
-                } else if (CLOSE_MODAL_REGEX.test(spokenText) || APPROVE_PROCEED_REGEX.test(spokenText)) {
-                  onUIActionRef.current?.("close_review_modal");
-                }
+                const intent = detectUserModalIntent(spokenText);
+                if (intent) onUIActionRef.current?.(intent);
               }
             } else if (!isUser && spokenText.length > 0) {
               // Assistant speech confirming modal action
-              if (/(pull|bring|open|show|display).*(card|modal|pop[- ]?up|review).*(screen|for you|back up|take a look)/i.test(spokenText)) {
-                onUIActionRef.current?.("open_review_modal");
-              } else if (/(close|hide|dismiss|minimiz).*(card|modal|pop[- ]?up|review)/i.test(spokenText)) {
-                onUIActionRef.current?.("close_review_modal");
-              }
+              const intent = detectAssistantModalIntent(spokenText);
+              if (intent) onUIActionRef.current?.(intent);
             }
           }
 
@@ -600,8 +474,10 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
         });
 
         // Start local visualizer
-        const mediaStreamTrack = localAudioTrack.getMediaStreamTrack();
-        startFrequencyVisualizer(mediaStreamTrack);
+        const audioCtx = startFrequencyVisualizer(localAudioTrack.getMediaStreamTrack(), setAudioFrequencies, (id) => {
+          animFrameRef.current = id;
+        });
+        if (audioCtx) audioContextRef.current = audioCtx;
 
         callActiveRef.current = true;
         setCallState("connected");
