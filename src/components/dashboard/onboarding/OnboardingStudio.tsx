@@ -549,7 +549,6 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
       {/* 1. Core Specs Review Modal (Stage 2: 6/6 Core Specs Verified) */}
       {showCoreModal && (
         <ReviewSpecsModal
-          isOpen={showCoreModal}
           mode="core"
           onClose={() => setShowCoreModal(false)}
           property={data.property}
@@ -565,7 +564,6 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
       {/* 2. Final Unified Review Modal (Stage 5: Final Review & Deploy) */}
       {showFinalModal && (
         <ReviewSpecsModal
-          isOpen={showFinalModal}
           mode="final"
           onClose={() => setShowFinalModal(false)}
           property={data.property}
@@ -580,7 +578,6 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
       {/* Success Launchpad Modal */}
       {publishedResult && (
         <PublishSuccessModal
-          isOpen={!!publishedResult}
           onClose={() => setPublishedResult(null)}
           property={publishedResult.property}
           qrCodeSvg={publishedResult.qrCodeSvg}

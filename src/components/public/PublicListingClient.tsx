@@ -519,7 +519,6 @@ export function PublicListingClient({
       {/* Voice Sales Agent Modal */}
       {isVoiceModalOpen && (
         <VoiceSalesAgentModal
-          isOpen={isVoiceModalOpen}
           onClose={() => setIsVoiceModalOpen(false)}
           property={{
             id: property.id,

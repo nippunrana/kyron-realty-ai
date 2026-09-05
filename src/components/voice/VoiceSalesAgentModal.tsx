@@ -25,7 +25,6 @@ import {
 } from "lucide-react";
 
 interface VoiceSalesAgentModalProps {
-  isOpen: boolean;
   onClose: () => void;
   property: {
     id?: number;
@@ -40,7 +39,6 @@ interface VoiceSalesAgentModalProps {
 }
 
 export function VoiceSalesAgentModal({
-  isOpen,
   onClose,
   property,
 }: VoiceSalesAgentModalProps) {
@@ -70,8 +68,6 @@ export function VoiceSalesAgentModal({
   useEffect(() => {
     transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [transcript]);
-
-  if (!isOpen) return null;
 
   const isCallActiveOrConnecting =
     callState === "connecting" ||

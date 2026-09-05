@@ -15,7 +15,6 @@ import {
 } from "lucide-react";
 
 interface PublishSuccessModalProps {
-  isOpen: boolean;
   onClose: () => void;
   property: {
     id: number;
@@ -30,15 +29,12 @@ interface PublishSuccessModalProps {
 }
 
 export function PublishSuccessModal({
-  isOpen,
   onClose,
   property,
   qrCodeSvg,
   shareUrl,
 }: PublishSuccessModalProps) {
   const [copied, setCopied] = useState(false);
-
-  if (!isOpen) return null;
 
   const handleCopyLink = async () => {
     try {

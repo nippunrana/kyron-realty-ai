@@ -18,7 +18,6 @@ import {
 import { ExtractedPropertyPayload } from "@/lib/kb-extractor";
 
 interface ReviewSpecsModalProps {
-  isOpen: boolean;
   onClose: () => void;
   property: ExtractedPropertyPayload["property"];
   knowledgeBase?: ExtractedPropertyPayload["knowledgeBase"];
@@ -31,7 +30,6 @@ interface ReviewSpecsModalProps {
 }
 
 export function ReviewSpecsModal({
-  isOpen,
   onClose,
   property,
   knowledgeBase,
@@ -42,8 +40,6 @@ export function ReviewSpecsModal({
   onPublish,
   isPublishing,
 }: ReviewSpecsModalProps) {
-  if (!isOpen) return null;
-
   const isRent = property.listingType === "rent";
   const formattedPrice = Number(property.price) > 0
     ? `$${Number(property.price).toLocaleString()}${isRent ? "/mo" : ""}`

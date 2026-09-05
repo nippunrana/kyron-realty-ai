@@ -110,7 +110,6 @@ export default function Home() {
       {/* Live Voice Sales Modal for Agora Calls */}
       {isCallModalOpen && (
         <VoiceSalesAgentModal
-          isOpen={isCallModalOpen}
           onClose={() => setIsCallModalOpen(false)}
           property={DEMO_LISTING}
         />
