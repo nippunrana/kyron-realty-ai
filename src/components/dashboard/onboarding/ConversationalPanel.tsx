@@ -32,6 +32,8 @@ interface ConversationalPanelProps {
   onUIAction?: (action: UIAction) => void;
   isProcessing: boolean;
   activePipelineStep: string | null;
+  /** Failure from the crawl or synthesis pipeline, shown beside the transcript; never a silent no-op. */
+  pipelineError: string | null;
 }
 
 export function ConversationalPanel({
@@ -41,6 +43,7 @@ export function ConversationalPanel({
   onUIAction,
   isProcessing,
   activePipelineStep,
+  pipelineError,
 }: ConversationalPanelProps) {
   const [urlInput, setUrlInput] = useState("");
   const [autoScroll, setAutoScroll] = useState(true);
@@ -536,6 +539,13 @@ export function ConversationalPanel({
             <div className="flex items-center gap-2 p-2.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-[11px] font-medium animate-pulse">
               <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600 shrink-0" />
               <span className="truncate">{activePipelineStep}</span>
+            </div>
+          )}
+
+          {pipelineError && (
+            <div className="flex items-center gap-2 p-2.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-[11px]">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+              <span>{pipelineError}</span>
             </div>
           )}
 

@@ -77,183 +77,9 @@ function generateKebabSlug(title: string, city: string): string {
   return `${slugify(`${title} ${city}`) || "property"}-${randomSlugSuffix()}`;
 }
 
-const COUNT_WORDS: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6 };
-
-function parseCountWord(word: string): number {
-  return COUNT_WORDS[word.toLowerCase()] ?? Number(word);
-}
-
-/**
- * Deterministic real-time attribute extractor for instantaneous (<10ms) hands-free voice updates.
- * Parses listing type, price, beds, baths, sqft, and address from spoken user text.
- */
-function extractHeuristicAttributes(
-  text: string,
-  prevProperty?: Partial<ExtractedPropertyPayload["property"]>
-): Partial<ExtractedPropertyPayload["property"]> {
-  const updates: Partial<ExtractedPropertyPayload["property"]> = {};
-  if (!text || typeof text !== "string") return updates;
-
-  const lower = text.toLowerCase().trim();
-
-  // 1. Listing Type
-  if (
-    /\b(?:for rent|to rent|rental|for lease|to lease)\b/i.test(lower) ||
-    /\b(?:renting|rent is|per month|\/mo|a month)\b/i.test(lower)
-  ) {
-    updates.listingType = "rent";
-  } else if (/\b(?:for sale|to buy|selling|purchase|asking price|to purchase)\b/i.test(lower)) {
-    updates.listingType = "sale";
-  }
-
-  // 2. Target Price / Rent
-  let parsedPrice: number | null = null;
-  const dollarMatch = text.match(/\$\s*([0-9]{1,3}(?:,[0-9]{3})+|[0-9]+(?:\.[0-9]{2})?)/);
-  if (dollarMatch && dollarMatch[1]) {
-    parsedPrice = Number(dollarMatch[1].replace(/,/g, ""));
-  } else {
-    const wordPriceMatch = text.match(
-      /\b([0-9]{1,3}(?:,[0-9]{3})+|[0-9]{3,7})\s*(?:dollars|bucks|per\s*month|\/mo|\/month|monthly|a\s*month)\b/i
-    );
-    if (wordPriceMatch && wordPriceMatch[1]) {
-      parsedPrice = Number(wordPriceMatch[1].replace(/,/g, ""));
-    }
-  }
-  if (parsedPrice && parsedPrice >= 100) {
-    updates.price = parsedPrice;
-  }
-
-  // 3. Bedrooms — "2 beds", "2 bedrooms", "two bedrooms", "studio"
-  if (/\b(?:studio|alcove\s*studio)\b/i.test(text)) {
-    updates.bedrooms = 0;
-  } else {
-    const bedMatch = text.match(/\b([0-9]+|one|two|three|four|five|six)\s*(?:bed|beds|bedroom|bedrooms|br)\b/i);
-    if (bedMatch && bedMatch[1]) {
-      updates.bedrooms = parseCountWord(bedMatch[1]);
-    }
-  }
-
-  // 4. Bathrooms — "2 baths", "2.5 bathrooms", "two baths", "1.5 ba", "2 washrooms"
-  const bathMatch = text.match(
-    /\b([0-9]+(?:\.[0-9]+)?|one|two|three|four|five)\s*(?:bath|baths|bathroom|bathrooms|ba|toilet|toilets|washroom|washrooms|restroom|restrooms|powder\s*room)\b/i
-  );
-  if (bathMatch && bathMatch[1]) {
-    updates.bathrooms = parseCountWord(bathMatch[1]);
-  }
-
-  // 5. Square footage — "1,200 sqft", "1200 square feet", "850 sf"
-  const sqftMatch = text.match(
-    /\b([0-9]{1,3}(?:,[0-9]{3})+|[0-9]{3,5})\s*(?:sq\s*ft|sqft|square\s*feet|square\s*foot|sf|square)\b/i
-  );
-  if (sqftMatch && sqftMatch[1]) {
-    updates.sqft = Number(sqftMatch[1].replace(/,/g, ""));
-  }
-
-  // 6. US street address in unprompted utterances
-  const streetRegex =
-    /(?:\bat\s+)?([0-9]{1,5}\s+[A-Za-z\s]+?\s+(?:Street|St|Avenue|Ave|Boulevard|Blvd|Road|Rd|Drive|Dr|Lane|Ln|Way|Court|Ct|Place|Pl|Terrace|Ter|Circle|Cir)\b)/i;
-  const streetMatch = text.match(streetRegex);
-  if (streetMatch && streetMatch[1]) {
-    updates.address = streetMatch[1].trim();
-    const afterAddress = text.substring((streetMatch.index || 0) + streetMatch[0].length);
-    const cityMatch = afterAddress.match(/,\s*([A-Za-z\s]+?)(?:,\s*([A-Z]{2}))?(?:\s+[0-9]{5})?(?:[.,]|$)/);
-    if (cityMatch && cityMatch[1]) {
-      updates.city = cityMatch[1].trim();
-      if (cityMatch[2]) updates.state = cityMatch[2].trim();
-    }
-  }
-
-  // 7. Zip code — only in explicit zip/state context, and never the number already parsed as the price
-  const zipMatch = text.match(/\b([0-9]{5})\b/);
-  if (zipMatch && zipMatch[1]) {
-    const candidateZip = zipMatch[1];
-    if (
-      (parsedPrice === null || Number(candidateZip) !== parsedPrice) &&
-      (/\b(?:zip|zipcode|postal)\b/i.test(text) || /[A-Z]{2}\s+[0-9]{5}\b/.test(text))
-    ) {
-      updates.zipCode = candidateZip;
-    }
-  }
-
-  // Auto-generate title only if address is found; do not assume "for rent"
-  const effectiveBeds = updates.bedrooms ?? prevProperty?.bedrooms;
-  const effectiveAddress = updates.address ?? prevProperty?.address;
-  const effectiveType = updates.listingType ?? prevProperty?.listingType;
-
-  if (effectiveAddress && !prevProperty?.title) {
-    updates.title = buildDefaultTitle(effectiveAddress, effectiveBeds, effectiveType);
-  }
-
-  return updates;
-}
-
-/**
- * Deterministic payload used when Gemini is unavailable or fails: heuristic specs
- * layered over whatever the caller already verified. Never invents facts.
- */
-function buildHeuristicFallback(input: ExtractInput): ExtractedPropertyPayload {
-  const current = input.currentPropertyState?.property;
-  const currentKb = input.currentPropertyState?.knowledgeBase;
-  const currentMatrix = input.currentPropertyState?.negotiationMatrix;
-  const heuristic = extractHeuristicAttributes(input.conversationText || input.markdown || "", current);
-  const targetPrice = heuristic.price || current?.price || 0;
-  const floorPrice = computeFloorPrice(targetPrice);
-
-  return {
-    property: {
-      title: heuristic.title || current?.title || (heuristic.address ? buildDefaultTitle(heuristic.address) : ""),
-      slug: generateKebabSlug(heuristic.title || heuristic.address || "property", heuristic.city || ""),
-      description: current?.description || "",
-      listingType: heuristic.listingType || current?.listingType || "",
-      propertyType: current?.propertyType || "apartment",
-      price: targetPrice,
-      securityDeposit: current?.securityDeposit || 0,
-      minLeaseMonths: current?.minLeaseMonths || 12,
-      hoaFeeMonthly: current?.hoaFeeMonthly || 0,
-      address: heuristic.address || current?.address || "",
-      unitNumber: current?.unitNumber || "",
-      city: heuristic.city || current?.city || "",
-      state: heuristic.state || current?.state || "",
-      zipCode: heuristic.zipCode || current?.zipCode || "",
-      country: "USA",
-      bedrooms: heuristic.bedrooms ?? current?.bedrooms ?? 0,
-      bathrooms: heuristic.bathrooms ?? current?.bathrooms ?? 0,
-      sqft: heuristic.sqft ?? current?.sqft ?? 0,
-      yearBuilt: current?.yearBuilt || 0,
-      amenities: current?.amenities || [],
-      features: current?.features || [],
-      coverImageUrl: current?.coverImageUrl || "",
-      images: current?.images || [],
-    },
-    knowledgeBase: {
-      rawScrapedMarkdown: input.markdown || "",
-      synthesizedSalesPitch: currentKb?.synthesizedSalesPitch || "",
-      neighborhoodSummary: currentKb?.neighborhoodSummary || "",
-      schoolDistrictInfo: currentKb?.schoolDistrictInfo || "",
-      petPolicyDetail: currentKb?.petPolicyDetail || "",
-      parkingDetail: currentKb?.parkingDetail || "",
-      utilitiesDetail: currentKb?.utilitiesDetail || "",
-      applicationProcess: currentKb?.applicationProcess || "",
-      contactEmail: currentKb?.contactEmail || "",
-      faqs: currentKb?.faqs || [],
-      agentTone: "warm_professional",
-      greetingMessage: currentKb?.greetingMessage || "",
-      unknownFallbackPolicy:
-        "Offer licensed broker follow-up rather than guessing unverified property specs.",
-    },
-    negotiationMatrix: {
-      allowNegotiation: true,
-      targetPrice,
-      minFloorPrice: floorPrice,
-      maxAllowedDiscountPct: 6.0,
-      concessionRules: currentMatrix?.concessionRules || [],
-      notesForAgent: floorPrice > 0 ? `Strict floor price lock at $${floorPrice}.` : "",
-    },
-  };
-}
-
 /**
  * Synthesizes a structured property profile, voice agent knowledge base, and concession guardrails.
+ * Gemini only: throws when the key is missing, the call fails, or the response is empty. No offline fallback.
  * Following Real Estate Voice AI Best Practices:
  * - Factual Data ("Filing Cabinet") separation
  * - Spoken-optimized FAQs (concise 1-2 sentence answers)
@@ -286,11 +112,10 @@ export async function extractPropertyKnowledgeBase(
   }
 
   const apiKey = getGeminiApiKey();
-
-  // Fallback heuristic if API key is missing or offline
   if (!apiKey || apiKey === "your_gemini_api_key_here") {
-    console.warn("GEMINI_API_KEY missing, using deterministic heuristic fallback.");
-    return buildHeuristicFallback(input);
+    throw new Error(
+      "GEMINI_API_KEY is not configured. Knowledge-base synthesis runs on Gemini only; there is no offline fallback."
+    );
   }
 
   const ai = new GoogleGenAI({ apiKey });
@@ -403,23 +228,19 @@ Return a strictly valid JSON object matching this schema:
 
     const parsed = JSON.parse(text);
 
-    // Apply heuristic overrides for any explicitly spoken details
-    const heuristic = extractHeuristicAttributes(input.conversationText || "", current);
-
-    const price = parsed.property?.price || heuristic.price || current?.price || 0;
-    const bedrooms = parsed.property?.bedrooms ?? heuristic.bedrooms ?? current?.bedrooms ?? 0;
-    const bathrooms = parsed.property?.bathrooms ?? heuristic.bathrooms ?? current?.bathrooms ?? 0;
-    const sqft = parsed.property?.sqft ?? heuristic.sqft ?? current?.sqft ?? 0;
-    const address = parsed.property?.address || heuristic.address || current?.address || "";
-    const listingType =
-      parsed.property?.listingType || heuristic.listingType || current?.listingType || "";
-    const city = parsed.property?.city || heuristic.city || current?.city || "";
-    const state = parsed.property?.state || heuristic.state || current?.state || "";
-    const zipCode = parsed.property?.zipCode || heuristic.zipCode || current?.zipCode || "";
+    // Gemini's extraction wins; whatever the caller already verified fills the gaps
+    const price = parsed.property?.price || current?.price || 0;
+    const bedrooms = parsed.property?.bedrooms ?? current?.bedrooms ?? 0;
+    const bathrooms = parsed.property?.bathrooms ?? current?.bathrooms ?? 0;
+    const sqft = parsed.property?.sqft ?? current?.sqft ?? 0;
+    const address = parsed.property?.address || current?.address || "";
+    const listingType = parsed.property?.listingType || current?.listingType || "";
+    const city = parsed.property?.city || current?.city || "";
+    const state = parsed.property?.state || current?.state || "";
+    const zipCode = parsed.property?.zipCode || current?.zipCode || "";
 
     const title =
       parsed.property?.title ||
-      heuristic.title ||
       current?.title ||
       (address ? buildDefaultTitle(address, bedrooms) : "Real Estate Listing");
     const slug = generateKebabSlug(title, city || "property");
@@ -477,7 +298,6 @@ Return a strictly valid JSON object matching this schema:
     };
   } catch (err: any) {
     console.error(`[Gemini Extraction Error]:`, err.message || err);
-    // Graceful fallback to heuristic extraction to ensure uninterrupted onboarding flow
-    return buildHeuristicFallback(input);
+    throw new Error(`Gemini synthesis error: ${err.message || err}`);
   }
 }

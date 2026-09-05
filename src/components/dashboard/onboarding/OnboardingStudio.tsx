@@ -82,6 +82,7 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [activePipelineStep, setActivePipelineStep] = useState<string | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [pipelineError, setPipelineError] = useState<string | null>(null);
   const [isTurnSyncing, setIsTurnSyncing] = useState(false);
   const [onboardingStage, setOnboardingStage] = useState<"core" | "additional_specs" | "final_review">("core");
   const [showCoreModal, setShowCoreModal] = useState(false);
@@ -310,6 +311,7 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
   // URL Ingestion Handler
   const handleIngestUrl = async (url: string) => {
     setIsProcessing(true);
+    setPipelineError(null);
     setActivePipelineStep("Crawling listing webpage via Apify Actor...");
 
     try {
@@ -321,6 +323,9 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
       });
 
       const scrapeJson = await scrapeRes.json();
+      if (!scrapeJson.success) {
+        throw new Error(scrapeJson.error || "The listing crawl failed.");
+      }
       const scrapedData = scrapeJson.data;
 
       // Step 2: Extract structured intelligence with Gemini
@@ -337,11 +342,13 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
       });
 
       const extractJson = await extractRes.json();
-      if (extractJson.success && extractJson.data) {
-        setData(extractJson.data);
+      if (!extractJson.success || !extractJson.data) {
+        throw new Error(extractJson.error || "Knowledge-base synthesis failed.");
       }
+      setData(extractJson.data);
     } catch (err) {
       console.error("URL Ingestion error:", err);
+      setPipelineError(err instanceof Error ? err.message : "The listing import failed.");
     } finally {
       setIsProcessing(false);
       setActivePipelineStep(null);
@@ -353,6 +360,7 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
     if (!text || !text.trim()) return;
 
     setIsProcessing(true);
+    setPipelineError(null);
     setActivePipelineStep("Synthesizing voice intelligence & knowledge base...");
 
     try {
@@ -368,71 +376,73 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
       });
 
       const json = await res.json();
-      if (json.success && json.data) {
-        setData((prev) => {
-          const newProp = json.data.property || {};
-          const newKb = json.data.knowledgeBase || {};
-          const newMatrix = json.data.negotiationMatrix || {};
-          const verified = getCoreSpecStatus(prev.property);
-
-          return {
-            property: {
-              ...prev.property,
-              title: newProp.title || prev.property.title,
-              slug: newProp.slug || prev.property.slug,
-              description: newProp.description || prev.property.description,
-              // Protect live-verified specs: do not let end-of-call synthesis clobber them
-              listingType: verified.listingType ? prev.property.listingType : newProp.listingType,
-              propertyType: prev.property.propertyType || newProp.propertyType,
-              price: verified.price ? prev.property.price : (newProp.price || 0),
-              securityDeposit: newProp.securityDeposit || prev.property.securityDeposit,
-              minLeaseMonths: newProp.minLeaseMonths || prev.property.minLeaseMonths,
-              hoaFeeMonthly: newProp.hoaFeeMonthly || prev.property.hoaFeeMonthly,
-              address: verified.address ? prev.property.address : (newProp.address || ""),
-              unitNumber: newProp.unitNumber || prev.property.unitNumber,
-              city: prev.property.city?.trim() ? prev.property.city : (newProp.city || ""),
-              state: prev.property.state?.trim() ? prev.property.state : (newProp.state || ""),
-              zipCode: prev.property.zipCode?.trim() ? prev.property.zipCode : (newProp.zipCode || ""),
-              country: "USA",
-              bedrooms: verified.bedrooms ? prev.property.bedrooms : (newProp.bedrooms || 0),
-              bathrooms: verified.bathrooms ? prev.property.bathrooms : (newProp.bathrooms || 0),
-              sqft: verified.sqft ? prev.property.sqft : (newProp.sqft || 0),
-              yearBuilt: newProp.yearBuilt || prev.property.yearBuilt,
-              availableDate: newProp.availableDate || prev.property.availableDate,
-              amenities: (newProp.amenities && newProp.amenities.length > 0) ? newProp.amenities : prev.property.amenities,
-              features: (newProp.features && newProp.features.length > 0) ? newProp.features : prev.property.features,
-              coverImageUrl: newProp.coverImageUrl || prev.property.coverImageUrl,
-              images: (newProp.images && newProp.images.length > 0) ? newProp.images : prev.property.images,
-            },
-            knowledgeBase: {
-              ...prev.knowledgeBase,
-              rawScrapedMarkdown: newKb.rawScrapedMarkdown || prev.knowledgeBase.rawScrapedMarkdown,
-              synthesizedSalesPitch: newKb.synthesizedSalesPitch || prev.knowledgeBase.synthesizedSalesPitch,
-              neighborhoodSummary: newKb.neighborhoodSummary || prev.knowledgeBase.neighborhoodSummary,
-              schoolDistrictInfo: newKb.schoolDistrictInfo || prev.knowledgeBase.schoolDistrictInfo,
-              petPolicyDetail: newKb.petPolicyDetail || prev.knowledgeBase.petPolicyDetail,
-              parkingDetail: newKb.parkingDetail || prev.knowledgeBase.parkingDetail,
-              utilitiesDetail: newKb.utilitiesDetail || prev.knowledgeBase.utilitiesDetail,
-              applicationProcess: newKb.applicationProcess || prev.knowledgeBase.applicationProcess,
-              faqs: (newKb.faqs && newKb.faqs.length > 0) ? newKb.faqs : prev.knowledgeBase.faqs,
-              agentTone: newKb.agentTone || prev.knowledgeBase.agentTone,
-              greetingMessage: newKb.greetingMessage || prev.knowledgeBase.greetingMessage,
-              contactEmail: newKb.contactEmail || prev.knowledgeBase.contactEmail || "",
-              unknownFallbackPolicy: newKb.unknownFallbackPolicy || prev.knowledgeBase.unknownFallbackPolicy,
-            },
-            negotiationMatrix: {
-              ...prev.negotiationMatrix,
-              targetPrice: newMatrix.targetPrice || prev.negotiationMatrix.targetPrice,
-              minFloorPrice: newMatrix.minFloorPrice || prev.negotiationMatrix.minFloorPrice,
-              maxAllowedDiscountPct: newMatrix.maxAllowedDiscountPct || prev.negotiationMatrix.maxAllowedDiscountPct,
-              concessionRules: (newMatrix.concessionRules && newMatrix.concessionRules.length > 0) ? newMatrix.concessionRules : prev.negotiationMatrix.concessionRules,
-              notesForAgent: newMatrix.notesForAgent || prev.negotiationMatrix.notesForAgent,
-            },
-          };
-        });
+      if (!json.success || !json.data) {
+        throw new Error(json.error || "Knowledge-base synthesis failed.");
       }
+      setData((prev) => {
+        const newProp = json.data.property || {};
+        const newKb = json.data.knowledgeBase || {};
+        const newMatrix = json.data.negotiationMatrix || {};
+        const verified = getCoreSpecStatus(prev.property);
+
+        return {
+          property: {
+            ...prev.property,
+            title: newProp.title || prev.property.title,
+            slug: newProp.slug || prev.property.slug,
+            description: newProp.description || prev.property.description,
+            // Protect live-verified specs: do not let end-of-call synthesis clobber them
+            listingType: verified.listingType ? prev.property.listingType : newProp.listingType,
+            propertyType: prev.property.propertyType || newProp.propertyType,
+            price: verified.price ? prev.property.price : (newProp.price || 0),
+            securityDeposit: newProp.securityDeposit || prev.property.securityDeposit,
+            minLeaseMonths: newProp.minLeaseMonths || prev.property.minLeaseMonths,
+            hoaFeeMonthly: newProp.hoaFeeMonthly || prev.property.hoaFeeMonthly,
+            address: verified.address ? prev.property.address : (newProp.address || ""),
+            unitNumber: newProp.unitNumber || prev.property.unitNumber,
+            city: prev.property.city?.trim() ? prev.property.city : (newProp.city || ""),
+            state: prev.property.state?.trim() ? prev.property.state : (newProp.state || ""),
+            zipCode: prev.property.zipCode?.trim() ? prev.property.zipCode : (newProp.zipCode || ""),
+            country: "USA",
+            bedrooms: verified.bedrooms ? prev.property.bedrooms : (newProp.bedrooms || 0),
+            bathrooms: verified.bathrooms ? prev.property.bathrooms : (newProp.bathrooms || 0),
+            sqft: verified.sqft ? prev.property.sqft : (newProp.sqft || 0),
+            yearBuilt: newProp.yearBuilt || prev.property.yearBuilt,
+            availableDate: newProp.availableDate || prev.property.availableDate,
+            amenities: (newProp.amenities && newProp.amenities.length > 0) ? newProp.amenities : prev.property.amenities,
+            features: (newProp.features && newProp.features.length > 0) ? newProp.features : prev.property.features,
+            coverImageUrl: newProp.coverImageUrl || prev.property.coverImageUrl,
+            images: (newProp.images && newProp.images.length > 0) ? newProp.images : prev.property.images,
+          },
+          knowledgeBase: {
+            ...prev.knowledgeBase,
+            rawScrapedMarkdown: newKb.rawScrapedMarkdown || prev.knowledgeBase.rawScrapedMarkdown,
+            synthesizedSalesPitch: newKb.synthesizedSalesPitch || prev.knowledgeBase.synthesizedSalesPitch,
+            neighborhoodSummary: newKb.neighborhoodSummary || prev.knowledgeBase.neighborhoodSummary,
+            schoolDistrictInfo: newKb.schoolDistrictInfo || prev.knowledgeBase.schoolDistrictInfo,
+            petPolicyDetail: newKb.petPolicyDetail || prev.knowledgeBase.petPolicyDetail,
+            parkingDetail: newKb.parkingDetail || prev.knowledgeBase.parkingDetail,
+            utilitiesDetail: newKb.utilitiesDetail || prev.knowledgeBase.utilitiesDetail,
+            applicationProcess: newKb.applicationProcess || prev.knowledgeBase.applicationProcess,
+            faqs: (newKb.faqs && newKb.faqs.length > 0) ? newKb.faqs : prev.knowledgeBase.faqs,
+            agentTone: newKb.agentTone || prev.knowledgeBase.agentTone,
+            greetingMessage: newKb.greetingMessage || prev.knowledgeBase.greetingMessage,
+            contactEmail: newKb.contactEmail || prev.knowledgeBase.contactEmail || "",
+            unknownFallbackPolicy: newKb.unknownFallbackPolicy || prev.knowledgeBase.unknownFallbackPolicy,
+          },
+          negotiationMatrix: {
+            ...prev.negotiationMatrix,
+            targetPrice: newMatrix.targetPrice || prev.negotiationMatrix.targetPrice,
+            minFloorPrice: newMatrix.minFloorPrice || prev.negotiationMatrix.minFloorPrice,
+            maxAllowedDiscountPct: newMatrix.maxAllowedDiscountPct || prev.negotiationMatrix.maxAllowedDiscountPct,
+            concessionRules: (newMatrix.concessionRules && newMatrix.concessionRules.length > 0) ? newMatrix.concessionRules : prev.negotiationMatrix.concessionRules,
+            notesForAgent: newMatrix.notesForAgent || prev.negotiationMatrix.notesForAgent,
+          },
+        };
+      });
     } catch (err) {
       console.error("Chat update error:", err);
+      setPipelineError(err instanceof Error ? err.message : "The knowledge-base synthesis failed.");
     } finally {
       setIsProcessing(false);
       setActivePipelineStep(null);
@@ -511,6 +521,7 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
             onUIAction={handleUIAction}
             isProcessing={isProcessing}
             activePipelineStep={activePipelineStep}
+            pipelineError={pipelineError}
           />
         </div>
 
