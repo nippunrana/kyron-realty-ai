@@ -13,10 +13,9 @@ git pull origin main
 echo "📦 Installing production dependencies..."
 npm ci --legacy-peer-deps || npm install
 
-echo "🛠️ Generating database migrations & applying (if any)..."
-if [ -f .env ] && grep -q "DATABASE_URL" .env; then
-  npx drizzle-kit migrate || echo "Database sync skipped or already up to date"
-fi
+echo "🛠️ Applying database migrations..."
+# A failed or unconfigured migration aborts the deploy (set -e); drizzle.config.ts refuses to run without DATABASE_URL.
+npx drizzle-kit migrate
 
 echo "🏗️ Building Next.js application..."
 npm run build
