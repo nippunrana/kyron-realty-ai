@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { ConversationalPanel } from "./ConversationalPanel";
 import { LivePropertyInspector } from "./LivePropertyInspector";
 import { PublishSuccessModal } from "./PublishSuccessModal";
@@ -70,6 +70,7 @@ export function OnboardingStudio() {
   dataRef.current = data;
 
   const hasTriggeredCompletionReviewRef = useRef(false);
+  const pendingInitialModalOpenRef = useRef(false);
   const voiceAgentActionsRef = useRef<{ sendTextMessage: (text: string) => void } | null>(null);
   const turnSequenceRef = useRef<number>(0);
   const turnAbortControllerRef = useRef<AbortController | null>(null);
@@ -109,6 +110,22 @@ export function OnboardingStudio() {
     }));
   };
 
+  const handleAgentSpeakingChanged = useCallback((isSpeaking: boolean) => {
+    // When Elena finishes speaking her summary sentence, smoothly pop open the review modal
+    if (!isSpeaking && pendingInitialModalOpenRef.current) {
+      pendingInitialModalOpenRef.current = false;
+      setShowReviewModal(true);
+    }
+  }, []);
+
+  const handleUIAction = useCallback((action: "open_review_modal" | "close_review_modal") => {
+    if (action === "open_review_modal") {
+      setShowReviewModal(true);
+    } else if (action === "close_review_modal") {
+      setShowReviewModal(false);
+    }
+  }, []);
+
   // Turn-level AI extraction with Latest-Wins concurrency
   const handleTurnExtraction = async (slidingWindow: TurnMessage[]) => {
     if (!slidingWindow || slidingWindow.length === 0) return;
@@ -137,6 +154,14 @@ export function OnboardingStudio() {
       if (sequenceId !== turnSequenceRef.current) return;
 
       const json = await res.json();
+      if (json.success && json.data?.modalAction) {
+        if (json.data.modalAction === "open") {
+          setShowReviewModal(true);
+        } else if (json.data.modalAction === "close") {
+          setShowReviewModal(false);
+        }
+      }
+
       if (json.success && json.data?.updates && Object.keys(json.data.updates).length > 0) {
         const updates = json.data.updates;
 
@@ -159,10 +184,18 @@ export function OnboardingStudio() {
             hasSqft,
           ].filter(Boolean).length;
 
-          // If all 6 parameters are verified, trigger the review modal & signal Elena via RTM
+          // If all 6 parameters are verified, trigger Elena's spoken summary and wait for her to finish before showing modal
           if (verifiedCount === 6 && !hasTriggeredCompletionReviewRef.current) {
             hasTriggeredCompletionReviewRef.current = true;
-            setShowReviewModal(true);
+            pendingInitialModalOpenRef.current = true;
+
+            // Safety fallback timer to guarantee modal displays even if UDP activity packets drop
+            setTimeout(() => {
+              if (pendingInitialModalOpenRef.current) {
+                pendingInitialModalOpenRef.current = false;
+                setShowReviewModal(true);
+              }
+            }, 8000);
 
             if (voiceAgentActionsRef.current?.sendTextMessage) {
               const summarySnippet = `Listing Type: ${updatedProperty.listingType === "rent" ? "For Rent" : "For Sale"}, Price: $${Number(updatedProperty.price).toLocaleString()}${updatedProperty.listingType === "rent" ? "/mo" : ""}, Address: ${updatedProperty.address || ""}, ${updatedProperty.bedrooms} Beds, ${updatedProperty.bathrooms} Baths, ${Number(updatedProperty.sqft).toLocaleString()} sqft`;
@@ -417,6 +450,8 @@ export function OnboardingStudio() {
             onVoiceAgentReady={(actions) => {
               voiceAgentActionsRef.current = actions;
             }}
+            onAgentSpeakingChanged={handleAgentSpeakingChanged}
+            onUIAction={handleUIAction}
             isProcessing={isProcessing}
             activePipelineStep={activePipelineStep}
             currentProperty={data.property}
@@ -431,6 +466,7 @@ export function OnboardingStudio() {
             onUpdateKnowledgeBase={handleUpdateKnowledgeBase}
             onUpdateNegotiationMatrix={handleUpdateNegotiationMatrix}
             onPublish={handlePublish}
+            onOpenReviewModal={() => setShowReviewModal(true)}
             isPublishing={isPublishing}
             isExtracting={isProcessing}
             isTurnSyncing={isTurnSyncing}

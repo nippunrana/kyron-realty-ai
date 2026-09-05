@@ -40,6 +40,8 @@ export interface UseAgoraVoiceAgentReturn {
 export interface UseAgoraVoiceAgentOptions {
   onCallEnd?: (transcript: VoiceMessage[]) => void;
   onAgentTurnComplete?: (transcript: VoiceMessage[]) => void;
+  onAgentSpeakingChanged?: (isSpeaking: boolean) => void;
+  onUIAction?: (action: "open_review_modal" | "close_review_modal") => void;
 }
 
 export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgoraVoiceAgentReturn {
@@ -69,6 +71,10 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
   onCallEndRef.current = options?.onCallEnd;
   const onAgentTurnCompleteRef = useRef<((transcript: VoiceMessage[]) => void) | undefined>(options?.onAgentTurnComplete);
   onAgentTurnCompleteRef.current = options?.onAgentTurnComplete;
+  const onAgentSpeakingChangedRef = useRef<((isSpeaking: boolean) => void) | undefined>(options?.onAgentSpeakingChanged);
+  onAgentSpeakingChangedRef.current = options?.onAgentSpeakingChanged;
+  const onUIActionRef = useRef<((action: "open_review_modal" | "close_review_modal") => void) | undefined>(options?.onUIAction);
+  onUIActionRef.current = options?.onUIAction;
   const transcriptRef = useRef<VoiceMessage[]>([]);
   const prevAgentStateRef = useRef<string | null>(null);
   const rtmClientRef = useRef<any>(null);
@@ -83,6 +89,11 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
   const transcriptDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "/projects/kyron-realty-ai";
+
+  const updateAgentSpeaking = useCallback((isSpeaking: boolean) => {
+    setIsAgentSpeaking(isSpeaking);
+    onAgentSpeakingChangedRef.current?.(isSpeaking);
+  }, []);
 
   // Centralized Resource Teardown
   const teardownResources = useCallback(async () => {
@@ -439,6 +450,25 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
                 if (onSpeechDetectedRef.current) {
                   onSpeechDetectedRef.current(spokenText);
                 }
+
+                // Fast verbal UI modal intent matching
+                const OPEN_MODAL_REGEX = /(pull|bring|open|show|display|pop|bring back|pull back|pull it back|bring it back).*(card|modal|pop[- ]?up|review|summary|details|specs)/i;
+                const CLOSE_MODAL_REGEX = /(close|hide|dismiss|minimize|shut).*(card|modal|pop[- ]?up|review|summary)/i;
+
+                if (OPEN_MODAL_REGEX.test(spokenText)) {
+                  console.log("[Agora Voice Agent] Verbal UI open command detected:", spokenText);
+                  onUIActionRef.current?.("open_review_modal");
+                } else if (CLOSE_MODAL_REGEX.test(spokenText)) {
+                  console.log("[Agora Voice Agent] Verbal UI close command detected:", spokenText);
+                  onUIActionRef.current?.("close_review_modal");
+                }
+              }
+            } else if (!isUser && spokenText.length > 0) {
+              // Assistant speech confirming modal action
+              if (/(pull|bring|open|show|display).*(card|modal|pop[- ]?up|review).*(screen|for you|back up)/i.test(spokenText)) {
+                onUIActionRef.current?.("open_review_modal");
+              } else if (/(close|hide|dismiss|minimiz).*(card|modal|pop[- ]?up|review)/i.test(spokenText)) {
+                onUIActionRef.current?.("close_review_modal");
               }
             }
           }
@@ -458,7 +488,7 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
 
         // Dual-Signal 1: Agent speaking state changed (Cloud Gateway activity stream)
         ai.on(AgoraVoiceAIEvents.AGENT_SPEAKING_CHANGED, (_agentUserId: string, isSpeaking: boolean) => {
-          setIsAgentSpeaking(isSpeaking);
+          updateAgentSpeaking(isSpeaking);
           if (isSpeaking) {
             setCallState("agent_speaking");
             hasAgentSpokenInTurnRef.current = true;
@@ -491,7 +521,7 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
           prevAgentStateRef.current = newState;
 
           if (newState === "speaking") {
-            setIsAgentSpeaking(true);
+            updateAgentSpeaking(true);
             setCallState("agent_speaking");
             hasAgentSpokenInTurnRef.current = true;
           } else if (
@@ -499,7 +529,7 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
             newState === "thinking" ||
             newState === "idle"
           ) {
-            setIsAgentSpeaking(false);
+            updateAgentSpeaking(false);
             setCallState("connected");
 
             if (prevState === "speaking" && (newState === "listening" || newState === "idle")) {

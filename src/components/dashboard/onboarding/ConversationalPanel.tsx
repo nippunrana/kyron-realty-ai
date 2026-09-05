@@ -27,6 +27,8 @@ interface ConversationalPanelProps {
   onQuickUpdate?: (updates: Partial<ExtractedPropertyPayload["property"]>) => void;
   onTurnExtraction?: (slidingWindow: TurnMessage[]) => void;
   onVoiceAgentReady?: (helpers: { sendTextMessage: (text: string) => void }) => void;
+  onAgentSpeakingChanged?: (isSpeaking: boolean) => void;
+  onUIAction?: (action: "open_review_modal" | "close_review_modal") => void;
   isProcessing: boolean;
   activePipelineStep: string | null;
   currentProperty?: ExtractedPropertyPayload["property"];
@@ -38,6 +40,8 @@ export function ConversationalPanel({
   onQuickUpdate,
   onTurnExtraction,
   onVoiceAgentReady,
+  onAgentSpeakingChanged,
+  onUIAction,
   isProcessing,
   activePipelineStep,
   currentProperty,
@@ -97,6 +101,8 @@ export function ConversationalPanel({
   } = useAgoraVoiceAgent({
     onCallEnd: handleCallEnd,
     onAgentTurnComplete: handleAgentTurnComplete,
+    onAgentSpeakingChanged,
+    onUIAction,
   });
 
   useEffect(() => {

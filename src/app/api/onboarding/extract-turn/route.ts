@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
     if (!slidingWindowMessages || !Array.isArray(slidingWindowMessages) || slidingWindowMessages.length === 0) {
       return NextResponse.json({
         success: true,
-        data: { updates: {} },
+        data: { updates: {}, modalAction: "none" },
       });
     }
 

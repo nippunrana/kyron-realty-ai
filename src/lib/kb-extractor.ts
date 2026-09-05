@@ -708,11 +708,11 @@ export interface TurnSpecUpdates {
  */
 export async function extractTurnSpecs(
   input: ExtractTurnInput
-): Promise<{ updates: TurnSpecUpdates }> {
+): Promise<{ updates: TurnSpecUpdates; modalAction?: "open" | "close" | "none" }> {
   const { slidingWindowMessages, currentPropertyState } = input;
 
   if (!slidingWindowMessages || slidingWindowMessages.length === 0) {
-    return { updates: {} };
+    return { updates: {}, modalAction: "none" };
   }
 
   const apiKey =
@@ -722,7 +722,7 @@ export async function extractTurnSpecs(
 
   if (!apiKey || apiKey.trim() === "") {
     console.warn("[Turn Extraction] Missing GEMINI_API_KEY in environment.");
-    return { updates: {} };
+    return { updates: {}, modalAction: "none" };
   }
 
   const formattedDialogue = slidingWindowMessages
@@ -758,6 +758,7 @@ CRITICAL INSTRUCTIONS FOR DIALOGUE REASONING & ASR ROBUSTNESS:
 - Extract facts EXCLUSIVELY from what the owner states or agrees to. Never treat Elena's hypothetical examples as facts.
 - Check the ENTIRE provided sliding window: If ANY of the specifications above were mentioned, answered, or corrected by the owner anywhere in the provided dialogue, include them in "updates".
 - If no property specs were mentioned or changed in this dialogue, return an empty "updates" object: { "updates": {} }.
+- UI MODAL INTENT DETECTION: If the dialogue indicates that the owner or Elena is asking to view, open, show, or pull back up the review modal/card/pop-up, set "modalAction": "open". If the owner or Elena is asking to close, hide, or minimize the review card, set "modalAction": "close". Otherwise, set "modalAction": "none".
 
 ${currentVerifiedSummary}
 
@@ -791,8 +792,12 @@ ${formattedDialogue}
                 zipCode: { type: "string" },
               },
             },
+            modalAction: {
+              type: "string",
+              enum: ["open", "close", "none"],
+            },
           },
-          required: ["updates"],
+          required: ["updates", "modalAction"],
         },
       },
     });
@@ -800,10 +805,11 @@ ${formattedDialogue}
     const parsed = JSON.parse(response.text || "{}");
     return {
       updates: parsed.updates || {},
+      modalAction: parsed.modalAction || "none",
     };
   } catch (err: any) {
     console.error("[Turn Extraction Error]:", err.message || err);
-    return { updates: {} };
+    return { updates: {}, modalAction: "none" };
   }
 }
 
