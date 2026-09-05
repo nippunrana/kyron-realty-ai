@@ -18,6 +18,9 @@ import {
 import type { ExtractedPropertyPayload } from "@/lib/kb-extractor";
 import { getCoreSpecStatus, isStudioListing } from "./inspector-specs";
 
+/** A missing term says so. Never substitute a plausible default the owner did not state. */
+const NOT_SPECIFIED = "Not specified";
+
 interface ReviewSpecsModalProps {
   onClose: () => void;
   property: ExtractedPropertyPayload["property"];
@@ -264,7 +267,7 @@ export function ReviewSpecsModal({
                 <div className="p-2.5 rounded-xl bg-white border border-slate-200/80">
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Parking</span>
                   <p className="font-semibold text-slate-800 mt-0.5 truncate">
-                    {hasParking ? knowledgeBase?.parkingDetail : "Street parking / Standard"}
+                    {hasParking ? knowledgeBase?.parkingDetail : NOT_SPECIFIED}
                   </p>
                 </div>
 
@@ -273,7 +276,7 @@ export function ReviewSpecsModal({
                   <div className="p-2.5 rounded-xl bg-white border border-slate-200/80">
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Pet Policy</span>
                     <p className="font-semibold text-slate-800 mt-0.5 truncate">
-                      {hasPets ? knowledgeBase?.petPolicyDetail : "Standard policy / Inquire"}
+                      {hasPets ? knowledgeBase?.petPolicyDetail : NOT_SPECIFIED}
                     </p>
                   </div>
                 )}
@@ -283,7 +286,7 @@ export function ReviewSpecsModal({
                   <div className="p-2.5 rounded-xl bg-white border border-slate-200/80">
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Monthly HOA</span>
                     <p className="font-semibold text-slate-800 mt-0.5 truncate">
-                      {hasHoa ? `$${Number(property.hoaFeeMonthly).toLocaleString()}/mo` : "No HOA Fee"}
+                      {hasHoa ? `$${Number(property.hoaFeeMonthly).toLocaleString()}/mo` : NOT_SPECIFIED}
                     </p>
                   </div>
                 )}
@@ -292,7 +295,7 @@ export function ReviewSpecsModal({
                 <div className="p-2.5 rounded-xl bg-white border border-slate-200/80">
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Utilities</span>
                   <p className="font-semibold text-slate-800 mt-0.5 truncate">
-                    {hasUtilities ? knowledgeBase?.utilitiesDetail : "Standard municipal utilities"}
+                    {hasUtilities ? knowledgeBase?.utilitiesDetail : NOT_SPECIFIED}
                   </p>
                 </div>
 
@@ -302,7 +305,7 @@ export function ReviewSpecsModal({
                     {isRent ? "Move-In Timing" : "Occupancy Status"}
                   </span>
                   <p className="font-semibold text-slate-800 mt-0.5 truncate">
-                    {hasAvailableDate ? property.availableDate : "Available Immediately"}
+                    {hasAvailableDate ? property.availableDate : NOT_SPECIFIED}
                   </p>
                 </div>
               </div>
