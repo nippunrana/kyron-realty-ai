@@ -18,7 +18,7 @@ import {
   Eye,
   Mail,
 } from "lucide-react";
-import { ExtractedPropertyPayload } from "@/lib/kb-extractor";
+import type { ExtractedPropertyPayload } from "@/lib/kb-extractor";
 import { VerificationChecklist } from "./VerificationChecklist";
 import { buildAdditionalSpecs, buildChecklistItems } from "./inspector-specs";
 import { ExtraSpecsSuggestionBar } from "./ExtraSpecsSuggestionBar";

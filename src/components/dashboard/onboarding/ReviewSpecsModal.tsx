@@ -15,7 +15,7 @@ import {
   X,
   Mail,
 } from "lucide-react";
-import { ExtractedPropertyPayload } from "@/lib/kb-extractor";
+import type { ExtractedPropertyPayload } from "@/lib/kb-extractor";
 
 interface ReviewSpecsModalProps {
   onClose: () => void;

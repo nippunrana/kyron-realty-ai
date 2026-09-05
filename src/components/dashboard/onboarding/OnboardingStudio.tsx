@@ -5,8 +5,9 @@ import { ConversationalPanel } from "./ConversationalPanel";
 import { LivePropertyInspector } from "./LivePropertyInspector";
 import { PublishSuccessModal } from "./PublishSuccessModal";
 import { ReviewSpecsModal } from "./ReviewSpecsModal";
-import { ExtractedPropertyPayload } from "@/lib/kb-extractor";
-import { TurnMessage } from "@/lib/turn-extractor";
+import type { UIAction } from "@/hooks/voice-agent-types";
+import type { ExtractedPropertyPayload } from "@/lib/kb-extractor";
+import type { TurnMessage } from "@/lib/turn-extractor";
 import { computeFloorPrice } from "@/lib/listing-helpers";
 import { BASE_PATH } from "@/lib/base-path";
 import { ArrowLeft } from "lucide-react";
@@ -136,7 +137,7 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
     setOnboardingStage("additional_specs");
   }, []);
 
-  const handleUIAction = useCallback((action: "open_review_modal" | "close_review_modal") => {
+  const handleUIAction = useCallback((action: UIAction) => {
     if (action === "open_review_modal") {
       if (onboardingStageRef.current === "core") {
         // If all 6 specs are already verified, open immediately

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { startAgoraAgentSession } from "@/lib/agora-agent-client";
+import type { CallerType } from "@/hooks/voice-agent-types";
 
 export async function POST(req: NextRequest) {
   try {
@@ -9,7 +10,7 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const { channelName, propertySlug, propertyId, userUid } = body || {};
-    const callerType: "buyer_inquiry" | "owner_onboarding" =
+    const callerType: CallerType =
       body?.callerType === "owner_onboarding" ? "owner_onboarding" : "buyer_inquiry";
 
     // Owner onboarding is only reachable from the authenticated studio; buyer calls stay public.

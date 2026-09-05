@@ -8,6 +8,7 @@ import { properties, propertyKnowledgeBases, negotiationMatrices, voiceSessions,
 import { and, eq } from "drizzle-orm";
 import { computeFloorPrice } from "./listing-helpers";
 import { DEMO_LISTING, DEMO_LISTING_SLUG } from "./demo-listing";
+import type { CallerType } from "@/hooks/voice-agent-types";
 
 export interface StartAgentSessionParams {
   channelName: string;
@@ -15,7 +16,7 @@ export interface StartAgentSessionParams {
   propertyId?: number;
   userUid?: number;
   agentUid?: number;
-  callerType?: "buyer_inquiry" | "owner_onboarding";
+  callerType?: CallerType;
   ownerName?: string | null;
   ownerEmail?: string | null;
   userId?: string | null;

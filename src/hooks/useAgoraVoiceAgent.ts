@@ -3,7 +3,9 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { BASE_PATH } from "@/lib/base-path";
 import type {
+  CallerType,
   CallState,
+  UIAction,
   UseAgoraVoiceAgentOptions,
   UseAgoraVoiceAgentReturn,
   VoiceMessage,
@@ -32,7 +34,7 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
   const callActiveRef = useRef<boolean>(false);
   const onCallEndRef = useRef<((transcript: VoiceMessage[]) => void) | undefined>(options?.onCallEnd);
   const onAgentTurnCompleteRef = useRef<((transcript: VoiceMessage[]) => void) | undefined>(options?.onAgentTurnComplete);
-  const onUIActionRef = useRef<((action: "open_review_modal" | "close_review_modal") => void) | undefined>(options?.onUIAction);
+  const onUIActionRef = useRef<((action: UIAction) => void) | undefined>(options?.onUIAction);
   // Keep the latest callbacks reachable from long-lived SDK listeners without re-subscribing
   useEffect(() => {
     onCallEndRef.current = options?.onCallEnd;
@@ -170,7 +172,7 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
     async (
       propertySlug?: string,
       propertyId?: number,
-      callerType: "buyer_inquiry" | "owner_onboarding" = "buyer_inquiry"
+      callerType: CallerType = "buyer_inquiry"
     ) => {
       // Prevent duplicate or overlapping starts
       if (isStartingRef.current || callActiveRef.current) {

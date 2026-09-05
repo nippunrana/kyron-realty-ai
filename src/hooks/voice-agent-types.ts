@@ -8,6 +8,9 @@ export type CallState =
   | "agent_speaking"
   | "error";
 
+/** Who the agent is talking to; selects the persona and the auth rules on the server. */
+export type CallerType = "buyer_inquiry" | "owner_onboarding";
+
 export interface VoiceMessage {
   id: string;
   role: "user" | "assistant" | "system";
@@ -25,7 +28,7 @@ export interface UseAgoraVoiceAgentReturn {
   startCall: (
     propertySlug?: string,
     propertyId?: number,
-    callerType?: "buyer_inquiry" | "owner_onboarding"
+    callerType?: CallerType
   ) => Promise<void>;
   toggleMute: () => void;
   endCall: () => Promise<void>;

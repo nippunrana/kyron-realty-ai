@@ -21,14 +21,15 @@ import {
   ArrowDown,
 } from "lucide-react";
 import { useAgoraVoiceAgent } from "@/hooks/useAgoraVoiceAgent";
-import { TurnMessage } from "@/lib/turn-extractor";
+import type { UIAction, VoiceMessage } from "@/hooks/voice-agent-types";
+import type { TurnMessage } from "@/lib/turn-extractor";
 import { BASE_PATH } from "@/lib/base-path";
 
 interface ConversationalPanelProps {
   onIngestUrl: (url: string) => Promise<void>;
   onSendMessage: (text: string) => Promise<void>;
   onTurnExtraction?: (slidingWindow: TurnMessage[]) => void;
-  onUIAction?: (action: "open_review_modal" | "close_review_modal") => void;
+  onUIAction?: (action: UIAction) => void;
   isProcessing: boolean;
   activePipelineStep: string | null;
 }
@@ -48,7 +49,7 @@ export function ConversationalPanel({
   const transcriptContainerRef = useRef<HTMLDivElement>(null);
 
   const handleCallEnd = useCallback(
-    (finalTranscript: any[]) => {
+    (finalTranscript: VoiceMessage[]) => {
       // Preserve full question & confirmation context with explicit role labels
       const formattedTranscript = finalTranscript
         .filter((m) => m.text && m.text.trim())
@@ -63,7 +64,7 @@ export function ConversationalPanel({
   );
 
   const handleAgentTurnComplete = useCallback(
-    (currentTranscript: any[]) => {
+    (currentTranscript: VoiceMessage[]) => {
       if (!currentTranscript || currentTranscript.length === 0) return;
 
       const meaningful = currentTranscript
