@@ -4,7 +4,6 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { BASE_PATH } from "@/lib/base-path";
 import type {
   CallState,
-  OwnerContext,
   UseAgoraVoiceAgentOptions,
   UseAgoraVoiceAgentReturn,
   VoiceMessage,
@@ -33,13 +32,11 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
   const callActiveRef = useRef<boolean>(false);
   const onCallEndRef = useRef<((transcript: VoiceMessage[]) => void) | undefined>(options?.onCallEnd);
   const onAgentTurnCompleteRef = useRef<((transcript: VoiceMessage[]) => void) | undefined>(options?.onAgentTurnComplete);
-  const onAgentSpeakingChangedRef = useRef<((isSpeaking: boolean) => void) | undefined>(options?.onAgentSpeakingChanged);
   const onUIActionRef = useRef<((action: "open_review_modal" | "close_review_modal") => void) | undefined>(options?.onUIAction);
   // Keep the latest callbacks reachable from long-lived SDK listeners without re-subscribing
   useEffect(() => {
     onCallEndRef.current = options?.onCallEnd;
     onAgentTurnCompleteRef.current = options?.onAgentTurnComplete;
-    onAgentSpeakingChangedRef.current = options?.onAgentSpeakingChanged;
     onUIActionRef.current = options?.onUIAction;
   });
   const transcriptRef = useRef<VoiceMessage[]>([]);
@@ -54,11 +51,6 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
   const lastExtractedAssistantTextRef = useRef<string>("");
   const hasAgentSpokenInTurnRef = useRef<boolean>(false);
   const transcriptDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  const updateAgentSpeaking = useCallback((isSpeaking: boolean) => {
-    setIsAgentSpeaking(isSpeaking);
-    onAgentSpeakingChangedRef.current?.(isSpeaking);
-  }, []);
 
   // Centralized Resource Teardown
   const teardownResources = useCallback(async () => {
@@ -178,8 +170,7 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
     async (
       propertySlug?: string,
       propertyId?: number,
-      callerType: "buyer_inquiry" | "owner_onboarding" = "buyer_inquiry",
-      ownerContext?: OwnerContext
+      callerType: "buyer_inquiry" | "owner_onboarding" = "buyer_inquiry"
     ) => {
       // Prevent duplicate or overlapping starts
       if (isStartingRef.current || callActiveRef.current) {
@@ -207,9 +198,6 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
             propertySlug,
             propertyId,
             callerType,
-            ownerName: ownerContext?.name,
-            ownerEmail: ownerContext?.email,
-            userId: ownerContext?.userId,
           }),
           signal: abortController.signal,
         });
@@ -371,7 +359,7 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
 
         // Dual-Signal 1: Agent speaking state changed (Cloud Gateway activity stream)
         ai.on(AgoraVoiceAIEvents.AGENT_SPEAKING_CHANGED, (_agentUserId: string, isSpeaking: boolean) => {
-          updateAgentSpeaking(isSpeaking);
+          setIsAgentSpeaking(isSpeaking);
           if (isSpeaking) {
             setCallState("agent_speaking");
             hasAgentSpokenInTurnRef.current = true;
@@ -404,7 +392,7 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
           prevAgentStateRef.current = newState;
 
           if (newState === "speaking") {
-            updateAgentSpeaking(true);
+            setIsAgentSpeaking(true);
             setCallState("agent_speaking");
             hasAgentSpokenInTurnRef.current = true;
           } else if (
@@ -412,7 +400,7 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
             newState === "thinking" ||
             newState === "idle"
           ) {
-            updateAgentSpeaking(false);
+            setIsAgentSpeaking(false);
             setCallState("connected");
 
             if (prevState === "speaking" && (newState === "listening" || newState === "idle")) {
@@ -542,7 +530,7 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
   }, [teardownResources]);
 
   // Send Text Message in active session (routed via RTM to Agora agent)
-  const sendTextMessage = useCallback(async (text: string, priority: "INTERRUPTED" | "APPEND" = "INTERRUPTED") => {
+  const sendTextMessage = useCallback(async (text: string) => {
     const trimmed = text.trim();
     if (!trimmed) return;
 
@@ -551,41 +539,32 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
       return;
     }
 
-    const isSystemCue = trimmed.startsWith("[SYSTEM CUE:");
-    let localMsgId = "";
-
-    // Only render pending local message in UI transcript if it's user dialogue, not a background system cue
-    if (!isSystemCue) {
-      localMsgId = `local-text-${Date.now()}`;
-      const localMsg: VoiceMessage = {
-        id: localMsgId,
-        role: "user",
-        text: trimmed,
-        timestamp: formatTimestamp(),
-      };
-      localMessagesRef.current = [...localMessagesRef.current, localMsg];
-      setTranscript([...mappedRemoteRef.current, ...localMessagesRef.current]);
-    }
+    // Render the pending local message until the remote transcript confirms it
+    const localMsgId = `local-text-${Date.now()}`;
+    const localMsg: VoiceMessage = {
+      id: localMsgId,
+      role: "user",
+      text: trimmed,
+      timestamp: formatTimestamp(),
+    };
+    localMessagesRef.current = [...localMessagesRef.current, localMsg];
+    setTranscript([...mappedRemoteRef.current, ...localMessagesRef.current]);
 
     try {
       const { ChatMessageType, ChatMessagePriority } = await import(
         "agora-agent-client-toolkit"
       );
-      const chosenPriority =
-        priority === "APPEND" ? ChatMessagePriority.APPEND : ChatMessagePriority.INTERRUPTED;
 
       await voiceAiRef.current.sendText(String(agentUidRef.current), {
         messageType: ChatMessageType.TEXT,
-        priority: chosenPriority,
+        priority: ChatMessagePriority.INTERRUPTED,
         responseInterruptable: true,
         text: trimmed,
       });
     } catch (sendErr: any) {
       console.error("[Agora Voice Agent] Could not send text message over RTM:", sendErr);
-      if (localMsgId) {
-        localMessagesRef.current = localMessagesRef.current.filter((msg) => msg.id !== localMsgId);
-        setTranscript([...mappedRemoteRef.current, ...localMessagesRef.current]);
-      }
+      localMessagesRef.current = localMessagesRef.current.filter((msg) => msg.id !== localMsgId);
+      setTranscript([...mappedRemoteRef.current, ...localMessagesRef.current]);
       setErrorMessage(
         `Failed to deliver message to voice agent: ${sendErr?.message || "RTM communication failure"}`
       );

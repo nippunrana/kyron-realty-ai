@@ -104,9 +104,6 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
     onboardingStageRef.current = onboardingStage;
   }, [data, onboardingStage]);
 
-  const voiceAgentActionsRef = useRef<{
-    sendTextMessage: (text: string, priority?: "INTERRUPTED" | "APPEND") => void;
-  } | null>(null);
   const turnSequenceRef = useRef<number>(0);
   const isExtractionBusyRef = useRef<boolean>(false);
   const pendingExtractionWindowRef = useRef<TurnMessage[] | null>(null);
@@ -519,13 +516,9 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
             onIngestUrl={handleIngestUrl}
             onSendMessage={handleSendMessage}
             onTurnExtraction={handleTurnExtraction}
-            onVoiceAgentReady={(actions) => {
-              voiceAgentActionsRef.current = actions;
-            }}
             onUIAction={handleUIAction}
             isProcessing={isProcessing}
             activePipelineStep={activePipelineStep}
-            user={user}
           />
         </div>
 

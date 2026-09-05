@@ -17,10 +17,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Authentication required." }, { status: 401 });
     }
 
-    // The signed-in identity always wins over client-supplied values.
-    const ownerName = sessionUser?.name ?? body?.ownerName ?? null;
-    const ownerEmail = sessionUser?.email ?? body?.ownerEmail ?? null;
-    const userId = sessionUser?.id ?? body?.userId ?? null;
+    // Identity comes from the session only; the request body carries none.
+    const ownerName = sessionUser?.name ?? null;
+    const ownerEmail = sessionUser?.email ?? null;
+    const userId = sessionUser?.id ?? null;
 
     const resolvedChannelName =
       channelName ||

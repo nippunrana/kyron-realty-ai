@@ -28,26 +28,18 @@ interface ConversationalPanelProps {
   onIngestUrl: (url: string) => Promise<void>;
   onSendMessage: (text: string) => Promise<void>;
   onTurnExtraction?: (slidingWindow: TurnMessage[]) => void;
-  onVoiceAgentReady?: (helpers: {
-    sendTextMessage: (text: string, priority?: "INTERRUPTED" | "APPEND") => void;
-  }) => void;
-  onAgentSpeakingChanged?: (isSpeaking: boolean) => void;
   onUIAction?: (action: "open_review_modal" | "close_review_modal") => void;
   isProcessing: boolean;
   activePipelineStep: string | null;
-  user?: { id?: string; name?: string | null; email?: string | null };
 }
 
 export function ConversationalPanel({
   onIngestUrl,
   onSendMessage,
   onTurnExtraction,
-  onVoiceAgentReady,
-  onAgentSpeakingChanged,
   onUIAction,
   isProcessing,
   activePipelineStep,
-  user,
 }: ConversationalPanelProps) {
   const [urlInput, setUrlInput] = useState("");
   const [autoScroll, setAutoScroll] = useState(true);
@@ -102,19 +94,11 @@ export function ConversationalPanel({
     startCall,
     toggleMute,
     endCall,
-    sendTextMessage,
   } = useAgoraVoiceAgent({
     onCallEnd: handleCallEnd,
     onAgentTurnComplete: handleAgentTurnComplete,
-    onAgentSpeakingChanged,
     onUIAction,
   });
-
-  useEffect(() => {
-    if (onVoiceAgentReady) {
-      onVoiceAgentReady({ sendTextMessage });
-    }
-  }, [onVoiceAgentReady, sendTextMessage]);
 
   const isProgrammaticScrollRef = useRef(false);
 
@@ -450,13 +434,7 @@ export function ConversationalPanel({
 
               <button
                 type="button"
-                onClick={() =>
-                  startCall(undefined, undefined, "owner_onboarding", {
-                    name: user?.name,
-                    email: user?.email,
-                    userId: user?.id,
-                  })
-                }
+                onClick={() => startCall(undefined, undefined, "owner_onboarding")}
                 className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs font-bold transition-all shadow-sm shadow-blue-600/25 flex items-center gap-1.5 cursor-pointer shrink-0"
               >
                 <PhoneCall className="w-3.5 h-3.5" />
