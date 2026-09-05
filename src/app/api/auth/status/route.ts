@@ -1,14 +1,13 @@
 import { NextResponse } from "next/server";
+import { getGoogleOAuthConfig } from "@/lib/google-oauth";
 
 export async function GET() {
-  const googleId = (process.env.AUTH_GOOGLE_ID || process.env.GOOGLE_CLIENT_ID || "").trim();
-  const googleSecret = (process.env.AUTH_GOOGLE_SECRET || process.env.GOOGLE_CLIENT_SECRET || "").trim();
-  const isGoogleConfigured = Boolean(googleId && googleSecret);
+  const { isConfigured } = getGoogleOAuthConfig();
 
   return NextResponse.json({
-    googleConfigured: isGoogleConfigured,
+    googleConfigured: isConfigured,
     providers: {
-      google: isGoogleConfigured,
+      google: isConfigured,
       credentials: true,
     },
   });

@@ -49,6 +49,23 @@ export function ReviewSpecsModal({
     ? `$${Number(property.price).toLocaleString()}${isRent ? "/mo" : ""}`
     : "Pending";
 
+  const hasValidType = property.listingType === "rent" || property.listingType === "sale";
+  const hasValidAddress = Boolean(property.address && property.address.trim().length > 3);
+  const hasValidPrice = Boolean(Number(property.price) > 0);
+  const isStudio = property.bedrooms === 0 && (property.title?.toLowerCase().includes("studio") || property.description?.toLowerCase().includes("studio"));
+  const hasValidBeds = (property.bedrooms !== undefined && property.bedrooms !== null && Number(property.bedrooms) > 0) || isStudio;
+  const hasValidBaths = property.bathrooms !== undefined && property.bathrooms !== null && Number(property.bathrooms) > 0;
+  const hasValidSqft = Boolean(Number(property.sqft) > 0);
+
+  const verifiedCoreCount = [
+    hasValidType,
+    hasValidAddress,
+    hasValidPrice,
+    hasValidBeds,
+    hasValidBaths,
+    hasValidSqft,
+  ].filter(Boolean).length;
+
   const fullAddress = [property.address, property.city, property.state]
     .filter(Boolean)
     .join(", ") || "Address pending";
@@ -86,7 +103,7 @@ export function ReviewSpecsModal({
           </div>
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold mb-1.5">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>{isFinalMode ? "Complete Property Intelligence Ready" : "Stage 1: Core Specs Verified (6/6)"}</span>
+            <span>{isFinalMode ? "Complete Property Intelligence Ready" : `Stage 1: Core Specs Verified (${verifiedCoreCount}/6)`}</span>
           </div>
           <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
             {isFinalMode ? "Final Listing Review & Deploy" : "Review Core Specifications"}
@@ -116,10 +133,16 @@ export function ReviewSpecsModal({
                   </p>
                 </div>
               </div>
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 border border-emerald-300 text-[10px] font-bold text-emerald-800 shrink-0">
-                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                <span>Verified</span>
-              </span>
+              {hasValidAddress ? (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 border border-emerald-300 text-[10px] font-bold text-emerald-800 shrink-0">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                  <span>Verified</span>
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-[10px] font-bold text-slate-500 shrink-0">
+                  <span>Pending</span>
+                </span>
+              )}
             </div>
 
             <div className="mt-2 pt-2 border-t border-emerald-100/70">
@@ -147,7 +170,7 @@ export function ReviewSpecsModal({
                 </div>
               </div>
               <span className="text-[11px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md">
-                {isRent ? "Rental" : "Sale"}
+                {isRent ? "Rental" : property.listingType === "sale" ? "Sale" : "Pending"}
               </span>
             </div>
 
@@ -167,7 +190,7 @@ export function ReviewSpecsModal({
                 </div>
               </div>
               <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-md">
-                {isRent ? "/month" : "Asking"}
+                {isRent ? "/month" : hasValidPrice ? "Asking" : "Pending"}
               </span>
             </div>
           </div>
@@ -185,7 +208,11 @@ export function ReviewSpecsModal({
                 </span>
               </div>
               <p className="text-xs sm:text-sm font-extrabold text-slate-900">
-                {property.bedrooms !== undefined && property.bedrooms !== null ? `${property.bedrooms} Beds` : "Pending"}
+                {hasValidBeds
+                  ? isStudio
+                    ? "Studio"
+                    : `${property.bedrooms} Beds`
+                  : "Pending"}
               </p>
             </div>
 
@@ -200,7 +227,7 @@ export function ReviewSpecsModal({
                 </span>
               </div>
               <p className="text-xs sm:text-sm font-extrabold text-slate-900">
-                {property.bathrooms !== undefined && property.bathrooms !== null ? `${property.bathrooms} Baths` : "Pending"}
+                {hasValidBaths ? `${property.bathrooms} Baths` : "Pending"}
               </p>
             </div>
 
@@ -215,7 +242,7 @@ export function ReviewSpecsModal({
                 </span>
               </div>
               <p className="text-xs sm:text-sm font-extrabold text-slate-900">
-                {Number(property.sqft) > 0 ? `${Number(property.sqft).toLocaleString()} sqft` : "Pending"}
+                {hasValidSqft ? `${Number(property.sqft).toLocaleString()} sqft` : "Pending"}
               </p>
             </div>
           </div>

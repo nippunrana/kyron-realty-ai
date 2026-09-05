@@ -38,7 +38,7 @@ export interface UseAgoraVoiceAgentReturn {
   ) => Promise<void>;
   toggleMute: () => void;
   endCall: () => Promise<void>;
-  sendTextMessage: (text: string) => void;
+  sendTextMessage: (text: string, priority?: "INTERRUPTED" | "APPEND") => void;
 }
 
 export interface UseAgoraVoiceAgentOptions {
@@ -448,10 +448,11 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
                 // Fast verbal UI modal intent matching
                 const OPEN_MODAL_REGEX = /(pull|bring|open|show|display|pop|bring back|pull back|pull it back|bring it back).*(card|modal|pop[- ]?up|review|summary|details|specs)/i;
                 const CLOSE_MODAL_REGEX = /(close|hide|dismiss|minimize|shut).*(card|modal|pop[- ]?up|review|summary)/i;
+                const APPROVE_PROCEED_REGEX = /(looks good|all looks good|look good|we can proceed|proceed further|let's proceed|let's move on|that's right|confirmed|continue)/i;
 
                 if (OPEN_MODAL_REGEX.test(spokenText)) {
                   onUIActionRef.current?.("open_review_modal");
-                } else if (CLOSE_MODAL_REGEX.test(spokenText)) {
+                } else if (CLOSE_MODAL_REGEX.test(spokenText) || APPROVE_PROCEED_REGEX.test(spokenText)) {
                   onUIActionRef.current?.("close_review_modal");
                 }
               }
@@ -641,7 +642,7 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
   }, [teardownResources]);
 
   // Send Text Message in active session (routed via RTM to Agora agent)
-  const sendTextMessage = useCallback(async (text: string) => {
+  const sendTextMessage = useCallback(async (text: string, priority: "INTERRUPTED" | "APPEND" = "INTERRUPTED") => {
     const trimmed = text.trim();
     if (!trimmed) return;
 
@@ -650,32 +651,41 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
       return;
     }
 
-    const localMsg: VoiceMessage = {
-      id: `local-text-${Date.now()}`,
-      role: "user",
-      text: trimmed,
-      timestamp: formatTimestamp(),
-    };
+    const isSystemCue = trimmed.startsWith("[SYSTEM CUE:");
+    let localMsgId = "";
 
-    // Optimistically render pending local message
-    localMessagesRef.current = [...localMessagesRef.current, localMsg];
-    setTranscript([...mappedRemoteRef.current, ...localMessagesRef.current]);
+    // Only render pending local message in UI transcript if it's user dialogue, not a background system cue
+    if (!isSystemCue) {
+      localMsgId = `local-text-${Date.now()}`;
+      const localMsg: VoiceMessage = {
+        id: localMsgId,
+        role: "user",
+        text: trimmed,
+        timestamp: formatTimestamp(),
+      };
+      localMessagesRef.current = [...localMessagesRef.current, localMsg];
+      setTranscript([...mappedRemoteRef.current, ...localMessagesRef.current]);
+    }
 
     try {
       const { ChatMessageType, ChatMessagePriority } = await import(
         "agora-agent-client-toolkit"
       );
+      const chosenPriority =
+        priority === "APPEND" ? ChatMessagePriority.APPEND : ChatMessagePriority.INTERRUPTED;
+
       await voiceAiRef.current.sendText(String(agentUidRef.current), {
         messageType: ChatMessageType.TEXT,
-        priority: ChatMessagePriority.INTERRUPTED,
+        priority: chosenPriority,
         responseInterruptable: true,
         text: trimmed,
       });
     } catch (sendErr: any) {
       console.error("[Agora Voice Agent] Could not send text message over RTM:", sendErr);
-      // Remove local message from UI to prevent fake success
-      localMessagesRef.current = localMessagesRef.current.filter((msg) => msg.id !== localMsg.id);
-      setTranscript([...mappedRemoteRef.current, ...localMessagesRef.current]);
+      if (localMsgId) {
+        localMessagesRef.current = localMessagesRef.current.filter((msg) => msg.id !== localMsgId);
+        setTranscript([...mappedRemoteRef.current, ...localMessagesRef.current]);
+      }
       setErrorMessage(
         `Failed to deliver message to voice agent: ${sendErr?.message || "RTM communication failure"}`
       );

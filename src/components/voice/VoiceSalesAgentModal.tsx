@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useAgoraVoiceAgent } from "@/hooks/useAgoraVoiceAgent";
+import { defaultTourDateTime } from "@/lib/listing-helpers";
 import {
   Mic,
   MicOff,
@@ -60,7 +61,7 @@ export function VoiceSalesAgentModal({
   const [showBookingDrawer, setShowBookingDrawer] = useState(false);
   const [bookingName, setBookingName] = useState("");
   const [bookingPhone, setBookingPhone] = useState("");
-  const [bookingDate, setBookingDate] = useState("2026-09-06T15:00");
+  const [bookingDate, setBookingDate] = useState(() => defaultTourDateTime(15));
   const [bookingConfirmed, setBookingConfirmed] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
 
@@ -87,15 +88,8 @@ export function VoiceSalesAgentModal({
     }
   };
 
-  // Direct "End Call" action from active call HUD
+  // "End Call" from the active HUD and "End & Close" from the exit confirmation
   const handleEndCall = async () => {
-    setShowExitConfirm(false);
-    await endCall();
-    onClose();
-  };
-
-  // Confirm exit during active call
-  const handleConfirmExit = async () => {
     setShowExitConfirm(false);
     await endCall();
     onClose();
@@ -556,7 +550,7 @@ export function VoiceSalesAgentModal({
                 </button>
                 <button
                   type="button"
-                  onClick={handleConfirmExit}
+                  onClick={handleEndCall}
                   className="flex-1 py-2.5 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs transition-colors cursor-pointer shadow-sm shadow-red-600/20"
                 >
                   End & Close

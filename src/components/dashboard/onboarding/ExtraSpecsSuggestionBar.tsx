@@ -140,14 +140,9 @@ export function ExtraSpecsSuggestionBar({
   const groups = isRent ? rentGroups : saleGroups;
 
   const isChipActive = (field: string, value: any): boolean => {
-    if (field === "parkingDetail") {
-      return Boolean(currentValues.parkingDetail && currentValues.parkingDetail.toLowerCase().includes(value.toLowerCase().split(" ")[0]));
-    }
-    if (field === "petPolicyDetail") {
-      return Boolean(currentValues.petPolicyDetail && currentValues.petPolicyDetail.toLowerCase().includes(value.toLowerCase().split(" ")[0]));
-    }
-    if (field === "utilitiesDetail") {
-      return Boolean(currentValues.utilitiesDetail && currentValues.utilitiesDetail.toLowerCase().includes(value.toLowerCase().split(" ")[0]));
+    if (field === "parkingDetail" || field === "petPolicyDetail" || field === "utilitiesDetail") {
+      const current = currentValues[field];
+      return Boolean(current && current.toLowerCase().includes(value.toLowerCase().split(" ")[0]));
     }
     if (field === "hoaFeeMonthly") {
       return Number(currentValues.hoaFeeMonthly) === Number(value);

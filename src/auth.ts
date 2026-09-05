@@ -6,10 +6,9 @@ import { db } from "@/db";
 import { users, accounts, sessions, verificationTokens } from "@/db/schema";
 import { verifyPassword } from "@/lib/auth-passwords";
 import { eq } from "drizzle-orm";
+import { getGoogleOAuthConfig } from "@/lib/google-oauth";
 
-const googleClientId = (process.env.AUTH_GOOGLE_ID || process.env.GOOGLE_CLIENT_ID || "").trim();
-const googleClientSecret = (process.env.AUTH_GOOGLE_SECRET || process.env.GOOGLE_CLIENT_SECRET || "").trim();
-const isGoogleConfigured = Boolean(googleClientId && googleClientSecret);
+const googleOAuth = getGoogleOAuthConfig();
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   basePath: "/projects/kyron-realty-ai/api/auth",
@@ -30,11 +29,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     error: "/login",
   },
   providers: [
-    ...(isGoogleConfigured
+    ...(googleOAuth.isConfigured
       ? [
           Google({
-            clientId: googleClientId,
-            clientSecret: googleClientSecret,
+            clientId: googleOAuth.clientId,
+            clientSecret: googleOAuth.clientSecret,
             allowDangerousEmailAccountLinking: true,
           }),
         ]

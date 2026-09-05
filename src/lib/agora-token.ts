@@ -22,14 +22,10 @@ export interface AgoraRtmTokenResult {
 }
 
 /**
- * Generates a signed Agora RTC token for client audio/video streaming.
- * Strict mode: Throws immediately if Agora credentials are missing or invalid.
+ * Reads and validates the Agora project credentials. Strict mode: throws on a
+ * missing or placeholder value so a misconfigured server fails at token time.
  */
-export function generateAgoraRtcToken(
-  channelName: string,
-  uid: number = 1001,
-  role: number = RtcRole.PUBLISHER
-): AgoraRtcTokenResult {
+function getAgoraCredentials(): { appId: string; appCertificate: string } {
   const appId = process.env.AGORA_APP_ID || process.env.NEXT_PUBLIC_AGORA_APP_ID;
   const appCertificate = process.env.AGORA_APP_CERTIFICATE;
 
@@ -44,6 +40,20 @@ export function generateAgoraRtcToken(
       "Missing AGORA_APP_CERTIFICATE in .env. Please set a valid Agora App Certificate from https://console.agora.io/."
     );
   }
+
+  return { appId, appCertificate };
+}
+
+/**
+ * Generates a signed Agora RTC token for client audio/video streaming.
+ * Strict mode: Throws immediately if Agora credentials are missing or invalid.
+ */
+export function generateAgoraRtcToken(
+  channelName: string,
+  uid: number = 1001,
+  role: number = RtcRole.PUBLISHER
+): AgoraRtcTokenResult {
+  const { appId, appCertificate } = getAgoraCredentials();
 
   const tokenExpirationInSeconds = 3600; // 1 hour
   const privilegeExpirationInSeconds = 3600;
@@ -79,20 +89,7 @@ export function generateAgoraRtcToken(
  * Strict mode: Throws immediately if Agora credentials are missing or invalid.
  */
 export function generateAgoraRtmToken(userId: string): AgoraRtmTokenResult {
-  const appId = process.env.AGORA_APP_ID || process.env.NEXT_PUBLIC_AGORA_APP_ID;
-  const appCertificate = process.env.AGORA_APP_CERTIFICATE;
-
-  if (!appId || appId.trim() === "" || appId === "your_agora_app_id_here") {
-    throw new Error(
-      "Missing AGORA_APP_ID in .env. Please set a valid Agora App ID from https://console.agora.io/."
-    );
-  }
-
-  if (!appCertificate || appCertificate.trim() === "" || appCertificate === "your_agora_app_certificate_here") {
-    throw new Error(
-      "Missing AGORA_APP_CERTIFICATE in .env. Please set a valid Agora App Certificate from https://console.agora.io/."
-    );
-  }
+  const { appId, appCertificate } = getAgoraCredentials();
 
   const tokenExpirationInSeconds = 3600; // 1 hour
   const currentTimestamp = Math.floor(Date.now() / 1000);
@@ -127,20 +124,7 @@ export function generateAgoraAgentCombinedToken(
   channelName: string,
   agentUid: number = 999001
 ): AgoraRtcTokenResult {
-  const appId = process.env.AGORA_APP_ID || process.env.NEXT_PUBLIC_AGORA_APP_ID;
-  const appCertificate = process.env.AGORA_APP_CERTIFICATE;
-
-  if (!appId || appId.trim() === "" || appId === "your_agora_app_id_here") {
-    throw new Error(
-      "Missing AGORA_APP_ID in .env. Please set a valid Agora App ID from https://console.agora.io/."
-    );
-  }
-
-  if (!appCertificate || appCertificate.trim() === "" || appCertificate === "your_agora_app_certificate_here") {
-    throw new Error(
-      "Missing AGORA_APP_CERTIFICATE in .env. Please set a valid Agora App Certificate from https://console.agora.io/."
-    );
-  }
+  const { appId, appCertificate } = getAgoraCredentials();
 
   const tokenExpirationInSeconds = 3600; // 1 hour
   const privilegeExpirationInSeconds = 3600;

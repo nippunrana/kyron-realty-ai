@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   Building2,
@@ -25,6 +25,7 @@ import {
   Check,
 } from "lucide-react";
 import { VoiceSalesAgentModal } from "@/components/voice/VoiceSalesAgentModal";
+import { defaultTourDateTime } from "@/lib/listing-helpers";
 
 interface PublicListingClientProps {
   property: any;
@@ -48,9 +49,14 @@ export function PublicListingClient({
   // Booking Form State
   const [bookName, setBookName] = useState("");
   const [bookPhone, setBookPhone] = useState("");
-  const [bookDate, setBookDate] = useState("2026-09-06T14:00");
+  const [bookDate, setBookDate] = useState("");
   const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
+
+  // Computed after mount so the server-rendered markup never carries a timezone-dependent value
+  useEffect(() => {
+    setBookDate(defaultTourDateTime(14));
+  }, []);
 
   const images =
     Array.isArray(property.images) && property.images.length > 0
