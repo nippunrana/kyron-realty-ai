@@ -19,12 +19,14 @@ import {
   Layers,
   Eye,
   Hash,
+  Mail,
 } from "lucide-react";
 import { ExtractedPropertyPayload } from "@/lib/kb-extractor";
 import { VerificationChecklist, ChecklistItemData } from "./VerificationChecklist";
 
 interface LivePropertyInspectorProps {
   data: ExtractedPropertyPayload;
+  ownerName?: string;
   onUpdateProperty: (updates: Partial<ExtractedPropertyPayload["property"]>) => void;
   onUpdateKnowledgeBase: (updates: Partial<ExtractedPropertyPayload["knowledgeBase"]>) => void;
   onUpdateNegotiationMatrix: (updates: Partial<ExtractedPropertyPayload["negotiationMatrix"]>) => void;
@@ -37,6 +39,7 @@ interface LivePropertyInspectorProps {
 
 export function LivePropertyInspector({
   data,
+  ownerName,
   onUpdateProperty,
   onUpdateKnowledgeBase,
   onUpdateNegotiationMatrix,
@@ -394,6 +397,33 @@ export function LivePropertyInspector({
                 <img src={img} alt="" className="w-full h-full object-cover" />
               </button>
             ))}
+          </div>
+        )}
+
+        {/* Verified Listing Contact Card */}
+        {knowledgeBase.contactEmail && (
+          <div className="p-3.5 rounded-2xl bg-gradient-to-r from-blue-50/70 via-white to-slate-50 border border-blue-200/80 shadow-2xs flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-xs shrink-0">
+                <Mail className="w-4 h-4" />
+              </div>
+              <div className="truncate">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-900">
+                    Verified Listing Contact
+                  </span>
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-bold">
+                    Connected
+                  </span>
+                </div>
+                <p className="text-xs font-extrabold text-slate-900 truncate">
+                  {knowledgeBase.contactEmail} {ownerName ? `• ${ownerName}` : ""}
+                </p>
+              </div>
+            </div>
+            <span className="text-[10px] font-semibold text-slate-400 shrink-0 hidden sm:inline">
+              Public Inquiry Email
+            </span>
           </div>
         )}
 

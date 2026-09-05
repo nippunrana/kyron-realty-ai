@@ -17,6 +17,12 @@ export interface VoiceMessage {
   timestamp: string;
 }
 
+export interface OwnerContext {
+  name?: string | null;
+  email?: string | null;
+  userId?: string | null;
+}
+
 export interface UseAgoraVoiceAgentReturn {
   callState: CallState;
   isMuted: boolean;
@@ -30,7 +36,8 @@ export interface UseAgoraVoiceAgentReturn {
     propertySlug?: string,
     propertyId?: number,
     callerType?: "buyer_inquiry" | "owner_onboarding",
-    onSpeechDetected?: (text: string) => void
+    onSpeechDetected?: (text: string) => void,
+    ownerContext?: OwnerContext
   ) => Promise<void>;
   toggleMute: () => void;
   endCall: () => Promise<void>;
@@ -268,7 +275,8 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
       propertySlug?: string,
       propertyId?: number,
       callerType: "buyer_inquiry" | "owner_onboarding" = "buyer_inquiry",
-      onSpeechDetected?: (text: string) => void
+      onSpeechDetected?: (text: string) => void,
+      ownerContext?: OwnerContext
     ) => {
       // Prevent duplicate or overlapping starts
       if (isStartingRef.current || callActiveRef.current) {
@@ -293,7 +301,14 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
         const sessionRes = await fetch(`${basePath}/api/agora/session/start`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ propertySlug, propertyId, callerType }),
+          body: JSON.stringify({
+            propertySlug,
+            propertyId,
+            callerType,
+            ownerName: ownerContext?.name,
+            ownerEmail: ownerContext?.email,
+            userId: ownerContext?.userId,
+          }),
           signal: abortController.signal,
         });
 

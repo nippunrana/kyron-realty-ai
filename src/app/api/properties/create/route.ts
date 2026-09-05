@@ -98,6 +98,32 @@ export async function POST(req: NextRequest) {
 
     // 2. Insert Knowledge Base
     if (knowledgeBase) {
+      const faqs = Array.isArray(knowledgeBase.faqs) ? [...knowledgeBase.faqs] : [];
+      if (
+        knowledgeBase.contactEmail &&
+        !faqs.some(
+          (f: any) =>
+            f.category === "Contact" ||
+            (f.question && f.question.toLowerCase().includes("contact email"))
+        )
+      ) {
+        faqs.push({
+          category: "Contact",
+          question: "What is the contact email for inquiries?",
+          answer: `You can reach the listing contact directly at ${knowledgeBase.contactEmail}.`,
+        });
+      }
+
+      const applicationProcess = knowledgeBase.applicationProcess
+        ? `${knowledgeBase.applicationProcess}${
+            knowledgeBase.contactEmail && !knowledgeBase.applicationProcess.includes(knowledgeBase.contactEmail)
+              ? ` (Contact: ${knowledgeBase.contactEmail})`
+              : ""
+          }`
+        : knowledgeBase.contactEmail
+        ? `Direct inquiry contact: ${knowledgeBase.contactEmail}`
+        : "";
+
       await db.insert(propertyKnowledgeBases).values({
         propertyId: insertedProperty.id,
         rawScrapedMarkdown: knowledgeBase.rawScrapedMarkdown || "",
@@ -107,8 +133,8 @@ export async function POST(req: NextRequest) {
         petPolicyDetail: knowledgeBase.petPolicyDetail || "",
         parkingDetail: knowledgeBase.parkingDetail || "",
         utilitiesDetail: knowledgeBase.utilitiesDetail || "",
-        applicationProcess: knowledgeBase.applicationProcess || "",
-        faqs: knowledgeBase.faqs || [],
+        applicationProcess,
+        faqs,
         agentTone: knowledgeBase.agentTone || "warm_professional",
         greetingMessage: knowledgeBase.greetingMessage || "",
       });

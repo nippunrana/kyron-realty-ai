@@ -58,8 +58,22 @@ const emptyInitialDraftState: ExtractedPropertyPayload = {
   },
 };
 
-export function OnboardingStudio() {
-  const [data, setData] = useState<ExtractedPropertyPayload>(emptyInitialDraftState);
+interface OnboardingStudioProps {
+  user?: {
+    id?: string;
+    name?: string | null;
+    email?: string | null;
+  };
+}
+
+export function OnboardingStudio({ user }: OnboardingStudioProps) {
+  const [data, setData] = useState<ExtractedPropertyPayload>(() => ({
+    ...emptyInitialDraftState,
+    knowledgeBase: {
+      ...emptyInitialDraftState.knowledgeBase,
+      contactEmail: user?.email || "",
+    },
+  }));
   const [isProcessing, setIsProcessing] = useState(false);
   const [activePipelineStep, setActivePipelineStep] = useState<string | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
@@ -154,18 +168,22 @@ export function OnboardingStudio() {
 
       if (json.success && json.data?.updates && Object.keys(json.data.updates).length > 0) {
         const updates = json.data.updates;
+        const { contactEmail, ...propertyUpdates } = updates;
 
         setData((prev) => {
-          const updatedProperty = { ...prev.property, ...updates };
+          const updatedProperty = { ...prev.property, ...propertyUpdates };
 
           return {
             ...prev,
             property: updatedProperty,
-            negotiationMatrix: updates.price
+            knowledgeBase: contactEmail
+              ? { ...prev.knowledgeBase, contactEmail }
+              : prev.knowledgeBase,
+            negotiationMatrix: propertyUpdates.price
               ? {
                   ...prev.negotiationMatrix,
-                  targetPrice: updates.price,
-                  minFloorPrice: Math.round(updates.price * 0.94),
+                  targetPrice: propertyUpdates.price,
+                  minFloorPrice: Math.round(propertyUpdates.price * 0.94),
                 }
               : prev.negotiationMatrix,
           };
@@ -309,6 +327,7 @@ export function OnboardingStudio() {
               faqs: (newKb.faqs && newKb.faqs.length > 0) ? newKb.faqs : prev.knowledgeBase.faqs,
               agentTone: newKb.agentTone || prev.knowledgeBase.agentTone,
               greetingMessage: newKb.greetingMessage || prev.knowledgeBase.greetingMessage,
+              contactEmail: newKb.contactEmail || prev.knowledgeBase.contactEmail || "",
               unknownFallbackPolicy: newKb.unknownFallbackPolicy || prev.knowledgeBase.unknownFallbackPolicy,
             },
             negotiationMatrix: {
@@ -407,6 +426,7 @@ export function OnboardingStudio() {
             isProcessing={isProcessing}
             activePipelineStep={activePipelineStep}
             currentProperty={data.property}
+            user={user}
           />
         </div>
 
@@ -414,6 +434,7 @@ export function OnboardingStudio() {
         <div className="lg:col-span-7 flex flex-col h-full min-h-[500px]">
           <LivePropertyInspector
             data={data}
+            ownerName={user?.name || ""}
             onUpdateProperty={handleUpdateProperty}
             onUpdateKnowledgeBase={handleUpdateKnowledgeBase}
             onUpdateNegotiationMatrix={handleUpdateNegotiationMatrix}
@@ -432,6 +453,8 @@ export function OnboardingStudio() {
           isOpen={showReviewModal}
           onClose={() => setShowReviewModal(false)}
           property={data.property}
+          contactEmail={data.knowledgeBase.contactEmail || user?.email || ""}
+          ownerName={user?.name || ""}
           onPublish={handlePublish}
           isPublishing={isPublishing}
         />

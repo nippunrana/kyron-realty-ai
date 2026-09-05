@@ -32,6 +32,7 @@ interface ConversationalPanelProps {
   isProcessing: boolean;
   activePipelineStep: string | null;
   currentProperty?: ExtractedPropertyPayload["property"];
+  user?: { id?: string; name?: string | null; email?: string | null };
 }
 
 export function ConversationalPanel({
@@ -45,6 +46,7 @@ export function ConversationalPanel({
   isProcessing,
   activePipelineStep,
   currentProperty,
+  user,
 }: ConversationalPanelProps) {
   const [urlInput, setUrlInput] = useState("");
 
@@ -396,7 +398,17 @@ export function ConversationalPanel({
                 <button
                   type="button"
                   onClick={() =>
-                    startCall(undefined, undefined, "owner_onboarding", handleHandsFreeSpeech)
+                    startCall(
+                      undefined,
+                      undefined,
+                      "owner_onboarding",
+                      handleHandsFreeSpeech,
+                      {
+                        name: user?.name,
+                        email: user?.email,
+                        userId: user?.id,
+                      }
+                    )
                   }
                   className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs font-bold transition-all shadow-sm shadow-blue-600/25 flex items-center gap-1.5 cursor-pointer"
                 >

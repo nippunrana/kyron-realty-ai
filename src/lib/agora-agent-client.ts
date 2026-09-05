@@ -4,7 +4,7 @@ import {
   generateAgoraAgentCombinedToken,
 } from "./agora-token";
 import { db } from "@/db";
-import { properties, propertyKnowledgeBases, negotiationMatrices, voiceSessions } from "@/db/schema";
+import { properties, propertyKnowledgeBases, negotiationMatrices, voiceSessions, users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
 export interface StartAgentSessionParams {
@@ -14,6 +14,9 @@ export interface StartAgentSessionParams {
   userUid?: number;
   agentUid?: number;
   callerType?: "buyer_inquiry" | "owner_onboarding";
+  ownerName?: string | null;
+  ownerEmail?: string | null;
+  userId?: string | null;
 }
 
 export interface AgoraAgentSessionResult {
@@ -43,6 +46,9 @@ export async function startAgoraAgentSession(
     userUid = 1001,
     agentUid = 999001,
     callerType = "buyer_inquiry",
+    ownerName,
+    ownerEmail,
+    userId,
   } = params;
 
   const appId = process.env.AGORA_APP_ID || process.env.NEXT_PUBLIC_AGORA_APP_ID;
@@ -58,6 +64,7 @@ export async function startAgoraAgentSession(
   let propertyRecord: any = null;
   let kbRecord: any = null;
   let matrixRecord: any = null;
+  let ownerUserRecord: any = null;
 
   if (propertyId) {
     const [p] = await db.select().from(properties).where(eq(properties.id, propertyId)).limit(1);
@@ -81,6 +88,19 @@ export async function startAgoraAgentSession(
       .where(eq(negotiationMatrices.propertyId, propertyRecord.id))
       .limit(1);
     matrixRecord = matrix;
+
+    if (propertyRecord.ownerId) {
+      try {
+        const [u] = await db
+          .select({ id: users.id, name: users.name, email: users.email })
+          .from(users)
+          .where(eq(users.id, propertyRecord.ownerId))
+          .limit(1);
+        ownerUserRecord = u;
+      } catch (err) {
+        console.warn("[Agora Voice Agent] Could not fetch owner user record:", err);
+      }
+    }
   }
 
   // 2. Generate Real Signed RTC and RTM Tokens for User, and ConvoAI Combined Token for Agent
@@ -98,8 +118,13 @@ export async function startAgoraAgentSession(
   let systemPrompt = "";
 
   if (callerType === "owner_onboarding") {
-    greeting =
-      "Hello! I'm Elena Vance, your Kyron Realty onboarding partner. I'll help you set up your listing and launch your 24/7 AI voice sales agent. To get started, is this property for rent or for sale?";
+    const trimmedName = (ownerName || "").trim();
+    const firstName = trimmedName ? trimmedName.split(/\s+/)[0] : "";
+    const resolvedEmail = (ownerEmail || "").trim();
+
+    greeting = firstName
+      ? `Hello ${firstName}! I'm Elena Vance, your Kyron Realty onboarding partner. I'll help you set up your listing and launch your 24/7 AI voice sales agent. To get started, is this property for rent or for sale?`
+      : "Hello there! I'm Elena Vance, your Kyron Realty onboarding partner. I'll help you set up your listing and launch your 24/7 AI voice sales agent. To get started, is this property for rent or for sale?";
 
     systemPrompt = `
 You are 'Elena Vance', Principal Luxury Listing Specialist & Real Estate Intelligence Partner at Kyron Realty AI.
@@ -111,8 +136,14 @@ Your mission is to interview property owners over Agora real-time voice and coll
 5. Bathrooms count
 6. Square footage / Size
 
+CURRENT PROPERTY OWNER IDENTITY:
+- Owner Name: ${trimmedName || "Property Owner"}${firstName ? ` (First name: ${firstName})` : ""}
+- Account Email: ${resolvedEmail || "Not specified on account"}
+
 VOICE DELIVERY GUIDELINES:
 - Speak in natural, concise, spoken sentences (1-2 sentences at a time). Never use markdown bullets, emojis, or robotic lists.
+- Address the owner naturally${firstName ? ` by their first name (${firstName})` : ""}.
+- CONTACT EMAIL CONFIRMATION: The owner's account email on file is ${resolvedEmail || "their account email"}. Whenever natural and convenient during the conversation or wrap-up, weave in a brief check to confirm if this email should be listed as the public contact for buyer inquiries, or if they prefer an alternate contact email. Acknowledge their confirmation warmly.
 - Proactively ask whether the property is for rent or for sale if not yet answered.
 - Guide the owner through remaining details one or two at a time in an encouraging, professional tone.
 - Accept global and international address formats naturally without insisting on US-specific state or zip code.
@@ -134,6 +165,8 @@ VOICE DELIVERY GUIDELINES:
       .map((r: any) => `- Condition: ${r.condition} -> Concession: ${r.concession}`)
       .join("\n");
 
+    const contactEmail = ownerUserRecord?.email || "";
+
     systemPrompt = `
 You are 'Sarah', a senior leasing advisor and sales specialist representing: ${propertyTitle}.
 Your goal is to converse naturally with prospective buyers/renters over Agora real-time voice, answer questions truthfully using the provided property knowledge base, negotiate within strict owner concession boundaries, and book viewing walkthroughs.
@@ -150,6 +183,7 @@ POLICIES & DETAILS:
 - Parking: ${kbRecord?.parkingDetail || "Assigned stall included"}
 - Utilities: ${kbRecord?.utilitiesDetail || "Standard utilities included"}
 - Application: ${kbRecord?.applicationProcess || "Standard application with credit verification"}
+${contactEmail ? `- Listing Contact Email: ${contactEmail}` : ""}
 
 VERIFIED PROPERTY FAQS:
 ${faqsText || "No additional custom FAQs."}
@@ -165,12 +199,14 @@ RULES OF ENGAGEMENT:
 2. Only state facts verified in the knowledge base.
 3. Use the Exchange-of-Value principle for negotiations. If a buyer asks for a discount, offer it ONLY in exchange for an 18-month lease or immediate move-in.
 4. When the buyer is interested, proactively offer two time slots to book an in-person viewing.
+${contactEmail ? `5. If asked for direct owner or leasing office contact, provide the verified contact email: ${contactEmail}.` : ""}
     `.trim();
   }
 
   // 4. Register Voice Session in Database
   let voiceSessionId = `agora-sess-${Date.now()}`;
   try {
+    const callerIdentifier = userId || (ownerEmail ? `user-${ownerEmail}` : `user-${userUid}`);
     const [sess] = await db
       .insert(voiceSessions)
       .values({
@@ -178,7 +214,7 @@ RULES OF ENGAGEMENT:
         channelName,
         agoraSessionId: voiceSessionId,
         callerType,
-        callerIdentifier: `user-${userUid}`,
+        callerIdentifier,
         status: "active",
       })
       .returning();

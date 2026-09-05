@@ -13,6 +13,7 @@ import {
   Mic,
   Loader2,
   X,
+  Mail,
 } from "lucide-react";
 import { ExtractedPropertyPayload } from "@/lib/kb-extractor";
 
@@ -20,6 +21,8 @@ interface ReviewSpecsModalProps {
   isOpen: boolean;
   onClose: () => void;
   property: ExtractedPropertyPayload["property"];
+  contactEmail?: string;
+  ownerName?: string;
   onPublish: () => Promise<void>;
   isPublishing: boolean;
 }
@@ -28,6 +31,8 @@ export function ReviewSpecsModal({
   isOpen,
   onClose,
   property,
+  contactEmail,
+  ownerName,
   onPublish,
   isPublishing,
 }: ReviewSpecsModalProps) {
@@ -194,6 +199,29 @@ export function ReviewSpecsModal({
             </p>
           </div>
         </div>
+
+        {/* Verified Listing Contact Spotlight */}
+        {contactEmail && (
+          <div className="mb-4 p-3.5 rounded-2xl bg-slate-50/90 border border-slate-200/80 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center border text-blue-600 bg-blue-50 border-blue-200 shrink-0">
+                <Mail className="w-3.5 h-3.5" />
+              </div>
+              <div className="truncate">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  Public Listing Contact
+                </span>
+                <span className="text-xs font-extrabold text-slate-900 truncate block">
+                  {contactEmail} {ownerName ? `(${ownerName})` : ""}
+                </span>
+              </div>
+            </div>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-[10px] font-bold text-blue-700 shrink-0">
+              <CheckCircle2 className="w-3 h-3 text-blue-600" />
+              <span>Verified Contact</span>
+            </span>
+          </div>
+        )}
 
         {/* 4. Live Voice Corrections Active Banner */}
         <div className="p-3.5 rounded-2xl bg-blue-50/80 border border-blue-200/80 mb-6 flex items-start gap-3 text-xs text-blue-900">

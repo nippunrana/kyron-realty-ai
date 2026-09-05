@@ -26,7 +26,7 @@ export default async function NewPropertyPage() {
 
       {/* Main Studio Workspace */}
       <main className="flex-1 flex flex-col">
-        <OnboardingStudio />
+        <OnboardingStudio user={session.user} />
       </main>
     </div>
   );

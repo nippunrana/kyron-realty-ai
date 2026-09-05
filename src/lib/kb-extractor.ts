@@ -36,6 +36,7 @@ export interface ExtractedPropertyPayload {
     parkingDetail: string;
     utilitiesDetail: string;
     applicationProcess: string;
+    contactEmail?: string;
     faqs: Array<{ question: string; answer: string; category: string }>;
     agentTone: string;
     greetingMessage: string;
@@ -421,6 +422,7 @@ export async function extractPropertyKnowledgeBase(
         parkingDetail: currentKb?.parkingDetail || "",
         utilitiesDetail: currentKb?.utilitiesDetail || "",
         applicationProcess: currentKb?.applicationProcess || "",
+        contactEmail: currentKb?.contactEmail || "",
         faqs: currentKb?.faqs || [],
         agentTone: "warm_professional",
         greetingMessage: currentKb?.greetingMessage || "",
@@ -611,6 +613,7 @@ Return a strictly valid JSON object matching this schema:
       },
       knowledgeBase: {
         ...parsed.knowledgeBase,
+        contactEmail: parsed.knowledgeBase?.contactEmail || currentKb?.contactEmail || "",
         rawScrapedMarkdown: input.markdown || contentToAnalyze,
       },
       negotiationMatrix: {
@@ -699,6 +702,7 @@ export interface TurnSpecUpdates {
   city?: string;
   state?: string;
   zipCode?: string;
+  contactEmail?: string;
 }
 
 /**
@@ -751,6 +755,7 @@ Your job is to analyze the recent conversation turns between Elena Vance (AI Rea
 5. sqft: interior square footage number (e.g. 1200)
 6. address: street address (e.g. "250 Marina Blvd")
 Optional location fields: city, state, zipCode.
+7. contactEmail: verified public contact email for listing (e.g. "alex@example.com") if the owner confirms their email or provides an alternate email.
 
 CRITICAL INSTRUCTIONS FOR DIALOGUE REASONING & ASR ROBUSTNESS:
 - Dialogue is labeled with [ELENA VANCE] and [OWNER].
@@ -790,6 +795,7 @@ ${formattedDialogue}
                 city: { type: "string" },
                 state: { type: "string" },
                 zipCode: { type: "string" },
+                contactEmail: { type: "string" },
               },
             },
             modalAction: {
