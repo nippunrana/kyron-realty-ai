@@ -16,22 +16,14 @@ export function hashPassword(password: string): string {
 /**
  * Verifies a password attempt against the stored salt:hash string.
  * Uses timingSafeEqual to protect against timing attacks.
- * Includes fallback for plaintext credentials if present in development.
+ * Only the salt:hash format is accepted; a stored value in any other shape never verifies.
  */
 export function verifyPassword(password: string, storedHash: string): boolean {
   if (!password || !storedHash) return false;
   if (typeof password !== "string" || typeof storedHash !== "string") return false;
 
   const parts = storedHash.split(":");
-  if (parts.length !== 2) {
-    // Development plaintext fallback with constant-time equality
-    const storedBuf = Buffer.from(storedHash);
-    const passBuf = Buffer.from(password);
-    if (storedBuf.length !== passBuf.length) {
-      return false;
-    }
-    return crypto.timingSafeEqual(storedBuf, passBuf);
-  }
+  if (parts.length !== 2) return false;
 
   const [salt, key] = parts;
   if (!salt || !key) return false;
