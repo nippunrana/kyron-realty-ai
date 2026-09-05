@@ -25,7 +25,7 @@ try {
     const listings = await tx`
       update properties set owner_id = ${OWNER_ID} where owner_id is null returning slug`;
     const sessions = await tx`
-      update voice_sessions set status = 'ended', ended_at = coalesce(ended_at, now())
+      update voice_sessions set status = 'completed', ended_at = coalesce(ended_at, now())
       where status = 'active' returning id`;
 
     if (listings.length !== 1 || sessions.length !== 84) {
