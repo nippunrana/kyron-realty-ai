@@ -9,6 +9,7 @@ import {
 } from "@/db/schema";
 import QRCode from "qrcode";
 import { eq } from "drizzle-orm";
+import { buildDefaultTitle, computeFloorPrice, randomSlugSuffix, slugify } from "@/lib/listing-helpers";
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,7 +20,7 @@ export async function POST(req: NextRequest) {
     const { property, knowledgeBase, negotiationMatrix } = body || {};
 
     if (property && !property.title && property.address) {
-      property.title = `${property.bedrooms ? `${property.bedrooms}-Bedroom ` : ""}Residence at ${property.address}`;
+      property.title = buildDefaultTitle(property.address, property.bedrooms);
     }
 
     if (!property || !property.title || !property.price || !property.address || !property.listingType) {
@@ -34,8 +35,8 @@ export async function POST(req: NextRequest) {
     const protocol = req.headers.get("x-forwarded-proto") || (host.includes("localhost") ? "http" : "https");
     const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "/projects/kyron-realty-ai";
 
-    let slug = property.slug || property.title.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-    
+    let slug = property.slug || slugify(property.title);
+
     // Check if slug exists
     const [existing] = await db
       .select({ id: properties.id })
@@ -44,7 +45,7 @@ export async function POST(req: NextRequest) {
       .limit(1);
 
     if (existing) {
-      slug = `${slug}-${Math.random().toString(36).substring(2, 6)}`;
+      slug = `${slug}-${randomSlugSuffix()}`;
     }
 
     const shareUrl = `${protocol}://${host}${basePath}/listings/${slug}`;
@@ -146,7 +147,7 @@ export async function POST(req: NextRequest) {
         propertyId: insertedProperty.id,
         allowNegotiation: negotiationMatrix.allowNegotiation ?? true,
         targetPrice: String(negotiationMatrix.targetPrice || property.price),
-        minFloorPrice: String(negotiationMatrix.minFloorPrice || Math.round(Number(property.price) * 0.94)),
+        minFloorPrice: String(negotiationMatrix.minFloorPrice || computeFloorPrice(Number(property.price))),
         maxAllowedDiscountPct: String(negotiationMatrix.maxAllowedDiscountPct || "5.00"),
         concessionRules: negotiationMatrix.concessionRules || [],
         notesForAgent: negotiationMatrix.notesForAgent || "",

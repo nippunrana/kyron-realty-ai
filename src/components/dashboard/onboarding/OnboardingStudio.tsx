@@ -6,6 +6,7 @@ import { LivePropertyInspector } from "./LivePropertyInspector";
 import { PublishSuccessModal } from "./PublishSuccessModal";
 import { ReviewSpecsModal } from "./ReviewSpecsModal";
 import { ExtractedPropertyPayload, TurnMessage } from "@/lib/kb-extractor";
+import { computeFloorPrice } from "@/lib/listing-helpers";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
@@ -14,7 +15,7 @@ const emptyInitialDraftState: ExtractedPropertyPayload = {
     title: "",
     slug: "",
     description: "",
-    listingType: "" as any,
+    listingType: "",
     propertyType: "apartment",
     price: 0,
     securityDeposit: 0,
@@ -66,6 +67,17 @@ interface OnboardingStudioProps {
   };
 }
 
+export function checkCoreSpecsCompleted(prop: ExtractedPropertyPayload["property"]): boolean {
+  const hasListingType = prop.listingType === "rent" || prop.listingType === "sale";
+  const hasAddress = Boolean(prop.address && prop.address.trim().length > 3);
+  const hasPrice = Boolean(Number(prop.price) > 0);
+  const hasBeds = prop.bedrooms !== undefined && prop.bedrooms !== null && Number(prop.bedrooms) >= 0;
+  const hasBaths = prop.bathrooms !== undefined && prop.bathrooms !== null && Number(prop.bathrooms) > 0;
+  const hasSqft = Boolean(Number(prop.sqft) > 0);
+
+  return hasListingType && hasAddress && hasPrice && hasBeds && hasBaths && hasSqft;
+}
+
 export function OnboardingStudio({ user }: OnboardingStudioProps) {
   const [data, setData] = useState<ExtractedPropertyPayload>(() => ({
     ...emptyInitialDraftState,
@@ -87,9 +99,12 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
   const onboardingStageRef = useRef(onboardingStage);
   onboardingStageRef.current = onboardingStage;
 
-  const voiceAgentActionsRef = useRef<{ sendTextMessage: (text: string) => void } | null>(null);
+  const voiceAgentActionsRef = useRef<{
+    sendTextMessage: (text: string, priority?: "INTERRUPTED" | "APPEND") => void;
+  } | null>(null);
   const turnSequenceRef = useRef<number>(0);
   const turnAbortControllerRef = useRef<AbortController | null>(null);
+  const hasCuedCoreReviewRef = useRef<boolean>(false);
 
   // Success Modal State
   const [publishedResult, setPublishedResult] = useState<{
@@ -114,29 +129,38 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
   };
 
   // Transition from Stage 1 (Core Specs) to Stage 2 (Additional Specs)
-  const handleConfirmCoreSpecs = () => {
+  const handleConfirmCoreSpecs = useCallback(() => {
     setShowCoreModal(false);
     setOnboardingStage("additional_specs");
     // Send conversational context trigger to Elena Vance if live voice session active
     if (voiceAgentActionsRef.current?.sendTextMessage) {
       voiceAgentActionsRef.current.sendTextMessage(
-        "The owner confirmed the core specs. Please now enthusiastically introduce and ask for the extra property details (parking, pets if rental, utilities, HOA if sale)."
+        "The owner confirmed the core specs. Please now enthusiastically introduce and ask for the extra property details (parking, pets if rental, utilities, HOA if sale).",
+        "APPEND"
       );
     }
-  };
+  }, []);
 
   const handleUIAction = useCallback((action: "open_review_modal" | "close_review_modal") => {
     if (action === "open_review_modal") {
       if (onboardingStageRef.current === "core") {
-        setShowCoreModal(true);
+        // Strictly guard against popping Core Review Modal unless 6/6 core specs are verified
+        if (checkCoreSpecsCompleted(dataRef.current.property)) {
+          setShowCoreModal(true);
+        } else {
+          console.log("[OnboardingStudio] Core specs not yet 6/6 verified, suppressing premature modal pop-up.");
+        }
       } else {
         setShowFinalModal(true);
       }
     } else if (action === "close_review_modal") {
       setShowCoreModal(false);
       setShowFinalModal(false);
+      if (onboardingStageRef.current === "core" && checkCoreSpecsCompleted(dataRef.current.property)) {
+        handleConfirmCoreSpecs();
+      }
     }
-  }, []);
+  }, [handleConfirmCoreSpecs]);
 
   // Turn-level AI extraction with Latest-Wins concurrency
   const handleTurnExtraction = async (slidingWindow: TurnMessage[]) => {
@@ -166,28 +190,8 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
       if (sequenceId !== turnSequenceRef.current) return;
 
       const json = await res.json();
-      if (json.success && json.data?.modalAction) {
-        const action = json.data.modalAction;
-        if (action === "open_core") {
-          setShowCoreModal(true);
-        } else if (action === "close_core") {
-          setShowCoreModal(false);
-          setOnboardingStage("additional_specs");
-        } else if (action === "open_final") {
-          setShowFinalModal(true);
-        } else if (action === "close_final") {
-          setShowFinalModal(false);
-        } else if (action === "open") {
-          if (onboardingStageRef.current === "core") {
-            setShowCoreModal(true);
-          } else {
-            setShowFinalModal(true);
-          }
-        } else if (action === "close") {
-          setShowCoreModal(false);
-          setShowFinalModal(false);
-        }
-      }
+
+      let candidateProperty = { ...dataRef.current.property };
 
       if (json.success && json.data?.updates && Object.keys(json.data.updates).length > 0) {
         const updates = json.data.updates;
@@ -201,20 +205,20 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
           ...propertyUpdates
         } = updates;
 
-        setData((prev) => {
-          const updatedProperty = {
-            ...prev.property,
-            ...propertyUpdates,
-            features:
-              newFeatures && newFeatures.length > 0
-                ? Array.from(new Set([...(prev.property.features || []), ...newFeatures]))
-                : prev.property.features,
-            amenities:
-              newAmenities && newAmenities.length > 0
-                ? Array.from(new Set([...(prev.property.amenities || []), ...newAmenities]))
-                : prev.property.amenities,
-          };
+        candidateProperty = {
+          ...candidateProperty,
+          ...propertyUpdates,
+          features:
+            newFeatures && newFeatures.length > 0
+              ? Array.from(new Set([...(candidateProperty.features || []), ...newFeatures]))
+              : candidateProperty.features,
+          amenities:
+            newAmenities && newAmenities.length > 0
+              ? Array.from(new Set([...(candidateProperty.amenities || []), ...newAmenities]))
+              : candidateProperty.amenities,
+        };
 
+        setData((prev) => {
           const updatedKb = {
             ...prev.knowledgeBase,
             ...(contactEmail ? { contactEmail } : {}),
@@ -225,17 +229,66 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
 
           return {
             ...prev,
-            property: updatedProperty,
+            property: candidateProperty,
             knowledgeBase: updatedKb,
             negotiationMatrix: propertyUpdates.price
               ? {
                   ...prev.negotiationMatrix,
                   targetPrice: propertyUpdates.price,
-                  minFloorPrice: Math.round(propertyUpdates.price * 0.94),
+                  minFloorPrice: computeFloorPrice(propertyUpdates.price),
                 }
               : prev.negotiationMatrix,
           };
         });
+      }
+
+      // Check if all 6 core specs are now verified in state
+      const isCoreComplete = checkCoreSpecsCompleted(candidateProperty);
+
+      // State-Driven Handoff to Elena Vance via Agora RTM (APPEND priority)
+      if (isCoreComplete && !hasCuedCoreReviewRef.current && onboardingStageRef.current === "core") {
+        hasCuedCoreReviewRef.current = true;
+        console.log("[OnboardingStudio] 6/6 Core Specs Verified! Sending state-driven cue via Agora RTM (APPEND)...");
+        const typeLabel = candidateProperty.listingType === "rent" ? "Rental" : "For Sale";
+        const priceLabel =
+          candidateProperty.listingType === "rent"
+            ? `$${Number(candidateProperty.price).toLocaleString()}/month`
+            : `$${Number(candidateProperty.price).toLocaleString()}`;
+        const cueMsg = `[SYSTEM CUE: ALL 6 CORE SPECS VERIFIED]: ${typeLabel}, Address: ${candidateProperty.address}, Price: ${priceLabel}, ${candidateProperty.bedrooms} Beds, ${candidateProperty.bathrooms} Baths, ${candidateProperty.sqft} sqft. Please now warmly announce that all 6 core details are locked in, summarize them concisely in 1-2 spoken sentences, and present the Core Specs Review Card on screen for the owner's confirmation.`;
+        voiceAgentActionsRef.current?.sendTextMessage(cueMsg, "APPEND");
+      }
+
+      // Handle modal action intent returned by turn extractor
+      if (json.success && json.data?.modalAction) {
+        const action = json.data.modalAction;
+        if (action === "open_core") {
+          // Strictly guard: Only open if all 6 core specs are truly verified
+          if (isCoreComplete) {
+            setShowCoreModal(true);
+          } else {
+            console.log("[OnboardingStudio] Suppressing open_core from turn extractor: core specs not yet 6/6 complete.");
+          }
+        } else if (action === "close_core") {
+          handleConfirmCoreSpecs();
+        } else if (action === "open_final") {
+          setShowFinalModal(true);
+        } else if (action === "close_final") {
+          setShowFinalModal(false);
+        } else if (action === "open") {
+          if (onboardingStageRef.current === "core") {
+            if (isCoreComplete) {
+              setShowCoreModal(true);
+            }
+          } else {
+            setShowFinalModal(true);
+          }
+        } else if (action === "close") {
+          if (onboardingStageRef.current === "core") {
+            handleConfirmCoreSpecs();
+          } else {
+            setShowFinalModal(false);
+          }
+        }
       }
     } catch (err: any) {
       if (err.name !== "AbortError") {

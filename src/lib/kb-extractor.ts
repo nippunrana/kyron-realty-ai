@@ -1,11 +1,18 @@
 import { GoogleGenAI } from "@google/genai";
+import {
+  buildDefaultTitle,
+  computeFloorPrice,
+  ListingType,
+  randomSlugSuffix,
+  slugify,
+} from "./listing-helpers";
 
 export interface ExtractedPropertyPayload {
   property: {
     title: string;
     slug: string;
     description: string;
-    listingType: "rent" | "sale";
+    listingType: ListingType;
     propertyType: "apartment" | "single_family" | "condo" | "townhouse" | "commercial";
     price: number;
     securityDeposit: number;
@@ -66,116 +73,35 @@ export interface ExtractInput {
 }
 
 function generateKebabSlug(title: string, city: string): string {
-  const base = `${title} ${city}`
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  const randomSuffix = Math.random().toString(36).substring(2, 6);
-  return `${base || "property"}-${randomSuffix}`;
+  return `${slugify(`${title} ${city}`) || "property"}-${randomSlugSuffix()}`;
 }
 
-function getQuestionFocus(
-  question?: string
-): "rent_or_sale" | "price" | "bedrooms" | "bathrooms" | "sqft" | "address" | null {
-  if (!question || typeof question !== "string") return null;
+const COUNT_WORDS: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6 };
 
-  // Split into sentences / clauses and inspect the trailing clause
-  const clauses = question
-    .split(/[?.!]\s*|\n+/)
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
-  const target = (clauses[clauses.length - 1] || question).toLowerCase();
-
-  // 1. Price / Rent amount questions
-  if (
-    /\b(?:monthly\s*rent|asking\s*price|target\s*price|price\b|how\s*much|cost\b|budget\b|rate\b)\b/i.test(target)
-  ) {
-    return "price";
-  }
-
-  // 2. Listing type questions (Rent vs Sale)
-  if (
-    /\b(?:for\s*rent\s*or\s*(?:for\s*)?sale|rent\s*or\s*sale|renting\s*or\s*selling|rent\s*or\s*buy)\b/i.test(target) ||
-    (/\b(?:rent|sale)\b/i.test(target) && /\b(?:is\s*(?:this|the\s*property)\s*for)\b/i.test(target))
-  ) {
-    return "rent_or_sale";
-  }
-
-  // 3. Bathrooms
-  if (/\b(?:bathroom|bathrooms|baths|bath|toilets|toilet|washroom|washrooms|restroom|restrooms)\b/i.test(target)) {
-    return "bathrooms";
-  }
-
-  // 4. Bedrooms
-  if (/\b(?:bedroom|bedrooms|beds|bed|br)\b/i.test(target)) {
-    return "bedrooms";
-  }
-
-  // 5. Sqft / Size
-  if (/\b(?:square\s*feet|square\s*foot|sqft|sq\s*ft|footage|size|area|how\s*big|square)\b/i.test(target)) {
-    return "sqft";
-  }
-
-  // 6. Address / Location
-  if (/\b(?:address|location|where\s*is|street|located|where's|neighborhood|city)\b/i.test(target)) {
-    return "address";
-  }
-
-  return null;
-}
-
-function parseSpokenNumber(text: string): number | null {
-  const cleaned = text.toLowerCase().trim().replace(/[,.]/g, "");
-  const digitMatch = cleaned.match(/\b([0-9]+)\b/);
-  if (digitMatch) return Number(digitMatch[1]);
-
-  const wordMap: Record<string, number> = {
-    zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5,
-    six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
-    eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15,
-    sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20,
-    thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70,
-    eighty: 80, ninety: 90,
-  };
-
-  if (wordMap[cleaned] !== undefined) return wordMap[cleaned];
-
-  if (cleaned.includes("thousand")) {
-    const parts = cleaned.split("thousand").map((p) => p.trim());
-    const base = wordMap[parts[0]] || 1;
-    const rem = parts[1] && wordMap[parts[1]] ? wordMap[parts[1]] : 0;
-    return base * 1000 + rem;
-  }
-
-  return null;
+function parseCountWord(word: string): number {
+  return COUNT_WORDS[word.toLowerCase()] ?? Number(word);
 }
 
 /**
  * Deterministic real-time attribute extractor for instantaneous (<10ms) hands-free voice updates.
- * Parses listing type, price, beds, baths, sqft, and address from spoken user text with question context.
+ * Parses listing type, price, beds, baths, sqft, and address from spoken user text.
  */
 export function extractHeuristicAttributes(
   text: string,
-  prevProperty?: Partial<ExtractedPropertyPayload["property"]>,
-  lastAssistantQuestion?: string
+  prevProperty?: Partial<ExtractedPropertyPayload["property"]>
 ): Partial<ExtractedPropertyPayload["property"]> {
   const updates: Partial<ExtractedPropertyPayload["property"]> = {};
   if (!text || typeof text !== "string") return updates;
 
   const lower = text.toLowerCase().trim();
-  const focus = getQuestionFocus(lastAssistantQuestion);
 
   // 1. Listing Type
   if (
     /\b(?:for rent|to rent|rental|for lease|to lease)\b/i.test(lower) ||
-    /\b(?:renting|rent is|per month|\/mo|a month)\b/i.test(lower) ||
-    (focus === "rent_or_sale" && /\brent\b/i.test(lower) && !/\bsale\b/i.test(lower))
+    /\b(?:renting|rent is|per month|\/mo|a month)\b/i.test(lower)
   ) {
     updates.listingType = "rent";
-  } else if (
-    /\b(?:for sale|to buy|selling|purchase|asking price|to purchase)\b/i.test(lower) ||
-    (focus === "rent_or_sale" && /\bsale\b/i.test(lower) && !/\brent\b/i.test(lower))
-  ) {
+  } else if (/\b(?:for sale|to buy|selling|purchase|asking price|to purchase)\b/i.test(lower)) {
     updates.listingType = "sale";
   }
 
@@ -190,137 +116,61 @@ export function extractHeuristicAttributes(
     );
     if (wordPriceMatch && wordPriceMatch[1]) {
       parsedPrice = Number(wordPriceMatch[1].replace(/,/g, ""));
-    } else if (focus === "price") {
-      // Standalone number or spoken amount when answering a price question
-      const standaloneNumMatch = text.match(
-        /(?:^|\b)(?:it's|it is|about|around)?\s*([0-9]{1,3}(?:,[0-9]{3})+|[0-9]{3,7})\b/i
-      );
-      if (standaloneNumMatch && standaloneNumMatch[1]) {
-        parsedPrice = Number(standaloneNumMatch[1].replace(/,/g, ""));
-      } else {
-        const spokenVal = parseSpokenNumber(text);
-        if (spokenVal && spokenVal >= 100) {
-          parsedPrice = spokenVal;
-        }
-      }
     }
   }
   if (parsedPrice && parsedPrice >= 100) {
     updates.price = parsedPrice;
   }
 
-  // 3. Bedrooms
-  // Matches "2 beds", "2 bed", "2 bedrooms", "two bedrooms", "studio"
+  // 3. Bedrooms — "2 beds", "2 bedrooms", "two bedrooms", "studio"
   if (/\b(?:studio|alcove\s*studio)\b/i.test(text)) {
     updates.bedrooms = 0;
   } else {
-    const bedWordMap: Record<string, number> = {
-      one: 1,
-      two: 2,
-      three: 3,
-      four: 4,
-      five: 5,
-      six: 6,
-    };
-    const bedRegex =
-      /\b([0-9]+|one|two|three|four|five|six)\s*(?:bed|beds|bedroom|bedrooms|br)\b/i;
-    const bedMatch = text.match(bedRegex);
+    const bedMatch = text.match(/\b([0-9]+|one|two|three|four|five|six)\s*(?:bed|beds|bedroom|bedrooms|br)\b/i);
     if (bedMatch && bedMatch[1]) {
-      const word = bedMatch[1].toLowerCase();
-      updates.bedrooms = bedWordMap[word] !== undefined ? bedWordMap[word] : Number(word);
-    } else if (focus === "bedrooms") {
-      const num = parseSpokenNumber(text);
-      if (num !== null && num >= 0 && num <= 20) {
-        updates.bedrooms = num;
-      }
+      updates.bedrooms = parseCountWord(bedMatch[1]);
     }
   }
 
-  // 4. Bathrooms
-  // Matches "2 baths", "2.5 bathrooms", "two baths", "1.5 ba", "2 toilets", "2 washrooms"
-  const bathWordMap: Record<string, number> = {
-    one: 1,
-    two: 2,
-    three: 3,
-    four: 4,
-    five: 5,
-  };
-  const bathRegex =
-    /\b([0-9]+(?:\.[0-9]+)?|one|two|three|four|five)\s*(?:bath|baths|bathroom|bathrooms|ba|toilet|toilets|washroom|washrooms|restroom|restrooms|powder\s*room)\b/i;
-  const bathMatch = text.match(bathRegex);
+  // 4. Bathrooms — "2 baths", "2.5 bathrooms", "two baths", "1.5 ba", "2 washrooms"
+  const bathMatch = text.match(
+    /\b([0-9]+(?:\.[0-9]+)?|one|two|three|four|five)\s*(?:bath|baths|bathroom|bathrooms|ba|toilet|toilets|washroom|washrooms|restroom|restrooms|powder\s*room)\b/i
+  );
   if (bathMatch && bathMatch[1]) {
-    const word = bathMatch[1].toLowerCase();
-    updates.bathrooms = bathWordMap[word] !== undefined ? bathWordMap[word] : Number(word);
-  } else if (focus === "bathrooms") {
-    const num = parseSpokenNumber(text);
-    if (num !== null && num >= 1 && num <= 15) {
-      updates.bathrooms = num;
-    }
+    updates.bathrooms = parseCountWord(bathMatch[1]);
   }
 
-  // 5. Square footage / Size
-  // Matches "1,200 sqft", "1200 square feet", "850 sf", "1,500 sq ft", "1100 square"
-  const sqftRegex =
-    /\b([0-9]{1,3}(?:,[0-9]{3})+|[0-9]{3,5})\s*(?:sq\s*ft|sqft|square\s*feet|square\s*foot|sf|square)\b/i;
-  const sqftMatch = text.match(sqftRegex);
+  // 5. Square footage — "1,200 sqft", "1200 square feet", "850 sf"
+  const sqftMatch = text.match(
+    /\b([0-9]{1,3}(?:,[0-9]{3})+|[0-9]{3,5})\s*(?:sq\s*ft|sqft|square\s*feet|square\s*foot|sf|square)\b/i
+  );
   if (sqftMatch && sqftMatch[1]) {
     updates.sqft = Number(sqftMatch[1].replace(/,/g, ""));
-  } else if (focus === "sqft") {
-    const standaloneSqft = text.match(/\b([0-9]{1,3}(?:,[0-9]{3})+|[0-9]{3,5})\b/);
-    if (standaloneSqft && standaloneSqft[1]) {
-      updates.sqft = Number(standaloneSqft[1].replace(/,/g, ""));
+  }
+
+  // 6. US street address in unprompted utterances
+  const streetRegex =
+    /(?:\bat\s+)?([0-9]{1,5}\s+[A-Za-z\s]+?\s+(?:Street|St|Avenue|Ave|Boulevard|Blvd|Road|Rd|Drive|Dr|Lane|Ln|Way|Court|Ct|Place|Pl|Terrace|Ter|Circle|Cir)\b)/i;
+  const streetMatch = text.match(streetRegex);
+  if (streetMatch && streetMatch[1]) {
+    updates.address = streetMatch[1].trim();
+    const afterAddress = text.substring((streetMatch.index || 0) + streetMatch[0].length);
+    const cityMatch = afterAddress.match(/,\s*([A-Za-z\s]+?)(?:,\s*([A-Z]{2}))?(?:\s+[0-9]{5})?(?:[.,]|$)/);
+    if (cityMatch && cityMatch[1]) {
+      updates.city = cityMatch[1].trim();
+      if (cityMatch[2]) updates.state = cityMatch[2].trim();
     }
   }
 
-  // 6. Street Address & Location
-  if (focus === "address") {
-    // Strip common leading conversational phrases
-    const cleanAddr = text
-      .replace(/^(?:it's|it is|the address is|address is|located at|at)\s+/i, "")
-      .replace(/[.]+$/, "")
-      .trim();
-
-    if (cleanAddr.length > 3) {
-      const parts = cleanAddr.split(",").map((p) => p.trim()).filter(Boolean);
-      if (parts.length >= 2) {
-        updates.city = parts[parts.length - 1];
-        updates.address = parts.slice(0, parts.length - 1).join(", ");
-      } else {
-        updates.address = cleanAddr;
-      }
-    }
-  } else {
-    // Regex fallback for US street addresses in unprompted utterances
-    const streetRegex =
-      /(?:\bat\s+)?([0-9]{1,5}\s+[A-Za-z\s]+?\s+(?:Street|St|Avenue|Ave|Boulevard|Blvd|Road|Rd|Drive|Dr|Lane|Ln|Way|Court|Ct|Place|Pl|Terrace|Ter|Circle|Cir)\b)/i;
-    const streetMatch = text.match(streetRegex);
-    if (streetMatch && streetMatch[1]) {
-      updates.address = streetMatch[1].trim();
-      const afterAddress = text.substring((streetMatch.index || 0) + streetMatch[0].length);
-      const cityMatch = afterAddress.match(/,\s*([A-Za-z\s]+?)(?:,\s*([A-Z]{2}))?(?:\s+[0-9]{5})?(?:[.,]|$)/);
-      if (cityMatch && cityMatch[1]) {
-        updates.city = cityMatch[1].trim();
-        if (cityMatch[2]) updates.state = cityMatch[2].trim();
-      }
-    }
-  }
-
-  // 7. Zip code extraction (PROTECTED AGAINST PRICE/RENT COLLISION)
-  // Never extract 5-digit number as zip if answering price, or if number equals parsedPrice
-  if (focus !== "price") {
-    const zipMatch = text.match(/\b([0-9]{5})\b/);
-    if (zipMatch && zipMatch[1]) {
-      const candidateZip = zipMatch[1];
-      if (parsedPrice === null || Number(candidateZip) !== parsedPrice) {
-        // Only treat as zip if in address context or explicitly preceded by zip/state
-        if (
-          focus === "address" ||
-          /\b(?:zip|zipcode|postal)\b/i.test(text) ||
-          /[A-Z]{2}\s+[0-9]{5}\b/.test(text)
-        ) {
-          updates.zipCode = candidateZip;
-        }
-      }
+  // 7. Zip code — only in explicit zip/state context, and never the number already parsed as the price
+  const zipMatch = text.match(/\b([0-9]{5})\b/);
+  if (zipMatch && zipMatch[1]) {
+    const candidateZip = zipMatch[1];
+    if (
+      (parsedPrice === null || Number(candidateZip) !== parsedPrice) &&
+      (/\b(?:zip|zipcode|postal)\b/i.test(text) || /[A-Z]{2}\s+[0-9]{5}\b/.test(text))
+    ) {
+      updates.zipCode = candidateZip;
     }
   }
 
@@ -330,15 +180,75 @@ export function extractHeuristicAttributes(
   const effectiveType = updates.listingType ?? prevProperty?.listingType;
 
   if (effectiveAddress && !prevProperty?.title) {
-    const typeLabel = effectiveType
-      ? effectiveType === "rent"
-        ? "Residence for Rent"
-        : "Residence for Sale"
-      : "Residence";
-    updates.title = `${effectiveBeds ? `${effectiveBeds}-Bedroom ` : ""}${typeLabel} at ${effectiveAddress}`;
+    updates.title = buildDefaultTitle(effectiveAddress, effectiveBeds, effectiveType);
   }
 
   return updates;
+}
+
+/**
+ * Deterministic payload used when Gemini is unavailable or fails: heuristic specs
+ * layered over whatever the caller already verified. Never invents facts.
+ */
+function buildHeuristicFallback(input: ExtractInput): ExtractedPropertyPayload {
+  const current = input.currentPropertyState?.property;
+  const currentKb = input.currentPropertyState?.knowledgeBase;
+  const currentMatrix = input.currentPropertyState?.negotiationMatrix;
+  const heuristic = extractHeuristicAttributes(input.conversationText || input.markdown || "", current);
+  const targetPrice = heuristic.price || current?.price || 0;
+  const floorPrice = computeFloorPrice(targetPrice);
+
+  return {
+    property: {
+      title: heuristic.title || current?.title || (heuristic.address ? buildDefaultTitle(heuristic.address) : ""),
+      slug: generateKebabSlug(heuristic.title || heuristic.address || "property", heuristic.city || ""),
+      description: current?.description || "",
+      listingType: heuristic.listingType || current?.listingType || "",
+      propertyType: current?.propertyType || "apartment",
+      price: targetPrice,
+      securityDeposit: current?.securityDeposit || 0,
+      minLeaseMonths: current?.minLeaseMonths || 12,
+      hoaFeeMonthly: current?.hoaFeeMonthly || 0,
+      address: heuristic.address || current?.address || "",
+      unitNumber: current?.unitNumber || "",
+      city: heuristic.city || current?.city || "",
+      state: heuristic.state || current?.state || "",
+      zipCode: heuristic.zipCode || current?.zipCode || "",
+      country: "USA",
+      bedrooms: heuristic.bedrooms ?? current?.bedrooms ?? 0,
+      bathrooms: heuristic.bathrooms ?? current?.bathrooms ?? 0,
+      sqft: heuristic.sqft ?? current?.sqft ?? 0,
+      yearBuilt: current?.yearBuilt || 0,
+      amenities: current?.amenities || [],
+      features: current?.features || [],
+      coverImageUrl: current?.coverImageUrl || "",
+      images: current?.images || [],
+    },
+    knowledgeBase: {
+      rawScrapedMarkdown: input.markdown || "",
+      synthesizedSalesPitch: currentKb?.synthesizedSalesPitch || "",
+      neighborhoodSummary: currentKb?.neighborhoodSummary || "",
+      schoolDistrictInfo: currentKb?.schoolDistrictInfo || "",
+      petPolicyDetail: currentKb?.petPolicyDetail || "",
+      parkingDetail: currentKb?.parkingDetail || "",
+      utilitiesDetail: currentKb?.utilitiesDetail || "",
+      applicationProcess: currentKb?.applicationProcess || "",
+      contactEmail: currentKb?.contactEmail || "",
+      faqs: currentKb?.faqs || [],
+      agentTone: "warm_professional",
+      greetingMessage: currentKb?.greetingMessage || "",
+      unknownFallbackPolicy:
+        "Offer licensed broker follow-up rather than guessing unverified property specs.",
+    },
+    negotiationMatrix: {
+      allowNegotiation: true,
+      targetPrice,
+      minFloorPrice: floorPrice,
+      maxAllowedDiscountPct: 6.0,
+      concessionRules: currentMatrix?.concessionRules || [],
+      notesForAgent: floorPrice > 0 ? `Strict floor price lock at $${floorPrice}.` : "",
+    },
+  };
 }
 
 /**
@@ -354,7 +264,6 @@ export async function extractPropertyKnowledgeBase(
 ): Promise<ExtractedPropertyPayload> {
   const current = input.currentPropertyState?.property;
   const currentKb = input.currentPropertyState?.knowledgeBase;
-  const currentMatrix = input.currentPropertyState?.negotiationMatrix;
 
   const contentToAnalyze = [
     input.url ? `Source Listing URL: ${input.url}` : "",
@@ -383,61 +292,7 @@ export async function extractPropertyKnowledgeBase(
   // Fallback heuristic if API key is missing or offline
   if (!apiKey || apiKey.trim() === "" || apiKey === "your_gemini_api_key_here") {
     console.warn("GEMINI_API_KEY missing, using deterministic heuristic fallback.");
-    const heuristic = extractHeuristicAttributes(input.conversationText || input.markdown || "", current);
-    const targetPrice = heuristic.price || current?.price || 0;
-    const floorPrice = targetPrice > 0 ? Math.round(targetPrice * 0.94) : 0;
-
-    return {
-      property: {
-        title: heuristic.title || current?.title || (heuristic.address ? `Residence at ${heuristic.address}` : ""),
-        slug: generateKebabSlug(heuristic.title || heuristic.address || "property", heuristic.city || ""),
-        description: current?.description || "",
-        listingType: heuristic.listingType || current?.listingType || ("" as any),
-        propertyType: current?.propertyType || "apartment",
-        price: targetPrice,
-        securityDeposit: current?.securityDeposit || 0,
-        minLeaseMonths: current?.minLeaseMonths || 12,
-        hoaFeeMonthly: current?.hoaFeeMonthly || 0,
-        address: heuristic.address || current?.address || "",
-        unitNumber: current?.unitNumber || "",
-        city: heuristic.city || current?.city || "",
-        state: heuristic.state || current?.state || "",
-        zipCode: heuristic.zipCode || current?.zipCode || "",
-        country: "USA",
-        bedrooms: heuristic.bedrooms ?? current?.bedrooms ?? 0,
-        bathrooms: heuristic.bathrooms ?? current?.bathrooms ?? 0,
-        sqft: heuristic.sqft ?? current?.sqft ?? 0,
-        yearBuilt: current?.yearBuilt || 0,
-        amenities: current?.amenities || [],
-        features: current?.features || [],
-        coverImageUrl: current?.coverImageUrl || "",
-        images: current?.images || [],
-      },
-      knowledgeBase: {
-        rawScrapedMarkdown: input.markdown || "",
-        synthesizedSalesPitch: currentKb?.synthesizedSalesPitch || "",
-        neighborhoodSummary: currentKb?.neighborhoodSummary || "",
-        schoolDistrictInfo: currentKb?.schoolDistrictInfo || "",
-        petPolicyDetail: currentKb?.petPolicyDetail || "",
-        parkingDetail: currentKb?.parkingDetail || "",
-        utilitiesDetail: currentKb?.utilitiesDetail || "",
-        applicationProcess: currentKb?.applicationProcess || "",
-        contactEmail: currentKb?.contactEmail || "",
-        faqs: currentKb?.faqs || [],
-        agentTone: "warm_professional",
-        greetingMessage: currentKb?.greetingMessage || "",
-        unknownFallbackPolicy:
-          "Offer licensed broker follow-up rather than guessing unverified property specs.",
-      },
-      negotiationMatrix: {
-        allowNegotiation: true,
-        targetPrice,
-        minFloorPrice: floorPrice,
-        maxAllowedDiscountPct: 6.0,
-        concessionRules: currentMatrix?.concessionRules || [],
-        notesForAgent: floorPrice > 0 ? `Strict floor price lock at $${floorPrice}.` : "",
-      },
-    };
+    return buildHeuristicFallback(input);
   }
 
   const ai = new GoogleGenAI({ apiKey });
@@ -568,7 +423,7 @@ Return a strictly valid JSON object matching this schema:
       parsed.property?.title ||
       heuristic.title ||
       current?.title ||
-      (address ? `${bedrooms ? `${bedrooms}-Bedroom ` : ""}Residence at ${address}` : "Real Estate Listing");
+      (address ? buildDefaultTitle(address, bedrooms) : "Real Estate Listing");
     const slug = generateKebabSlug(title, city || "property");
 
     // Merge existing images if found
@@ -583,7 +438,7 @@ Return a strictly valid JSON object matching this schema:
     const targetPrice = price || Number(parsed.negotiationMatrix?.targetPrice) || 0;
     const minFloorPrice =
       targetPrice > 0
-        ? parsed.negotiationMatrix?.minFloorPrice || Math.round(targetPrice * 0.94)
+        ? parsed.negotiationMatrix?.minFloorPrice || computeFloorPrice(targetPrice)
         : 0;
 
     return {
@@ -625,60 +480,7 @@ Return a strictly valid JSON object matching this schema:
   } catch (err: any) {
     console.error(`[Gemini Extraction Error]:`, err.message || err);
     // Graceful fallback to heuristic extraction to ensure uninterrupted onboarding flow
-    const heuristic = extractHeuristicAttributes(input.conversationText || input.markdown || "", current);
-    const targetPrice = heuristic.price || current?.price || 0;
-    const floorPrice = targetPrice > 0 ? Math.round(targetPrice * 0.94) : 0;
-
-    return {
-      property: {
-        title: heuristic.title || current?.title || (heuristic.address ? `Residence at ${heuristic.address}` : ""),
-        slug: generateKebabSlug(heuristic.title || heuristic.address || "property", heuristic.city || ""),
-        description: current?.description || "",
-        listingType: heuristic.listingType || current?.listingType || ("" as any),
-        propertyType: current?.propertyType || "apartment",
-        price: targetPrice,
-        securityDeposit: current?.securityDeposit || 0,
-        minLeaseMonths: current?.minLeaseMonths || 12,
-        hoaFeeMonthly: current?.hoaFeeMonthly || 0,
-        address: heuristic.address || current?.address || "",
-        unitNumber: current?.unitNumber || "",
-        city: heuristic.city || current?.city || "",
-        state: heuristic.state || current?.state || "",
-        zipCode: heuristic.zipCode || current?.zipCode || "",
-        country: "USA",
-        bedrooms: heuristic.bedrooms ?? current?.bedrooms ?? 0,
-        bathrooms: heuristic.bathrooms ?? current?.bathrooms ?? 0,
-        sqft: heuristic.sqft ?? current?.sqft ?? 0,
-        yearBuilt: current?.yearBuilt || 0,
-        amenities: current?.amenities || [],
-        features: current?.features || [],
-        coverImageUrl: current?.coverImageUrl || "",
-        images: current?.images || [],
-      },
-      knowledgeBase: {
-        rawScrapedMarkdown: input.markdown || "",
-        synthesizedSalesPitch: currentKb?.synthesizedSalesPitch || "",
-        neighborhoodSummary: currentKb?.neighborhoodSummary || "",
-        schoolDistrictInfo: currentKb?.schoolDistrictInfo || "",
-        petPolicyDetail: currentKb?.petPolicyDetail || "",
-        parkingDetail: currentKb?.parkingDetail || "",
-        utilitiesDetail: currentKb?.utilitiesDetail || "",
-        applicationProcess: currentKb?.applicationProcess || "",
-        faqs: currentKb?.faqs || [],
-        agentTone: "warm_professional",
-        greetingMessage: currentKb?.greetingMessage || "",
-        unknownFallbackPolicy:
-          "Offer licensed broker follow-up rather than guessing unverified property specs.",
-      },
-      negotiationMatrix: {
-        allowNegotiation: true,
-        targetPrice,
-        minFloorPrice: floorPrice,
-        maxAllowedDiscountPct: 6.0,
-        concessionRules: currentMatrix?.concessionRules || [],
-        notesForAgent: floorPrice > 0 ? `Strict floor price lock at $${floorPrice}.` : "",
-      },
-    };
+    return buildHeuristicFallback(input);
   }
 }
 
@@ -793,8 +595,9 @@ CRITICAL INSTRUCTIONS FOR DIALOGUE REASONING & ASR ROBUSTNESS:
 - If no property specs were mentioned or changed in this dialogue, return an empty "updates" object: { "updates": {} }.
 
 UI MODAL INTENT DETECTION:
-- "open_core" (or "open"): Elena or owner is showing, pulling up, or opening the Core Specs review card.
-- "close_core" (or "close"): The owner confirms the core specs (e.g. "looks good", "confirmed", "that's right", "continue") or asks to minimize the core card.
+- "open_core" (or "open"): Elena or owner is EXPLICITLY announcing, showing, pulling up, or opening the Core Specs review card (e.g. Elena says "I've pulled up your core specs review card on your screen", or owner asks "open the review card" / "show me the card").
+  CRITICAL: If the owner or Elena is simply asking or answering regular property intake questions (such as stating "for rent", giving an address, stating a price, bedrooms, bathrooms, or sqft), modalAction MUST BE "none". NEVER return "open_core" during intake answers!
+- "close_core" (or "close"): The owner confirms or approves the core specs (e.g. "looks good", "this all looks good", "we can proceed further", "let's proceed", "confirmed", "that's right", "continue", "let's move on") or explicitly asks to close/minimize the review card.
 - "open_final": Elena or owner is pulling up the Final Complete / Deploy review card.
 - "close_final": Owner asks to close or minimize the final review card.
 - Otherwise: "none".
