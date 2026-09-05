@@ -14,6 +14,16 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      # Enforces the Agora-only voice policy in docs/built-systems/voice-agent-and-agora.md.
+      # Documentation is advisory; this step is not.
+      - name: Enforce Agora-only policy
+        run: |
+          if grep -rnE "speechSynthesis|webkitSpeechRecognition|SpeechRecognition" src/; then
+            echo "::error::Browser speech API found. Voice must run exclusively on Agora SD-RTN — see docs/built-systems/voice-agent-and-agora.md"
+            exit 1
+          fi
+          echo "OK: no browser speech APIs in src/"
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:

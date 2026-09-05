@@ -1,64 +1,13 @@
-# Kyron Realty AI — Authentication & Security System
+# Authentication — Rules
 
-This document outlines the authentication architecture, NextAuth v5 configuration, credentials verification, and OAuth fallback mechanisms for Kyron Realty AI.
-
----
-
-## 1. Overview & Architecture
-
-- **Library**: NextAuth.js v5 (beta) with `@auth/drizzle-adapter`.
-- **Primary Auth Config**: `src/auth.ts`.
-- **Database Tables**: Managed in `src/db/schema.ts` (`users`, `accounts`, `sessions`, `verificationTokens`).
-- **Session Strategy**: `jwt` (JSON Web Token) with a 30-day `maxAge`.
-- **Subpath BasePath**: Configured to `/projects/kyron-realty-ai/api/auth`.
+Canonical source: **`src/auth.ts`** (NextAuth v5). Routes: `src/app/api/auth/`.
+Password hashing: `src/lib/auth-passwords.ts`.
 
 ---
 
-## 2. Authentication Methods
+## Rules
 
-### A. Credentials (Email & Password)
-- **Hashing**: Cryptographic `scrypt` key derivation with random salt (`src/lib/auth-passwords.ts`).
-- **Registration Endpoint**: `POST /projects/kyron-realty-ai/api/auth/register`
-  - Validates email format, password length (8-128 chars), and name.
-  - Checks for existing user in PostgreSQL.
-  - Stores user record with hashed password.
-- **Authorization Flow**: Look up user by lowercase trimmed email in `src/db/schema.ts` -> verify hash with `verifyPassword()` -> return user session object.
-
-### B. Google OAuth
-- **Provider**: `next-auth/providers/google`.
-- **Environment Keys**: `AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET` in `.env`.
-- **Graceful Fallback**: If Google keys are omitted or blank, Google OAuth is disabled gracefully. The frontend checks `GET /projects/kyron-realty-ai/api/auth/status` and displays a helpful configuration notice rather than crashing.
-
----
-
-## 3. Key Endpoints & Routes
-
-| Route | Method | Purpose |
-| :--- | :--- | :--- |
-| `/api/auth/[...nextauth]` | `GET`, `POST` | NextAuth core handler (sign-in, callback, session, csrf). |
-| `/api/auth/register` | `POST` | Creates a new user account with scrypt-hashed credentials. |
-| `/api/auth/status` | `GET` | Returns status flags (e.g. `{ googleConfigured: true/false }`). |
-| `/login` | `GET` | Dual-pane split authentication interface (Sign In & Sign Up toggle). |
-
----
-
-## 4. Protected Session Usage
-
-### Client Components
-Use standard NextAuth `signIn` / `signOut` / `useSession`:
-```tsx
-import { signIn, signOut, useSession } from "next-auth/react";
-```
-
-### Server Components & Route Handlers
-```ts
-import { auth } from "@/auth";
-
-export async function GET() {
-  const session = await auth();
-  if (!session?.user) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  // User is authenticated: session.user.id, session.user.email
-}
-```
+- **Never crash `/login` when Google OAuth keys are absent.** Missing `AUTH_GOOGLE_*` env vars must degrade gracefully: the frontend reads `/api/auth/status` and disables the Google button with a notice. Treat absent keys as a supported configuration, not an error.
+- **Never re-implement or duplicate password validation in a route handler.** Hashing and verification live in `src/lib/auth-passwords.ts` and nowhere else. Changing the policy means changing that one file.
+- **The `sessions` table is not the session store.** The Drizzle adapter is configured, but the session strategy is JWT — so sessions are stateless and that table stays empty. Do not try to revoke a login by deleting a row; there is no row. Server-side invalidation requires a different mechanism, which does not exist yet.
+- **NextAuth is mounted under the subpath**, not at the domain root. Callback and redirect URLs must carry the base path — see [architecture-and-basepath.md](architecture-and-basepath.md).

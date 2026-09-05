@@ -7,14 +7,14 @@ Kyron Realty AI is a modern real estate intelligence platform integrating AI cap
 
 ## 1. Single Sources of Truth (Read Directly)
 Before writing or modifying features, consult the canonical source files and their dedicated system docs:
-- **Design System & UI Tokens**: [docs/systems/design-system.md](docs/systems/design-system.md) & [src/app/globals.css](src/app/globals.css)
-- **Auth & Session System**: [docs/systems/auth.md](docs/systems/auth.md) & [src/auth.ts](src/auth.ts)
-- **Database & Schemas**: [docs/systems/database.md](docs/systems/database.md), [docs/plan/03-database-schema.md](docs/plan/03-database-schema.md) & [src/db/schema.ts](src/db/schema.ts)
-- **Voice Agent & Agora SD-RTN**: [docs/systems/voice-agent-and-agora.md](docs/systems/voice-agent-and-agora.md)
-- **Property Onboarding & Apify**: [docs/systems/property-onboarding-and-apify.md](docs/systems/property-onboarding-and-apify.md)
-- **Public Listings & Leads**: [docs/systems/public-listings-and-leads.md](docs/systems/public-listings-and-leads.md)
-- **Master Plan & Architecture**: [docs/plan/](docs/plan/)
-- **Architecture & Subpath Hosting**: [docs/systems/architecture-and-basepath.md](docs/systems/architecture-and-basepath.md)
+- **Design System & UI Tokens**: [docs/built-systems/design-system.md](docs/built-systems/design-system.md) & [src/app/globals.css](src/app/globals.css)
+- **Auth & Session System**: [docs/built-systems/auth.md](docs/built-systems/auth.md) & [src/auth.ts](src/auth.ts)
+- **Database & Schemas**: [src/db/schema.ts](src/db/schema.ts) is the only description of the schema — read it directly; rules and traps in [docs/built-systems/database.md](docs/built-systems/database.md)
+- **Voice Agent & Agora SD-RTN**: [docs/built-systems/voice-agent-and-agora.md](docs/built-systems/voice-agent-and-agora.md)
+- **Property Onboarding & Apify**: [docs/built-systems/property-onboarding-and-apify.md](docs/built-systems/property-onboarding-and-apify.md)
+- **Public Listings & Leads**: [docs/built-systems/public-listings-and-leads.md](docs/built-systems/public-listings-and-leads.md)
+- **Original Design Intent (historical)**: [docs/plan/](docs/plan/) — pre-implementation planning, frozen at authoring time. Useful for *why* the system was shaped this way. **Never treat it as current truth**: it contains copied schema and architecture snapshots that the code has since moved past.
+- **Architecture & Subpath Hosting**: [docs/built-systems/architecture-and-basepath.md](docs/built-systems/architecture-and-basepath.md)
 - **VPS Infrastructure**: [docs/server-config.md](docs/server-config.md)
 
 ### Strict Agora-Only Conversational AI Policy (Zero Browser Fallbacks)
@@ -30,14 +30,14 @@ To prevent duplicate code or assuming features that do not yet exist:
 
 | System / Feature | Status | System Spec | Code Location | Notes |
 | :--- | :--- | :--- | :--- | :--- |
-| **Authentication** | Built | [auth.md](docs/systems/auth.md) | `src/app/login/page.tsx`, `src/auth.ts`, `src/app/api/auth/` | NextAuth credentials + Google OAuth fallback flow |
-| **User Dashboard** | Built | [architecture-and-basepath.md](docs/systems/architecture-and-basepath.md) | `src/app/dashboard/page.tsx`, `src/components/dashboard/` | Protected workspace with header, logout, and active inventory |
-| **Landing Page** | Built | [architecture-and-basepath.md](docs/systems/architecture-and-basepath.md) | `src/app/page.tsx`, `src/components/home/` | Light-mode luxury: Hero voice simulator, speed-to-lead comparison, 3-step engine, negotiation matrix, demo listing, Agora modal |
-| **Database Pool & ORM**| Built | [database.md](docs/systems/database.md) | `src/db/index.ts`, `src/db/schema.ts` | Drizzle ORM + PostgreSQL 17 pool connection (13 tables) |
-| **Design System** | Built | [design-system.md](docs/systems/design-system.md) | `src/app/globals.css` | Dual-pane light/midnight luxury dark system |
-| **Voice Agent / Agora Real-Time** | Built | [voice-agent-and-agora.md](docs/systems/voice-agent-and-agora.md) | `src/app/api/agora/`, `src/hooks/`, `src/components/voice/` | Agora Conversational AI Cloud Gateway + WebRTC client |
-| **Conversational Onboarding & Apify**| Built | [property-onboarding-and-apify.md](docs/systems/property-onboarding-and-apify.md) | `src/app/dashboard/properties/new`, `src/lib/apify-crawler.ts` | Split-screen studio + Apify crawler + KB synthesizer |
-| **Public Listing & QR Sales Agent** | Built | [public-listings-and-leads.md](docs/systems/public-listings-and-leads.md) | `src/app/listings/[slug]`, `src/app/api/leads/` | QR Code generator, Voice Sales Modal, Tour booking |
+| **Authentication** | Built | [auth.md](docs/built-systems/auth.md) | `src/app/login/page.tsx`, `src/auth.ts`, `src/app/api/auth/` | NextAuth credentials + Google OAuth fallback flow |
+| **User Dashboard** | Built | [architecture-and-basepath.md](docs/built-systems/architecture-and-basepath.md) | `src/app/dashboard/page.tsx`, `src/components/dashboard/` | Protected workspace with header, logout, and active inventory |
+| **Landing Page** | Built | [architecture-and-basepath.md](docs/built-systems/architecture-and-basepath.md) | `src/app/page.tsx`, `src/components/home/` | Light-mode luxury: Hero voice simulator, speed-to-lead comparison, 3-step engine, negotiation matrix, demo listing, Agora modal |
+| **Database Pool & ORM**| Built | [database.md](docs/built-systems/database.md) | `src/db/index.ts`, `src/db/schema.ts` | Drizzle ORM + PostgreSQL 17 pool connection |
+| **Design System** | Built | [design-system.md](docs/built-systems/design-system.md) | `src/app/globals.css` | Dual-pane light/midnight luxury dark system |
+| **Voice Agent / Agora Real-Time** | Built | [voice-agent-and-agora.md](docs/built-systems/voice-agent-and-agora.md) | `src/app/api/agora/`, `src/hooks/`, `src/components/voice/` | Agora Conversational AI Cloud Gateway + WebRTC client |
+| **Conversational Onboarding & Apify**| Built | [property-onboarding-and-apify.md](docs/built-systems/property-onboarding-and-apify.md) | `src/app/dashboard/properties/new`, `src/lib/apify-crawler.ts` | Split-screen studio + Apify crawler + KB synthesizer |
+| **Public Listing & QR Sales Agent** | Built | [public-listings-and-leads.md](docs/built-systems/public-listings-and-leads.md) | `src/app/listings/[slug]`, `src/app/api/leads/` | QR Code generator, Voice Sales Modal, Tour booking |
 
 ---
 

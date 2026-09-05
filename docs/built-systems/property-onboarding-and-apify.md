@@ -1,40 +1,13 @@
-# Kyron Realty AI — Property Onboarding & Apify Ingestion System
+# Property Onboarding & Apify Ingestion — Rules
 
-This document outlines the dual-path property ingestion pipeline, split-screen onboarding studio, and Gemini-powered knowledge base synthesizer.
-
----
-
-## 1. Onboarding Studio UI
-- **Location**: `src/app/dashboard/properties/new/page.tsx`
-- **Controller**: `src/components/dashboard/onboarding/OnboardingStudio.tsx`
-- **Design Mode**: Product Mode with Light Theme and high-contrast sapphire/emerald accents.
-- **Left Pane (`ConversationalPanel.tsx`)**:
-  - URL Listing Scraper (Apify web ingestion).
-  - Elena Vance AI Agent Persona Card (Principal Luxury Listing Specialist).
-  - Real-time animated soundwave pill with dynamic speaking/listening state transitions.
-  - Compact scrollable dialogue stream container for live turns.
-  - Agora SD-RTN call controls (Connect, Mute, End Call).
-- **Right Pane (`LivePropertyInspector.tsx`)**:
-  - Real-time dynamic parameter revelation (Discovered Specs & Synthesized Intelligence).
-  - No empty static prefilled forms; parameters appear dynamically upon detection.
-  - 6-Point dynamic verification checklist and circular progress indicator.
-  - Sticky deployment action button unlocking at 6/6 verified attributes.
+Canonical sources: `src/lib/apify-crawler.ts` (ingestion), `src/lib/kb-extractor.ts` (synthesis), `src/components/dashboard/onboarding/` (UI), `src/app/api/onboarding/`.
 
 ---
 
-## 2. Ingestion & Extraction Pipeline
-- **Apify Crawler (`src/lib/apify-crawler.ts`)**:
-  - Executes `apify/website-content-crawler` actor.
-  - Extracts clean markdown, page content, and high-resolution images.
-  - Built-in direct HTTP and demo fallbacks for offline testing.
-- **Gemini Synthesizer (`src/lib/kb-extractor.ts`)**:
-  - Uses `@google/genai` (Gemini 2.5) with strict Fact vs. Copy split and zero-fabrication constraints.
-  - Live conversational turns use instant deterministic heuristics (<10ms).
-  - Post-call synthesis runs once against accumulated dialogue transcript to generate speech-optimized elevator pitch, categorized FAQs, and concession matrices without inventing unstated lease terms or specs.
+## Rules
 
----
-
-## 3. API Endpoints
-- `POST /api/onboarding/scrape`: Scrapes property URL.
-- `POST /api/onboarding/extract`: Synthesizes knowledge base and guardrails.
-- `POST /api/properties/create`: Persists property and generates QR code SVG.
+- **Never fabricate property facts.** The knowledge-base synthesizer operates under a strict fact-vs-copy split: marketing copy may be written, but specs, lease terms, and policies may only be restated from crawled or spoken input. Inventing an unstated term is the worst failure mode in this system — it puts false claims into a sales agent's mouth.
+- **Never block a live conversational turn on the LLM.** Turn-time extraction uses deterministic heuristics; full synthesis runs once after the call against the accumulated transcript. Moving synthesis into the turn loop breaks the real-time voice experience.
+- **Never pre-fill the inspector pane with empty form fields.** Parameters are revealed only as they are genuinely detected. The design intent is that visible state always reflects real extracted data, so an owner can trust the checklist.
+- **The deploy action stays locked until every required attribute is verified.** Do not add a bypass.
+- **Apify runs in strict mode**: a missing token or a failed crawl throws immediately rather than returning partial data. Preserve that — see the fail-fast contract in [voice-agent-and-agora.md](voice-agent-and-agora.md).

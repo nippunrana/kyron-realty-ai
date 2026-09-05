@@ -1,25 +1,12 @@
-# Kyron Realty AI — Public Listings & Lead Capture System
+# Public Listings & Lead Capture — Rules
 
-This document outlines the public listing experience, marketing toolkit (QR Codes & WhatsApp cards), and automated buyer lead capture workflows.
-
----
-
-## 1. Public Listing Architecture
-- **Route**: `src/app/listings/[slug]/page.tsx`
-- **Component**: `src/components/public/PublicListingClient.tsx`
-- **Subpath Support**: Fully resolves `${BASE_PATH}/listings/[slug]`.
-- **OpenGraph & SEO**: Generates dynamic rich preview cards for WhatsApp and social media.
+Canonical sources: `src/app/listings/[slug]/`, `src/components/public/`, `src/app/api/leads/`.
 
 ---
 
-## 2. Marketing & Distribution Toolkit
-- **Vector QR Code Generator**: Generates SVG and PNG QR codes encoded directly with the public listing URL.
-- **WhatsApp Share Deep Link**: Generates 1-click formatted WhatsApp messages with listing specs and voice agent direct links.
+## Rules
 
----
-
-## 3. Inbound Conversion & Lead Booking
-- **Floating CTA Bar**: Sticky conversion launcher on mobile & desktop with instant "Talk with AI Voice Agent" and "Book Viewing" triggers.
-- **Lead Capture API (`src/app/api/leads/capture/route.ts`)**:
-  - Validates buyer contact info, move-in timeline, and budget.
-  - Inserts records into `inquiries_and_leads` and `viewing_appointments`.
+- **Public listing URLs are printed onto QR codes and shared into WhatsApp.** They are effectively permanent once distributed. Never change the public listing route shape or a property's slug after a listing has been deployed — an existing QR code cannot be recalled.
+- **Listing URLs must be absolute and base-path-correct** wherever they are embedded (QR payloads, share links, OpenGraph tags). A relative URL is unusable in a QR code and breaks link previews. See [architecture-and-basepath.md](architecture-and-basepath.md).
+- **Lead capture writes to two tables in one flow** — the lead record and, when a viewing is requested, the appointment. Both must succeed or the lead is half-recorded; check `src/app/api/leads/capture/` before changing either write.
+- **Write leads to `inquiries_and_leads`, never to the legacy `inquiries` table.** See [database.md](database.md).

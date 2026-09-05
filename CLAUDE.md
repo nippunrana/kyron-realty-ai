@@ -1,5 +1,24 @@
 # AI Coding Guidelines
 
+@docs/globalrule-v3.md
+
+<!-- The guidelines above are IMPORTED, not copied. docs/globalrule-v3.md is the single
+     source of truth for these rules and is shared with the project's other AI tools.
+     Never paste its contents back into this file: a second copy is a second thing to
+     keep true, and it will drift. This is the same rule the guidelines themselves state. -->
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
+
+# AI Coding Guidelines
+
 ## 0. Project Context First & Knowledge Hub
 **Read the project's context file before doing anything else. Keep it true afterward.**
 
@@ -13,21 +32,48 @@ The hub stays small enough to read every session; depth lives in spokes loaded o
 
 1. **Overview & Tech Stack** — what the project is; framework, database, and tooling versions.
 2. **Single Sources of Truth** — direct pointers to the canonical schema, auth, and config files.
-3. **Built Systems vs Roadmap** — a status table (`Built` / `Roadmap`) pointing to `docs/systems/*.md` and code locations. Prevents rebuilding what already exists or assuming what doesn't.
+3. **Built Systems vs Roadmap** — a status table (`Built` / `Roadmap`) pointing to `docs/built-systems/*.md` and code locations. Prevents rebuilding what already exists or assuming what doesn't.
 4. **Environment & Deployment Constraints** — anything that silently breaks when ignored: base paths, subpath hosting, local-vs-production splits, proxy rules, build mode.
 5. **Development & Deployment Guidelines** — migrations, secrets handling, CI/CD.
+
+### What belongs in a doc — the two tests
+**The code is the single source of truth. Documentation carries only what the code cannot say.**
+
+Before writing any line into `ai-context.md` or `docs/built-systems/*.md`, apply both tests:
+
+1. **Recoverability** — *could an agent recover this by reading the code in under a minute?* If yes, delete it and point at the file instead.
+2. **Impact** — *would removing this line cause an agent to make a mistake?* If no, delete it.
+
+A line must pass **both** to stay.
+
+| ✅ Write this | ❌ Never write this |
+| :--- | :--- |
+| Prohibitions and non-negotiable policies | Table, column, endpoint, or route enumerations |
+| Why a decision was made, and what breaks if reversed | Config values, model names, timeouts, version pins |
+| Traps the code does not announce | Code snippets copied out of the repo |
+| Which of several similar paths is canonical | File-by-file descriptions of the codebase |
+| Environment quirks and local-vs-production splits | Anything an agent can grep in seconds |
+
+**Prohibitions are the highest-value content.** Code shows what exists, never what is forbidden. An absent fallback looks like an unbuilt feature to the next agent, who will helpfully add it.
+
+**Phrase rules as bans or decisions, not principles.** "**Never** call the browser Speech API" changes behaviour; "audio should be handled consistently" does not.
+
+**Point at files or directories — never at line numbers.** `src/lib/agora-token.ts` survives edits; `src/lib/agora-token.ts:49` does not. A stale pointer fails loudly — the agent searches and recovers. A stale enumeration fails silently — the agent believes it.
 
 ### Maintenance protocol
 **Applies only when `ai-context.md` already exists.** If the user declined to create one, skip this section entirely — never write documentation unprompted.
 
-When a meaningful new feature, subsystem, API route group, or database model is built or restructured:
+**The trigger is a decision, not a code change.** Update documentation when a rule, constraint, prohibition, or non-obvious decision is **established, changed, or reversed**. Building, editing, or refactoring code implies no documentation edit on its own.
 
-1. Update the **Built Systems vs Roadmap** table in `ai-context.md`.
-2. Create or update the matching spec in `docs/systems/<feature>.md` (endpoints, schema usage, design tokens, developer rules).
-3. Keep `ai-context.md` under 150 lines by offloading technical detail into `docs/systems/`.
+When that trigger fires:
 
-- **Not for minor changes**: no documentation edits for 1-line bug fixes, styling tweaks, or copy adjustments.
+1. Record the rule in `docs/built-systems/<feature>.md` as a ban or a decision, with the reason it exists.
+2. Add or remove a row in the **Built Systems vs Roadmap** table in `ai-context.md` only when a system is *born* or *retired* — not when it is edited.
+3. Keep `ai-context.md` under 150 lines.
+
 - **Never document what isn't built**: planned work is marked `Roadmap`, never described as if it exists.
+- **Delete rather than guess**: if you cannot verify a documentation claim against the code in this session, delete the claim. A confident false statement is worse than a missing one.
+- **Enforce what matters deterministically**: a rule the build can check belongs in CI as well as in prose. Documentation is advisory; a failing build is not.
 - **Name what you touched**: list any documentation files you changed in your summary, so the user reviews them alongside the code.
 
 ---
@@ -84,11 +130,11 @@ Transform tasks into verifiable goals. When the project has test infrastructure,
 If the project has no test infrastructure, verify by running or exercising the code directly instead.
 
 For multi-step tasks, state a brief plan:
-```
+
 1. [Step] → verify: [check]
 2. [Step] → verify: [check]
 3. [Step] → verify: [check]
-```
+
 
 - **Propose a brief plan first**: For non-trivial tasks, outline the steps and verification criteria before making edits.
 - **Confirm the fix**: Always confirm that the change actually addresses the root cause of the problem. Don't assume it works.
@@ -127,15 +173,5 @@ Before considering a task done, verify:
 - **Traceability**: Every changed line of code traces directly to the user's request. Documentation updates under Rule 0 are the only sanctioned exception.
 - **No drive-by changes**: No unrelated refactoring, comments, or formatting were touched.
 - **Questions asked first**: Ambiguity was clarified before implementing, not discovered after.
-- **Documentation synced**: If `ai-context.md` exists *and* a new feature, model, or route was built, the Built Systems table and `docs/systems/` were updated — and named in the summary.
+- **Documentation synced**: A doc was edited only because a rule or decision changed — not merely because code changed. Every line written passed both tests (recoverability, impact), and each file touched is named in the summary.
 - **Senior Engineer Test**: The solution is the simplest one that solves the problem — nothing speculative was added.
-
-<!-- BEGIN:nextjs-agent-rules -->
-
-# This is NOT the Next.js you know
-
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
-
-This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
-
-<!-- END:nextjs-agent-rules -->
