@@ -92,32 +92,34 @@ export async function startAgoraAgentSession(
   }
 
   if (propertyRecord) {
-    const [kb] = await db
-      .select()
-      .from(propertyKnowledgeBases)
-      .where(eq(propertyKnowledgeBases.propertyId, propertyRecord.id))
-      .limit(1);
+    // The three follow-up reads are independent; run them together instead of one after another.
+    const [[kb], [matrix], owner] = await Promise.all([
+      db
+        .select()
+        .from(propertyKnowledgeBases)
+        .where(eq(propertyKnowledgeBases.propertyId, propertyRecord.id))
+        .limit(1),
+      db
+        .select()
+        .from(negotiationMatrices)
+        .where(eq(negotiationMatrices.propertyId, propertyRecord.id))
+        .limit(1),
+      propertyRecord.ownerId
+        ? db
+            .select({ id: users.id, name: users.name, email: users.email })
+            .from(users)
+            .where(eq(users.id, propertyRecord.ownerId))
+            .limit(1)
+            .then(([u]) => u ?? null)
+            .catch((err) => {
+              console.warn("[Agora Voice Agent] Could not fetch owner user record:", err);
+              return null;
+            })
+        : Promise.resolve(null),
+    ]);
     kbRecord = kb;
-
-    const [matrix] = await db
-      .select()
-      .from(negotiationMatrices)
-      .where(eq(negotiationMatrices.propertyId, propertyRecord.id))
-      .limit(1);
     matrixRecord = matrix;
-
-    if (propertyRecord.ownerId) {
-      try {
-        const [u] = await db
-          .select({ id: users.id, name: users.name, email: users.email })
-          .from(users)
-          .where(eq(users.id, propertyRecord.ownerId))
-          .limit(1);
-        ownerUserRecord = u;
-      } catch (err) {
-        console.warn("[Agora Voice Agent] Could not fetch owner user record:", err);
-      }
-    }
+    ownerUserRecord = owner;
   }
 
   // 2. Generate Real Signed RTC and RTM Tokens for User, and ConvoAI Combined Token for Agent

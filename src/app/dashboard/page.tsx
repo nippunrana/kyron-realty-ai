@@ -28,6 +28,24 @@ export const metadata: Metadata = {
   description: "Your AI real estate intelligence workspace and automated property valuation pipeline.",
 };
 
+// Only the columns the cards render: each row's stored QR SVG alone would dwarf the rest.
+const listingCardColumns = {
+  id: properties.id,
+  slug: properties.slug,
+  title: properties.title,
+  address: properties.address,
+  city: properties.city,
+  listingType: properties.listingType,
+  propertyType: properties.propertyType,
+  price: properties.price,
+  bedrooms: properties.bedrooms,
+  bathrooms: properties.bathrooms,
+  sqft: properties.sqft,
+  coverImageUrl: properties.coverImageUrl,
+  images: properties.images,
+};
+type ListingCard = Pick<typeof properties.$inferSelect, keyof typeof listingCardColumns>;
+
 export default async function DashboardPage() {
   const session = await auth();
 
@@ -40,10 +58,10 @@ export default async function DashboardPage() {
 
   // Own listings only. Rows with a null owner_id predate authentication and stay
   // visible to every user until they are assigned (see docs/built-systems/database.md).
-  let userProperties: any[] = [];
+  let userProperties: ListingCard[] = [];
   try {
     userProperties = await db
-      .select()
+      .select(listingCardColumns)
       .from(properties)
       .where(or(eq(properties.ownerId, user.id ?? ""), isNull(properties.ownerId)))
       .orderBy(desc(properties.createdAt));

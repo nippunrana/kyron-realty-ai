@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { notFound } from "next/navigation";
 import { Metadata } from "next";
 import { db } from "@/db";
@@ -10,15 +11,17 @@ interface ListingPageProps {
   params: Promise<{ slug: string }>;
 }
 
+// One query per request: generateMetadata and the page both read this row.
+const getPropertyBySlug = cache(async (slug: string) => {
+  const [property] = await db.select().from(properties).where(eq(properties.slug, slug)).limit(1);
+  return property ?? null;
+});
+
 export async function generateMetadata({ params }: ListingPageProps): Promise<Metadata> {
   const { slug } = await params;
 
   try {
-    const [property] = await db
-      .select()
-      .from(properties)
-      .where(eq(properties.slug, slug))
-      .limit(1);
+    const property = await getPropertyBySlug(slug);
 
     if (!property) {
       return {
@@ -49,12 +52,8 @@ export async function generateMetadata({ params }: ListingPageProps): Promise<Me
 export default async function PublicListingPage({ params }: ListingPageProps) {
   const { slug } = await params;
 
-  // 1. Fetch Property
-  const [property] = await db
-    .select()
-    .from(properties)
-    .where(eq(properties.slug, slug))
-    .limit(1);
+  // 1. Fetch Property (memoized with generateMetadata for this request)
+  const property = await getPropertyBySlug(slug);
 
   if (!property) {
     notFound();
