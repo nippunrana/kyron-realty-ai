@@ -6,8 +6,8 @@
  */
 export const DEMO_LISTING_SLUG = "marina-luxury-loft";
 
+// No id on purpose: the agent resolves the demo by slug, so it can never collide with a real row id.
 export const DEMO_LISTING = {
-  id: 1,
   title: "Luxury 2-Bedroom Marina Loft with Golden Gate Views",
   slug: DEMO_LISTING_SLUG,
   price: "3450",
