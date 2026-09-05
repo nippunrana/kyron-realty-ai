@@ -5,7 +5,7 @@ import {
 } from "./agora-token";
 import { db } from "@/db";
 import { properties, propertyKnowledgeBases, negotiationMatrices, voiceSessions, users } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 export interface StartAgentSessionParams {
   channelName: string;
@@ -244,8 +244,8 @@ ${contactEmail ? `5. If asked for direct owner or leasing office contact, provid
     `.trim();
   }
 
-  // 4. Register Voice Session in Database
-  let voiceSessionId = `agora-sess-${Date.now()}`;
+  // 4. Register Voice Session in Database (agoraSessionId is filled with the remote agent id after join)
+  let voiceSessionRowId: number | null = null;
   try {
     const callerIdentifier = userId || (ownerEmail ? `user-${ownerEmail}` : `user-${userUid}`);
     const [sess] = await db
@@ -253,16 +253,12 @@ ${contactEmail ? `5. If asked for direct owner or leasing office contact, provid
       .values({
         propertyId: propertyRecord?.id || null,
         channelName,
-        agoraSessionId: voiceSessionId,
         callerType,
         callerIdentifier,
         status: "active",
       })
-      .returning();
-
-    if (sess?.id) {
-      voiceSessionId = `agora-sess-${sess.id}`;
-    }
+      .returning({ id: voiceSessions.id });
+    voiceSessionRowId = sess?.id ?? null;
   } catch (dbErr) {
     console.warn("[Agora Voice Session] DB insert warning:", dbErr);
   }
@@ -447,16 +443,15 @@ ${contactEmail ? `5. If asked for direct owner or leasing office contact, provid
     console.error(`[Agora Gateway Error ${response.status}]:`, parsedDetail || response.statusText);
 
     // Update voiceSession record to failed
-    try {
-      await db
-        .update(voiceSessions)
-        .set({
-          status: "failed",
-          endedAt: new Date(),
-        })
-        .where(eq(voiceSessions.agoraSessionId, voiceSessionId));
-    } catch (dbErr) {
-      console.warn("[Agora Voice Session] DB update to failed warning:", dbErr);
+    if (voiceSessionRowId !== null) {
+      try {
+        await db
+          .update(voiceSessions)
+          .set({ status: "failed", endedAt: new Date() })
+          .where(eq(voiceSessions.id, voiceSessionRowId));
+      } catch (dbErr) {
+        console.warn("[Agora Voice Session] DB update to failed warning:", dbErr);
+      }
     }
 
     throw new Error(
@@ -465,7 +460,19 @@ ${contactEmail ? `5. If asked for direct owner or leasing office contact, provid
   }
 
   const json = await response.json();
-  const remoteAgentId = json.agent_id || json.data?.agent_id || voiceSessionId;
+  const remoteAgentId: string = json.agent_id || json.data?.agent_id || `agora-sess-${voiceSessionRowId ?? Date.now()}`;
+
+  // Store the id the client will hand back to /session/stop, so the row can be closed and the stop call verified
+  if (voiceSessionRowId !== null) {
+    try {
+      await db
+        .update(voiceSessions)
+        .set({ agoraSessionId: remoteAgentId })
+        .where(eq(voiceSessions.id, voiceSessionRowId));
+    } catch (dbErr) {
+      console.warn("[Agora Voice Session] DB agent id update warning:", dbErr);
+    }
+  }
 
   return {
     success: true,
@@ -483,8 +490,17 @@ ${contactEmail ? `5. If asked for direct owner or leasing office contact, provid
 
 /**
  * Stops an active Agora Conversational AI Agent session (v2 API).
+ * Returns null when no session with this id exists on this channel, so callers
+ * cannot stop arbitrary agents by guessing ids.
  */
 export async function stopAgoraAgentSession(sessionId: string, channelName: string) {
+  const [row] = await db
+    .select({ id: voiceSessions.id })
+    .from(voiceSessions)
+    .where(and(eq(voiceSessions.agoraSessionId, sessionId), eq(voiceSessions.channelName, channelName)))
+    .limit(1);
+  if (!row) return null;
+
   const appId = process.env.AGORA_APP_ID || process.env.NEXT_PUBLIC_AGORA_APP_ID;
   const authHeader = buildAgoraCloudAuthHeader();
 
@@ -506,11 +522,8 @@ export async function stopAgoraAgentSession(sessionId: string, channelName: stri
 
   await db
     .update(voiceSessions)
-    .set({
-      status: "completed",
-      endedAt: new Date(),
-    })
-    .where(eq(voiceSessions.agoraSessionId, sessionId));
+    .set({ status: "completed", endedAt: new Date() })
+    .where(eq(voiceSessions.id, row.id));
 
   return { success: true, sessionId, channelName };
 }

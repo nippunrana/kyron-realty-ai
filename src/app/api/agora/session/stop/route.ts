@@ -13,7 +13,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const result = await stopAgoraAgentSession(sessionId, channelName);
+    const result = await stopAgoraAgentSession(String(sessionId), String(channelName));
+    if (!result) {
+      return NextResponse.json(
+        { success: false, error: "No active voice session matches that id and channel." },
+        { status: 404 }
+      );
+    }
     return NextResponse.json(result);
   } catch (error: any) {
     console.error("Agora stop session error:", error);

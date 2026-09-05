@@ -25,7 +25,8 @@ Approved cloud components are Agora-managed services (managed TTS, cloud ASR) an
 ## Rules
 
 - **The agent identity needs a dual RTC+RTM token**, not a plain RTC token — the Cloud Gateway rejects the agent otherwise once RTM is enabled. Caller and agent use distinct reserved UIDs; see `src/lib/agora-token.ts`.
-- **Subscribe to the RTM channel before joining RTC.** Reversing the order drops the opening transcripts.
+- **Join and publish RTC, register every toolkit event handler, then call `subscribeMessage()`.** The toolkit does not wrap join/publish (see its README), and events emitted before a handler is registered are lost. The hook in `src/hooks/` follows this order; an earlier version of this rule had it backwards.
+- **`voice_sessions.agora_session_id` holds the remote agent id returned by the Cloud Gateway**, written right after a successful join. `/api/agora/session/stop` refuses ids that do not match a row on the same channel. Rows opened before 2026-09-05 were never closed (see the SQL note in the audit) because the id was never stored.
 - **Deduplicate transcript turns by turn id.** The transcript stream re-emits partial turns; without dedup, extraction fires repeatedly on the same utterance.
 - **Owner identity comes from the session, never from the request body.** `/api/agora/session/start` rejects `owner_onboarding` without a session and prefers the signed-in name/email/id over any client-supplied values. The client still sends them for now; treat those body fields as redundant, not authoritative.
 - **Two personas exist and are not interchangeable**: an owner-onboarding persona and a buyer-facing sales persona, selected by caller type in `src/lib/agora-agent-client.ts`. Read the file for current names and prompts — do not copy persona text into a document.
