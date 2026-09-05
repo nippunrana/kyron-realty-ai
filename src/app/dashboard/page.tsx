@@ -4,7 +4,7 @@ import { Metadata } from "next";
 import { auth } from "@/auth";
 import { db } from "@/db";
 import { properties } from "@/db/schema";
-import { desc } from "drizzle-orm";
+import { desc, eq, isNull, or } from "drizzle-orm";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import {
   BrainCircuit,
@@ -38,12 +38,14 @@ export default async function DashboardPage() {
   const user = session.user;
   const firstName = (user.name || user.email?.split("@")[0] || "there").split(" ")[0];
 
-  // Fetch active properties
+  // Own listings only. Rows with a null owner_id predate authentication and stay
+  // visible to every user until they are assigned (see docs/built-systems/database.md).
   let userProperties: any[] = [];
   try {
     userProperties = await db
       .select()
       .from(properties)
+      .where(or(eq(properties.ownerId, user.id ?? ""), isNull(properties.ownerId)))
       .orderBy(desc(properties.createdAt));
   } catch (err) {
     console.error("Error fetching properties for dashboard:", err);
