@@ -372,7 +372,7 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
           rtcEngine: client,
           rtmEngine: rtmClient,
           renderMode: TranscriptHelperMode.TEXT,
-          enableLog: true,
+          enableLog: process.env.NODE_ENV !== "production",
           enableRenderModeFallback: true,
         });
         voiceAiRef.current = ai;

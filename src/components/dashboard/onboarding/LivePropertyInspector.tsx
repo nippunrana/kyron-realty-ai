@@ -32,9 +32,10 @@ interface LivePropertyInspectorProps {
   onUpdateProperty: (updates: Partial<ExtractedPropertyPayload["property"]>) => void;
   onUpdateKnowledgeBase: (updates: Partial<ExtractedPropertyPayload["knowledgeBase"]>) => void;
   onPublish: () => void;
+  /** Opens the review card for the current stage: core specs, or final review once core is confirmed. */
   onOpenReviewModal?: () => void;
+  /** Re-opens the confirmed core specs from a later stage. */
   onOpenCoreModal?: () => void;
-  onOpenFinalModal?: () => void;
   isPublishing: boolean;
   isExtracting: boolean;
   isTurnSyncing?: boolean;
@@ -49,7 +50,6 @@ export function LivePropertyInspector({
   onPublish,
   onOpenReviewModal,
   onOpenCoreModal,
-  onOpenFinalModal,
   isPublishing,
   isExtracting,
   isTurnSyncing = false,
@@ -350,9 +350,9 @@ export function LivePropertyInspector({
               <span>Syncing specs...</span>
             </div>
           )}
-          {isFullyVerified && (onOpenReviewModal || onOpenFinalModal || onOpenCoreModal) ? (
+          {isFullyVerified && onOpenReviewModal ? (
             <div className="flex items-center gap-1.5">
-              {onOpenCoreModal && (
+              {onOpenCoreModal && onboardingStage !== "core" && (
                 <button
                   type="button"
                   onClick={onOpenCoreModal}
@@ -364,7 +364,7 @@ export function LivePropertyInspector({
               )}
               <button
                 type="button"
-                onClick={onOpenFinalModal || onOpenReviewModal}
+                onClick={onOpenReviewModal}
                 className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-[11px] font-bold text-emerald-700 shadow-xs transition-all cursor-pointer hover:scale-105 active:scale-95"
               >
                 <Sparkles className="w-3.5 h-3.5 text-emerald-600" />

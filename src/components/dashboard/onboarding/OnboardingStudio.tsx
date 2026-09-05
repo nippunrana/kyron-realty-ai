@@ -529,7 +529,6 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
             onUpdateKnowledgeBase={handleUpdateKnowledgeBase}
             onPublish={handlePublish}
             onOpenCoreModal={() => setShowCoreModal(true)}
-            onOpenFinalModal={() => setShowFinalModal(true)}
             onOpenReviewModal={() => {
               if (onboardingStage === "core") {
                 setShowCoreModal(true);

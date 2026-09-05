@@ -26,7 +26,9 @@ interface ConversationalPanelProps {
   onIngestUrl: (url: string) => Promise<void>;
   onSendMessage: (text: string) => Promise<void>;
   onTurnExtraction?: (slidingWindow: TurnMessage[]) => void;
-  onVoiceAgentReady?: (helpers: { sendTextMessage: (text: string) => void }) => void;
+  onVoiceAgentReady?: (helpers: {
+    sendTextMessage: (text: string, priority?: "INTERRUPTED" | "APPEND") => void;
+  }) => void;
   onAgentSpeakingChanged?: (isSpeaking: boolean) => void;
   onUIAction?: (action: "open_review_modal" | "close_review_modal") => void;
   isProcessing: boolean;
