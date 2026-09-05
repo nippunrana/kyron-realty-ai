@@ -5,9 +5,6 @@ import {
   Building2,
   Sparkles,
   ShieldCheck,
-  Bed,
-  Bath,
-  Maximize,
   MapPin,
   Tag,
   MessageSquare,
@@ -17,11 +14,11 @@ import {
   Zap,
   Lock,
   Clock,
-  Home,
   CheckCircle2,
   Calendar,
   Layers,
   Eye,
+  Hash,
 } from "lucide-react";
 import { ExtractedPropertyPayload } from "@/lib/kb-extractor";
 import { VerificationChecklist, ChecklistItemData } from "./VerificationChecklist";
@@ -130,8 +127,8 @@ export function LivePropertyInspector({
   const verifiedCount = checklistItems.filter((item) => item.isComplete).length;
   const isFullyVerified = verifiedCount === 6;
 
-  // Track discovered parameters
-  const discoveredSpecs: Array<{
+  // Track additional/secondary parameters (excluding the 6 core checklist items)
+  const additionalSpecs: Array<{
     id: string;
     label: string;
     value: string;
@@ -139,71 +136,97 @@ export function LivePropertyInspector({
     color: string;
   }> = [];
 
-  if (hasPrice) {
-    discoveredSpecs.push({
-      id: "price",
-      label: property.listingType === "rent" ? "Monthly Rent" : "Asking Price",
-      value: `$${Number(property.price).toLocaleString()}${
-        property.listingType === "rent" ? "/mo" : ""
-      }`,
-      icon: Tag,
-      color: "emerald",
-    });
-  }
-  if (hasBeds) {
-    discoveredSpecs.push({
-      id: "beds",
-      label: "Bedrooms",
-      value: `${property.bedrooms} Bedrooms`,
-      icon: Bed,
-      color: "blue",
-    });
-  }
-  if (hasBaths) {
-    discoveredSpecs.push({
-      id: "baths",
-      label: "Bathrooms",
-      value: `${property.bathrooms} Bathrooms`,
-      icon: Bath,
-      color: "blue",
-    });
-  }
-  if (hasSqft) {
-    discoveredSpecs.push({
-      id: "sqft",
-      label: "Floor Area",
-      value: `${Number(property.sqft).toLocaleString()} sqft`,
-      icon: Maximize,
-      color: "blue",
-    });
-  }
-  if (hasAddress) {
-    discoveredSpecs.push({
-      id: "address",
-      label: "Location",
-      value: `${property.address}${property.city ? `, ${property.city}` : ""}${
-        property.state ? ` ${property.state}` : ""
-      }${property.zipCode ? ` ${property.zipCode}` : ""}`,
-      icon: MapPin,
-      color: "indigo",
-    });
-  }
-  if (hasListingType) {
-    discoveredSpecs.push({
-      id: "type",
-      label: "Listing Type",
-      value: property.listingType === "rent" ? "For Rent" : "For Sale",
-      icon: Home,
-      color: "slate",
-    });
-  }
-  if (property.yearBuilt && property.yearBuilt > 0) {
-    discoveredSpecs.push({
-      id: "year",
+  // 1. Year Built
+  if (property.yearBuilt && Number(property.yearBuilt) > 0) {
+    additionalSpecs.push({
+      id: "year_built",
       label: "Year Built",
       value: `${property.yearBuilt}`,
       icon: Calendar,
       color: "slate",
+    });
+  }
+
+  // 2. Property Subtype
+  if (
+    property.propertyType &&
+    property.propertyType.trim().length > 0 &&
+    property.propertyType !== "apartment"
+  ) {
+    const subtypeLabels: Record<string, string> = {
+      single_family: "Single Family Home",
+      condo: "Condominium",
+      townhouse: "Townhouse",
+      commercial: "Commercial Space",
+    };
+    const formattedType = subtypeLabels[property.propertyType] || "Residential Property";
+
+    additionalSpecs.push({
+      id: "property_type",
+      label: "Property Subtype",
+      value: formattedType,
+      icon: Building2,
+      color: "blue",
+    });
+  }
+
+  // 3. Unit / Suite Number
+  if (property.unitNumber && property.unitNumber.trim().length > 0) {
+    additionalSpecs.push({
+      id: "unit_number",
+      label: "Unit / Suite #",
+      value: property.unitNumber.startsWith("#") ? property.unitNumber : `#${property.unitNumber}`,
+      icon: Hash,
+      color: "indigo",
+    });
+  }
+
+  // 4. Monthly HOA Fee
+  if (property.hoaFeeMonthly && Number(property.hoaFeeMonthly) > 0) {
+    additionalSpecs.push({
+      id: "hoa_fee",
+      label: "Monthly HOA Fee",
+      value: `$${Number(property.hoaFeeMonthly).toLocaleString()}/mo`,
+      icon: Tag,
+      color: "amber",
+    });
+  }
+
+  // 5. Security Deposit
+  if (property.securityDeposit && Number(property.securityDeposit) > 0) {
+    additionalSpecs.push({
+      id: "security_deposit",
+      label: "Security Deposit",
+      value: `$${Number(property.securityDeposit).toLocaleString()}`,
+      icon: ShieldCheck,
+      color: "emerald",
+    });
+  }
+
+  // 6. Minimum Lease Term (Rental)
+  if (
+    property.listingType === "rent" &&
+    property.minLeaseMonths &&
+    Number(property.minLeaseMonths) > 0 &&
+    property.minLeaseMonths !== 12
+  ) {
+    additionalSpecs.push({
+      id: "min_lease",
+      label: "Min. Lease Term",
+      value: `${property.minLeaseMonths} Months`,
+      icon: Clock,
+      color: "cyan",
+    });
+  }
+
+  // 7. Available Date
+  if (property.availableDate && property.availableDate.trim().length > 0) {
+    additionalSpecs.push({
+      id: "available_date",
+      label: "Available Date",
+      value: property.availableDate,
+      icon: Calendar,
+      color: "emerald",
     });
   }
 
@@ -241,7 +264,7 @@ export function LivePropertyInspector({
             className={`w-2.5 h-2.5 rounded-full ${
               isFullyVerified
                 ? "bg-emerald-500 animate-pulse"
-                : discoveredSpecs.length > 0
+                : verifiedCount > 0 || additionalSpecs.length > 0
                 ? "bg-blue-500 animate-pulse"
                 : "bg-slate-300"
             }`}
@@ -332,12 +355,12 @@ export function LivePropertyInspector({
             </div>
 
             <h3 className="text-sm font-extrabold tracking-tight text-slate-900">
-              {discoveredSpecs.length > 0
+              {verifiedCount > 0 || additionalSpecs.length > 0
                 ? `${property.title || "Discovered Listing in Progress"}`
                 : "Awaiting property details..."}
             </h3>
             <p className="text-xs text-slate-500 mt-1 max-w-sm leading-relaxed">
-              {discoveredSpecs.length > 0
+              {verifiedCount > 0 || additionalSpecs.length > 0
                 ? "Parameters are dynamically populating in real time as Elena Vance listens."
                 : "Speak with Elena Vance on the left or paste a listing URL to automatically extract property specs in real time."}
             </p>
@@ -377,34 +400,34 @@ export function LivePropertyInspector({
         {/* 6-Point Dynamic Verification Checklist */}
         <VerificationChecklist items={checklistItems} verifiedCount={verifiedCount} />
 
-        {/* SECTION 1: DISCOVERED PROPERTY SPECS (Dynamically revealed) */}
+        {/* SECTION 1: ADDITIONAL PROPERTY SPECS (Dynamically revealed) */}
         <div>
           <div className="flex items-center justify-between mb-2.5">
             <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
               <Layers className="w-3.5 h-3.5 text-blue-600" />
-              <span>Discovered Specs ({discoveredSpecs.length})</span>
+              <span>Additional Specs ({additionalSpecs.length})</span>
             </span>
-            {discoveredSpecs.length > 0 && (
+            {additionalSpecs.length > 0 && (
               <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
                 Active Parameters
               </span>
             )}
           </div>
 
-          {discoveredSpecs.length === 0 ? (
-            /* Empty state when no parameters discovered yet */
-            <div className="p-4 rounded-2xl bg-slate-50/70 border border-dashed border-slate-200 text-center">
+          {additionalSpecs.length === 0 ? (
+            /* Subtle placeholder when no additional parameters discovered yet */
+            <div className="p-3.5 rounded-2xl bg-slate-50/70 border border-dashed border-slate-200 text-center">
               <p className="text-xs font-semibold text-slate-600">
-                No property parameters recorded yet
+                No additional specs recorded yet
               </p>
               <p className="text-[11px] text-slate-400 mt-0.5">
-                Parameters (price, beds, baths, area, address) will appear here dynamically as you mention them to Elena Vance.
+                Secondary details (Year Built, HOA, deposit, lease terms, unit #) will appear here as they are mentioned to Elena Vance.
               </p>
             </div>
           ) : (
             /* Dynamic Parameter Cards Grid */
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              {discoveredSpecs.map((spec) => {
+              {additionalSpecs.map((spec) => {
                 const Icon = spec.icon;
                 return (
                   <div
