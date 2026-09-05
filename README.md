@@ -66,9 +66,6 @@ In your GitHub repository, navigate to **Settings** → **Secrets and variables*
 ## 📦 Database Commands
 
 ```bash
-# Push schema directly to database
-npm run db:push
-
 # Generate Drizzle migration files
 npm run db:generate
 

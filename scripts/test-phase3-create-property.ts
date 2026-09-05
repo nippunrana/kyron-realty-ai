@@ -1,10 +1,12 @@
 import "dotenv/config";
+import { assertSampleDataWritesAllowed } from "./sample-data-guard";
 import { db } from "../src/db";
 import { properties, propertyKnowledgeBases, negotiationMatrices } from "../src/db/schema";
 import QRCode from "qrcode";
 import { BASE_PATH, PUBLIC_ORIGIN } from "../src/lib/base-path";
 
 async function testPropertyCreation() {
+  assertSampleDataWritesAllowed();
   console.log("=== Testing Phase 3 Property Creation in Database ===\n");
 
   const sampleTitle = "Luxury 2-Bedroom Marina Loft with Golden Gate Views";

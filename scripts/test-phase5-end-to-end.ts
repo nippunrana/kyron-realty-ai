@@ -1,9 +1,11 @@
 import "dotenv/config";
+import { assertSampleDataWritesAllowed } from "./sample-data-guard";
 import { db } from "../src/db";
 import { properties, inquiriesAndLeads, viewingAppointments } from "../src/db/schema";
 import { desc } from "drizzle-orm";
 
 async function testPhase5EndToEnd() {
+  assertSampleDataWritesAllowed();
   console.log("=== Testing Phase 5: Public Listing & Lead Capture Pipeline ===\n");
 
   // 1. Fetch latest active property

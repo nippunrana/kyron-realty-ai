@@ -1,8 +1,10 @@
 import "dotenv/config";
+import { assertSampleDataWritesAllowed } from "./sample-data-guard";
 import { generateAgoraRtcToken } from "../src/lib/agora-token";
 import { startAgoraAgentSession, stopAgoraAgentSession } from "../src/lib/agora-agent-client";
 
 async function testAgoraVoicePipeline() {
+  assertSampleDataWritesAllowed();
   console.log("=== Testing Phase 4: Agora Real-Time Voice Pipeline ===\n");
 
   const channelName = `listing-test-channel-${Date.now().toString(36)}`;
