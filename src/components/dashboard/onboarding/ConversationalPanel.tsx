@@ -87,6 +87,7 @@ export function ConversationalPanel({
 
   const {
     callState,
+    isCallActive,
     isMuted,
     isAgentSpeaking,
     audioFrequencies,
@@ -145,12 +146,6 @@ export function ConversationalPanel({
     const url = urlInput.trim();
     await onIngestUrl(url);
   };
-
-  const isCallActive =
-    callState === "connecting" ||
-    callState === "connected" ||
-    callState === "user_speaking" ||
-    callState === "agent_speaking";
 
   return (
     <div className="flex flex-col h-full min-h-0 bg-white rounded-3xl border border-slate-200/90 shadow-xl shadow-slate-200/40 overflow-hidden text-slate-900">

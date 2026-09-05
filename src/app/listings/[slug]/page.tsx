@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { properties, propertyKnowledgeBases, propertyMedia } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { PublicListingClient } from "@/components/public/PublicListingClient";
-import { BASE_PATH } from "@/lib/base-path";
+import { BASE_PATH, PUBLIC_ORIGIN } from "@/lib/base-path";
 
 interface ListingPageProps {
   params: Promise<{ slug: string }>;
@@ -73,7 +73,7 @@ export default async function PublicListingPage({ params }: ListingPageProps) {
     .from(propertyMedia)
     .where(eq(propertyMedia.propertyId, property.id));
 
-  const shareUrl = property.shareUrl || `https://egnitech.com${BASE_PATH}/listings/${property.slug}`;
+  const shareUrl = property.shareUrl || `${PUBLIC_ORIGIN}${BASE_PATH}/listings/${property.slug}`;
 
   return (
     <PublicListingClient

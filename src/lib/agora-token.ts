@@ -25,8 +25,17 @@ export interface AgoraRtmTokenResult {
  * Reads and validates the Agora project credentials. Strict mode: throws on a
  * missing or placeholder value so a misconfigured server fails at token time.
  */
-function getAgoraCredentials(): { appId: string; appCertificate: string } {
-  const appId = process.env.AGORA_APP_ID || process.env.NEXT_PUBLIC_AGORA_APP_ID;
+/** The Agora app id as configured, unvalidated; token builders validate it through getAgoraCredentials(). */
+export function getAgoraAppId(): string | undefined {
+  return process.env.AGORA_APP_ID || process.env.NEXT_PUBLIC_AGORA_APP_ID;
+}
+
+/** Every token lives one hour; the privilege window matches so the two never drift apart. */
+const TOKEN_TTL_SECONDS = 3600;
+const expiresAtFromNow = () => Math.floor(Date.now() / 1000) + TOKEN_TTL_SECONDS;
+
+export function getAgoraCredentials(): { appId: string; appCertificate: string } {
+  const appId = getAgoraAppId();
   const appCertificate = process.env.AGORA_APP_CERTIFICATE;
 
   if (!appId || appId.trim() === "" || appId === "your_agora_app_id_here") {
@@ -55,10 +64,7 @@ export function generateAgoraRtcToken(
 ): AgoraRtcTokenResult {
   const { appId, appCertificate } = getAgoraCredentials();
 
-  const tokenExpirationInSeconds = 3600; // 1 hour
-  const privilegeExpirationInSeconds = 3600;
-  const currentTimestamp = Math.floor(Date.now() / 1000);
-  const expiresAt = currentTimestamp + tokenExpirationInSeconds;
+  const expiresAt = expiresAtFromNow();
 
   try {
     const token = RtcTokenBuilder.buildTokenWithUid(
@@ -67,8 +73,8 @@ export function generateAgoraRtcToken(
       channelName,
       uid,
       role,
-      tokenExpirationInSeconds,
-      privilegeExpirationInSeconds
+      TOKEN_TTL_SECONDS,
+      TOKEN_TTL_SECONDS
     );
 
     return {
@@ -91,17 +97,10 @@ export function generateAgoraRtcToken(
 export function generateAgoraRtmToken(userId: string): AgoraRtmTokenResult {
   const { appId, appCertificate } = getAgoraCredentials();
 
-  const tokenExpirationInSeconds = 3600; // 1 hour
-  const currentTimestamp = Math.floor(Date.now() / 1000);
-  const expiresAt = currentTimestamp + tokenExpirationInSeconds;
+  const expiresAt = expiresAtFromNow();
 
   try {
-    const token = RtmTokenBuilder.buildToken(
-      appId,
-      appCertificate,
-      userId,
-      tokenExpirationInSeconds
-    );
+    const token = RtmTokenBuilder.buildToken(appId, appCertificate, userId, TOKEN_TTL_SECONDS);
 
     return {
       appId,
@@ -126,10 +125,7 @@ export function generateAgoraAgentCombinedToken(
 ): AgoraRtcTokenResult {
   const { appId, appCertificate } = getAgoraCredentials();
 
-  const tokenExpirationInSeconds = 3600; // 1 hour
-  const privilegeExpirationInSeconds = 3600;
-  const currentTimestamp = Math.floor(Date.now() / 1000);
-  const expiresAt = currentTimestamp + tokenExpirationInSeconds;
+  const expiresAt = expiresAtFromNow();
   const stringAgentUid = String(agentUid);
 
   try {
@@ -139,8 +135,8 @@ export function generateAgoraAgentCombinedToken(
       channelName,
       stringAgentUid,
       RtcRole.PUBLISHER,
-      tokenExpirationInSeconds,
-      privilegeExpirationInSeconds
+      TOKEN_TTL_SECONDS,
+      TOKEN_TTL_SECONDS
     );
 
     return {

@@ -9,14 +9,15 @@ import {
   CheckCircle2,
   Bot,
 } from "lucide-react";
+import { DEMO_LISTING } from "@/lib/demo-listing";
 
 export function NegotiationSimulator() {
   const [callerBudget, setCallerBudget] = useState<number>(3150);
   const [leaseMonths, setLeaseMonths] = useState<number>(18);
   const [moveInQuick, setMoveInQuick] = useState<boolean>(true);
 
-  const TARGET_PRICE = 3450;
-  const FLOOR_PRICE = 3250;
+  const TARGET_PRICE = Number(DEMO_LISTING.price);
+  const FLOOR_PRICE = DEMO_LISTING.minFloorPrice;
 
   // Compute negotiation outcome
   let outcomeType: "accepted_with_trade" | "alternative_pivot" | "standard_rate" = "accepted_with_trade";
@@ -33,7 +34,7 @@ export function NegotiationSimulator() {
   } else if (callerBudget < 3000) {
     outcomeType = "alternative_pivot";
     negotiatedRent = 2850;
-    concessionText = "Budget below $3,250 floor • Graceful Pivot to 1-Bed + Den inventory";
+    concessionText = `Budget below $${FLOOR_PRICE.toLocaleString()} floor • Graceful Pivot to 1-Bed + Den inventory`;
     dialogueReply =
       `"I can't drop the 2-Bedroom unit below our landlord minimum of $${FLOOR_PRICE}/mo. However, we have a beautiful 1-Bed + Den unit with private terrace in the same building for $2,850/mo. Would you like to tour that one instead?"`;
   } else {
@@ -109,8 +110,8 @@ export function NegotiationSimulator() {
               />
               <div className="flex justify-between text-[11px] text-slate-400 mt-1 font-medium">
                 <span>$2,800 (Low)</span>
-                <span className="text-emerald-700 font-bold">$3,250 Floor</span>
-                <span>$3,450 (Target)</span>
+                <span className="text-emerald-700 font-bold">${FLOOR_PRICE.toLocaleString()} Floor</span>
+                <span>${TARGET_PRICE.toLocaleString()} (Target)</span>
               </div>
             </div>
 

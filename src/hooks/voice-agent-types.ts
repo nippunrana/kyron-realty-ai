@@ -20,6 +20,8 @@ export interface VoiceMessage {
 
 export interface UseAgoraVoiceAgentReturn {
   callState: CallState;
+  /** True from the moment a call starts connecting until it ends or errors. */
+  isCallActive: boolean;
   isMuted: boolean;
   isAgentSpeaking: boolean;
   audioFrequencies: number[];

@@ -20,6 +20,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { LoginShowcase } from "@/components/login/LoginShowcase";
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, isValidEmail } from "@/lib/auth-policy";
 import { BASE_PATH } from "@/lib/base-path";
 
 function LoginFormContent() {
@@ -64,16 +65,16 @@ function LoginFormContent() {
 
   const validateForm = () => {
     const trimmedEmail = email.trim();
-    if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+    if (!trimmedEmail || !isValidEmail(trimmedEmail)) {
       setErrorMsg("Please enter a valid email address.");
       return false;
     }
-    if (!password || password.length < 8) {
-      setErrorMsg("Password must be at least 8 characters long.");
+    if (!password || password.length < PASSWORD_MIN_LENGTH) {
+      setErrorMsg(`Password must be at least ${PASSWORD_MIN_LENGTH} characters long.`);
       return false;
     }
-    if (password.length > 128) {
-      setErrorMsg("Password cannot exceed 128 characters.");
+    if (password.length > PASSWORD_MAX_LENGTH) {
+      setErrorMsg(`Password cannot exceed ${PASSWORD_MAX_LENGTH} characters.`);
       return false;
     }
     if (mode === "signup" && !name.trim()) {

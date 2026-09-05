@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import {
   CheckCircle2,
@@ -13,6 +12,7 @@ import {
   ShieldCheck,
   X,
 } from "lucide-react";
+import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
 
 interface PublishSuccessModalProps {
   onClose: () => void;
@@ -34,17 +34,7 @@ export function PublishSuccessModal({
   qrCodeSvg,
   shareUrl,
 }: PublishSuccessModalProps) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
-    } catch (err) {
-      console.error("Failed to copy URL:", err);
-    }
-  };
+  const { copied, copy } = useCopyToClipboard(2500);
 
   const handleDownloadQrSvg = () => {
     const blob = new Blob([qrCodeSvg], { type: "image/svg+xml" });
@@ -133,7 +123,7 @@ export function PublishSuccessModal({
               {shareUrl}
             </div>
             <button
-              onClick={handleCopyLink}
+              onClick={() => copy(shareUrl)}
               className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm shrink-0"
             >
               {copied ? (

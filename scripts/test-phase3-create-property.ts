@@ -2,13 +2,14 @@ import "dotenv/config";
 import { db } from "../src/db";
 import { properties, propertyKnowledgeBases, negotiationMatrices } from "../src/db/schema";
 import QRCode from "qrcode";
+import { BASE_PATH, PUBLIC_ORIGIN } from "../src/lib/base-path";
 
 async function testPropertyCreation() {
   console.log("=== Testing Phase 3 Property Creation in Database ===\n");
 
   const sampleTitle = "Luxury 2-Bedroom Marina Loft with Golden Gate Views";
   const slug = `marina-luxury-loft-${Date.now().toString(36)}`;
-  const shareUrl = `https://egnitech.com/projects/kyron-realty-ai/listings/${slug}`;
+  const shareUrl = `${PUBLIC_ORIGIN}${BASE_PATH}/listings/${slug}`;
 
   // Generate vector QR code
   const qrCodeSvg = await QRCode.toString(shareUrl, {

@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import {
   Building2,
@@ -18,21 +17,17 @@ import {
   Zap,
   Dog,
 } from "lucide-react";
+import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
+import { BASE_PATH, PUBLIC_ORIGIN } from "@/lib/base-path";
+import { DEMO_LISTING, DEMO_LISTING_SLUG } from "@/lib/demo-listing";
 
 interface DemoListingCardProps {
   onOpenCallModal: () => void;
 }
 
 export function DemoListingCard({ onOpenCallModal }: DemoListingCardProps) {
-  const [copiedLink, setCopiedLink] = useState(false);
-
-  const listingUrl = "https://egnitech.com/projects/kyron-realty-ai/listings/marina-luxury-loft";
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(listingUrl);
-    setCopiedLink(true);
-    setTimeout(() => setCopiedLink(false), 2000);
-  };
+  const { copied: copiedLink, copy } = useCopyToClipboard();
+  const listingUrl = `${PUBLIC_ORIGIN}${BASE_PATH}/listings/${DEMO_LISTING_SLUG}`;
 
   return (
     <section id="flagship-property" className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-16 md:py-24 border-t border-slate-200/80">
@@ -60,7 +55,7 @@ export function DemoListingCard({ onOpenCallModal }: DemoListingCardProps) {
               <div className="relative rounded-2xl overflow-hidden aspect-video sm:aspect-16/10 bg-slate-100 border border-slate-200">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src="https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80"
+                  src={DEMO_LISTING.coverImageUrl}
                   alt="250 Marina Boulevard residence"
                   className="w-full h-full object-cover"
                 />
@@ -89,7 +84,7 @@ export function DemoListingCard({ onOpenCallModal }: DemoListingCardProps) {
                   </div>
                   <div className="text-right">
                     <span className="text-2xl sm:text-3xl font-black drop-shadow-sm">
-                      $3,450
+                      ${Number(DEMO_LISTING.price).toLocaleString()}
                     </span>
                     <span className="text-xs text-slate-200 block">/ month</span>
                   </div>
@@ -103,21 +98,21 @@ export function DemoListingCard({ onOpenCallModal }: DemoListingCardProps) {
                     <Bed className="w-4 h-4 text-blue-600" />
                     <span>Bedrooms</span>
                   </div>
-                  <span className="text-sm font-bold text-slate-900 mt-1 block">2 Beds</span>
+                  <span className="text-sm font-bold text-slate-900 mt-1 block">{DEMO_LISTING.bedrooms} Beds</span>
                 </div>
                 <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80">
                   <div className="flex items-center justify-center gap-1.5 text-xs text-slate-500">
                     <Bath className="w-4 h-4 text-blue-600" />
                     <span>Bathrooms</span>
                   </div>
-                  <span className="text-sm font-bold text-slate-900 mt-1 block">2.0 Baths</span>
+                  <span className="text-sm font-bold text-slate-900 mt-1 block">{DEMO_LISTING.bathrooms.toFixed(1)} Baths</span>
                 </div>
                 <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80">
                   <div className="flex items-center justify-center gap-1.5 text-xs text-slate-500">
                     <Maximize className="w-4 h-4 text-blue-600" />
                     <span>Living Area</span>
                   </div>
-                  <span className="text-sm font-bold text-slate-900 mt-1 block">1,150 sqft</span>
+                  <span className="text-sm font-bold text-slate-900 mt-1 block">{DEMO_LISTING.sqft.toLocaleString()} sqft</span>
                 </div>
               </div>
 
@@ -150,7 +145,7 @@ export function DemoListingCard({ onOpenCallModal }: DemoListingCardProps) {
               </button>
 
               <Link
-                href="/listings/marina-luxury-loft"
+                href={`/listings/${DEMO_LISTING_SLUG}`}
                 className="inline-flex items-center justify-center gap-2 px-5 py-3.5 text-sm font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl shadow-xs transition-all"
               >
                 <span>View Full Listing Page</span>
@@ -199,7 +194,7 @@ export function DemoListingCard({ onOpenCallModal }: DemoListingCardProps) {
                   </span>
                   <button
                     type="button"
-                    onClick={handleCopy}
+                    onClick={() => copy(listingUrl)}
                     className="text-[11px] font-semibold text-blue-600 hover:underline cursor-pointer"
                   >
                     {copiedLink ? "Copied!" : "Copy Link"}

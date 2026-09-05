@@ -575,6 +575,11 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
 
   return {
     callState,
+    isCallActive:
+      callState === "connecting" ||
+      callState === "connected" ||
+      callState === "user_speaking" ||
+      callState === "agent_speaking",
     isMuted,
     isAgentSpeaking,
     audioFrequencies,

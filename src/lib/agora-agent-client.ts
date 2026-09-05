@@ -2,12 +2,15 @@ import {
   generateAgoraRtcToken,
   generateAgoraRtmToken,
   generateAgoraAgentCombinedToken,
+  getAgoraAppId,
+  getAgoraCredentials,
 } from "./agora-token";
 import { db } from "@/db";
 import { properties, propertyKnowledgeBases, negotiationMatrices, voiceSessions, users } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { computeFloorPrice } from "./listing-helpers";
 import { DEMO_LISTING, DEMO_LISTING_SLUG } from "./demo-listing";
+import { getGeminiApiKey } from "./gemini";
 import type { CallerType } from "@/hooks/voice-agent-types";
 
 export interface StartAgentSessionParams {
@@ -71,13 +74,8 @@ export async function startAgoraAgentSession(
     userId,
   } = params;
 
-  const appId = process.env.AGORA_APP_ID || process.env.NEXT_PUBLIC_AGORA_APP_ID;
-
-  if (!appId || appId.trim() === "" || appId === "your_agora_app_id_here") {
-    throw new Error(
-      "Missing AGORA_APP_ID in .env. Please configure your Agora App ID from https://console.agora.io/."
-    );
-  }
+  // Validated once here; the token builders below re-read the same credentials.
+  const { appId } = getAgoraCredentials();
 
   // 1. Fetch property, knowledge base & guardrails
   let propertyRecord: any = null;
@@ -289,12 +287,7 @@ ${contactEmail ? `5. If asked for direct owner or leasing office contact, provid
   }
 
   // 6. Configure LLM brain (Google Gemini or OpenAI)
-  const geminiApiKey = (
-    process.env.GEMINI_API_KEY ||
-    process.env.GOOGLE_API_KEY ||
-    process.env.GOOGLE_GENAI_API_KEY ||
-    ""
-  ).trim();
+  const geminiApiKey = getGeminiApiKey();
   const openaiApiKey = (process.env.OPENAI_API_KEY || "").trim();
 
   let llmConfig: any = null;
@@ -528,7 +521,7 @@ export async function stopAgoraAgentSession(sessionId: string, channelName: stri
     .limit(1);
   if (!row) return null;
 
-  const appId = process.env.AGORA_APP_ID || process.env.NEXT_PUBLIC_AGORA_APP_ID;
+  const appId = getAgoraAppId();
   const authHeader = buildAgoraCloudAuthHeader();
 
   if (appId && authHeader) {

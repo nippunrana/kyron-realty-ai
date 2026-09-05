@@ -6,6 +6,7 @@ import {
   randomSlugSuffix,
   slugify,
 } from "./listing-helpers";
+import { getGeminiApiKey } from "./gemini";
 
 export interface ExtractedPropertyPayload {
   property: {
@@ -284,13 +285,10 @@ export async function extractPropertyKnowledgeBase(
     throw new Error("No property content or notes provided for AI synthesis.");
   }
 
-  const apiKey =
-    process.env.GEMINI_API_KEY ||
-    process.env.GOOGLE_API_KEY ||
-    process.env.GOOGLE_GENAI_API_KEY;
+  const apiKey = getGeminiApiKey();
 
   // Fallback heuristic if API key is missing or offline
-  if (!apiKey || apiKey.trim() === "" || apiKey === "your_gemini_api_key_here") {
+  if (!apiKey || apiKey === "your_gemini_api_key_here") {
     console.warn("GEMINI_API_KEY missing, using deterministic heuristic fallback.");
     return buildHeuristicFallback(input);
   }

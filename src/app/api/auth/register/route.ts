@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { hashPassword } from "@/lib/auth-passwords";
+import { EMAIL_MAX_LENGTH, PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, isValidEmail } from "@/lib/auth-policy";
 import { eq } from "drizzle-orm";
 
 export async function POST(request: Request) {
@@ -20,8 +21,8 @@ export async function POST(request: Request) {
 
     if (
       typeof email !== "string" ||
-      email.trim().length > 255 ||
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
+      email.trim().length > EMAIL_MAX_LENGTH ||
+      !isValidEmail(email.trim())
     ) {
       return NextResponse.json(
         { error: "A valid email address is required." },
@@ -29,16 +30,16 @@ export async function POST(request: Request) {
       );
     }
 
-    if (typeof password !== "string" || password.length < 8) {
+    if (typeof password !== "string" || password.length < PASSWORD_MIN_LENGTH) {
       return NextResponse.json(
-        { error: "Password must be at least 8 characters long." },
+        { error: `Password must be at least ${PASSWORD_MIN_LENGTH} characters long.` },
         { status: 400 }
       );
     }
 
-    if (password.length > 128) {
+    if (password.length > PASSWORD_MAX_LENGTH) {
       return NextResponse.json(
-        { error: "Password cannot exceed 128 characters." },
+        { error: `Password cannot exceed ${PASSWORD_MAX_LENGTH} characters.` },
         { status: 400 }
       );
     }

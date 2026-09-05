@@ -23,6 +23,7 @@ import { TourBookingForm } from "./TourBookingForm";
 import { ShareListingModal } from "./ShareListingModal";
 import { TourBookingModal } from "./TourBookingModal";
 import { ListingPoliciesCard } from "./ListingPoliciesCard";
+import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
 import { defaultTourDateTime } from "@/lib/listing-helpers";
 import { BASE_PATH } from "@/lib/base-path";
 
@@ -43,7 +44,7 @@ export function PublicListingClient({
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const { copied, copy: copyShareUrl } = useCopyToClipboard();
 
   // Booking Form State
   const [bookName, setBookName] = useState("");
@@ -70,16 +71,6 @@ export function PublicListingClient({
   const availability = property.availableDate
     ? new Date(property.availableDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })
     : "Not listed";
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (e) {
-      console.warn("Could not copy:", e);
-    }
-  };
 
   const handleDirectTourBooking = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -140,7 +131,7 @@ export function PublicListingClient({
             </Link>
             <span className="text-slate-300 text-xs">/</span>
             <span className="text-xs font-semibold text-slate-600 truncate max-w-[140px] sm:max-w-xs">
-              {[property.city, property.state].filter(Boolean).join(", ") || property.address}
+              {locationSummary}
             </span>
           </div>
 
@@ -538,7 +529,7 @@ export function PublicListingClient({
           qrCodeSvg={property.qrCodeSvg}
           whatsAppUrl={whatsAppUrl}
           copied={copied}
-          onCopy={handleCopy}
+          onCopy={() => copyShareUrl(shareUrl)}
           onClose={() => setIsShareModalOpen(false)}
         />
       )}

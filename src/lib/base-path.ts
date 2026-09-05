@@ -5,3 +5,9 @@
  */
 export const BASE_PATH = "/projects/kyron-realty-ai";
 export const AUTH_BASE_PATH = `${BASE_PATH}/api/auth`;
+
+/**
+ * Where the app is publicly served. Used only where a request's own host is not
+ * available: static marketing copy and the share-URL fallback for older rows.
+ */
+export const PUBLIC_ORIGIN = "https://egnitech.com";

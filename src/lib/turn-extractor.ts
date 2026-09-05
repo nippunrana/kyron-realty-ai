@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import type { ExtractedPropertyPayload } from "./kb-extractor";
+import { getGeminiApiKey } from "./gemini";
 
 export interface TurnMessage {
   role: "assistant" | "user";
@@ -51,12 +52,9 @@ export async function extractTurnSpecs(
     return { updates: {}, modalAction: "none" };
   }
 
-  const apiKey =
-    process.env.GEMINI_API_KEY ||
-    process.env.GOOGLE_API_KEY ||
-    process.env.GOOGLE_GENAI_API_KEY;
+  const apiKey = getGeminiApiKey();
 
-  if (!apiKey || apiKey.trim() === "") {
+  if (!apiKey) {
     console.warn("[Turn Extraction] Missing GEMINI_API_KEY in environment.");
     return { updates: {}, modalAction: "none" };
   }

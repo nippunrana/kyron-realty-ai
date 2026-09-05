@@ -44,6 +44,7 @@ export function VoiceSalesAgentModal({
 }: VoiceSalesAgentModalProps) {
   const {
     callState,
+    isCallActive,
     isMuted,
     isAgentSpeaking,
     audioFrequencies,
@@ -69,15 +70,9 @@ export function VoiceSalesAgentModal({
     transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [transcript]);
 
-  const isCallActiveOrConnecting =
-    callState === "connecting" ||
-    callState === "connected" ||
-    callState === "user_speaking" ||
-    callState === "agent_speaking";
-
   // When user clicks the top "X" or backdrop
   const handleRequestClose = () => {
-    if (isCallActiveOrConnecting) {
+    if (isCallActive) {
       setShowExitConfirm(true);
     } else {
       onClose();
@@ -134,7 +129,7 @@ export function VoiceSalesAgentModal({
                 <h3 className="text-sm font-extrabold text-slate-900 leading-tight">
                   Sarah • AI Leasing Advisor
                 </h3>
-                {isCallActiveOrConnecting ? (
+                {isCallActive ? (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                     <span>&lt;300ms Agora SD-RTN</span>
