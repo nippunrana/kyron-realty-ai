@@ -25,17 +25,44 @@ export interface AdditionalSpec {
   color: string;
 }
 
+/** A declared studio: zero bedrooms with "studio" in the title or description. A bare 0 is an unstated count. */
+export function isStudioListing(property: Property): boolean {
+  return (
+    Number(property.bedrooms) === 0 &&
+    `${property.title} ${property.description}`.toLowerCase().includes("studio")
+  );
+}
+
+/**
+ * The one definition of "core specs verified". The checklist, the deploy lock, the
+ * studio's review-card gate, the review card, and the end-of-call merge all consume
+ * it; never re-derive these rules in a component.
+ */
+export function getCoreSpecStatus(property: Property) {
+  return {
+    listingType: property.listingType === "rent" || property.listingType === "sale",
+    address: Boolean(property.address && property.address.trim().length > 3),
+    price: Number(property.price) > 0,
+    bedrooms: Number(property.bedrooms) > 0 || isStudioListing(property),
+    bathrooms: Number(property.bathrooms) > 0,
+    sqft: Number(property.sqft) > 0,
+  };
+}
+
+export function areCoreSpecsVerified(property: Property): boolean {
+  return Object.values(getCoreSpecStatus(property)).every(Boolean);
+}
+
 /** The six core attributes the deploy button waits on, with their display values. */
 export function buildChecklistItems(property: Property): ChecklistItemData[] {
-  // 6-Point Verification Items
-  const hasListingType = Boolean(
-    property.listingType === "rent" || property.listingType === "sale"
-  );
-  const hasAddress = Boolean(property.address && property.address.trim().length > 0);
-  const hasPrice = Number(property.price) > 0;
-  const hasBeds = Number(property.bedrooms) > 0;
-  const hasBaths = Number(property.bathrooms) > 0;
-  const hasSqft = Number(property.sqft) > 0;
+  const {
+    listingType: hasListingType,
+    address: hasAddress,
+    price: hasPrice,
+    bedrooms: hasBeds,
+    bathrooms: hasBaths,
+    sqft: hasSqft,
+  } = getCoreSpecStatus(property);
 
   const checklistItems: ChecklistItemData[] = [
     {
@@ -74,7 +101,7 @@ export function buildChecklistItems(property: Property): ChecklistItemData[] {
       label: "Bedrooms count",
       sublabel: "Number of bedrooms",
       isComplete: hasBeds,
-      valueDisplay: hasBeds ? `${property.bedrooms} Beds` : null,
+      valueDisplay: hasBeds ? (isStudioListing(property) ? "Studio" : `${property.bedrooms} Beds`) : null,
     },
     {
       id: "bathrooms",

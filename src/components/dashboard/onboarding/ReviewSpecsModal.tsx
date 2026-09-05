@@ -16,6 +16,7 @@ import {
   Mail,
 } from "lucide-react";
 import type { ExtractedPropertyPayload } from "@/lib/kb-extractor";
+import { getCoreSpecStatus, isStudioListing } from "./inspector-specs";
 
 interface ReviewSpecsModalProps {
   onClose: () => void;
@@ -45,13 +46,15 @@ export function ReviewSpecsModal({
     ? `$${Number(property.price).toLocaleString()}${isRent ? "/mo" : ""}`
     : "Pending";
 
-  const hasValidType = property.listingType === "rent" || property.listingType === "sale";
-  const hasValidAddress = Boolean(property.address && property.address.trim().length > 3);
-  const hasValidPrice = Boolean(Number(property.price) > 0);
-  const isStudio = property.bedrooms === 0 && (property.title?.toLowerCase().includes("studio") || property.description?.toLowerCase().includes("studio"));
-  const hasValidBeds = (property.bedrooms !== undefined && property.bedrooms !== null && Number(property.bedrooms) > 0) || isStudio;
-  const hasValidBaths = property.bathrooms !== undefined && property.bathrooms !== null && Number(property.bathrooms) > 0;
-  const hasValidSqft = Boolean(Number(property.sqft) > 0);
+  const {
+    listingType: hasValidType,
+    address: hasValidAddress,
+    price: hasValidPrice,
+    bedrooms: hasValidBeds,
+    bathrooms: hasValidBaths,
+    sqft: hasValidSqft,
+  } = getCoreSpecStatus(property);
+  const isStudio = isStudioListing(property);
 
   const verifiedCoreCount = [
     hasValidType,

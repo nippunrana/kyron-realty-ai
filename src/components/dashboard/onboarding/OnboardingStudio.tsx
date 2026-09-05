@@ -5,6 +5,7 @@ import { ConversationalPanel } from "./ConversationalPanel";
 import { LivePropertyInspector } from "./LivePropertyInspector";
 import { PublishSuccessModal } from "./PublishSuccessModal";
 import { ReviewSpecsModal } from "./ReviewSpecsModal";
+import { areCoreSpecsVerified, getCoreSpecStatus } from "./inspector-specs";
 import type { UIAction } from "@/hooks/voice-agent-types";
 import type { ExtractedPropertyPayload } from "@/lib/kb-extractor";
 import type { TurnMessage } from "@/lib/turn-extractor";
@@ -70,17 +71,6 @@ interface OnboardingStudioProps {
   };
 }
 
-function checkCoreSpecsCompleted(prop: ExtractedPropertyPayload["property"]): boolean {
-  const hasListingType = prop.listingType === "rent" || prop.listingType === "sale";
-  const hasAddress = Boolean(prop.address && prop.address.trim().length > 3);
-  const hasPrice = Boolean(Number(prop.price) > 0);
-  const hasBeds = prop.bedrooms !== undefined && prop.bedrooms !== null && Number(prop.bedrooms) >= 0;
-  const hasBaths = prop.bathrooms !== undefined && prop.bathrooms !== null && Number(prop.bathrooms) > 0;
-  const hasSqft = Boolean(Number(prop.sqft) > 0);
-
-  return hasListingType && hasAddress && hasPrice && hasBeds && hasBaths && hasSqft;
-}
-
 export function OnboardingStudio({ user }: OnboardingStudioProps) {
   const [data, setData] = useState<ExtractedPropertyPayload>(() => ({
     ...emptyInitialDraftState,
@@ -141,7 +131,7 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
     if (action === "open_review_modal") {
       if (onboardingStageRef.current === "core") {
         // If all 6 specs are already verified, open immediately
-        if (checkCoreSpecsCompleted(dataRef.current.property)) {
+        if (areCoreSpecsVerified(dataRef.current.property)) {
           setShowCoreModal(true);
           pendingModalOpenRef.current = false;
         } else if (isTurnSyncingRef.current) {
@@ -156,7 +146,7 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
       setShowCoreModal(false);
       setShowFinalModal(false);
       pendingModalOpenRef.current = false;
-      if (onboardingStageRef.current === "core" && checkCoreSpecsCompleted(dataRef.current.property)) {
+      if (onboardingStageRef.current === "core" && areCoreSpecsVerified(dataRef.current.property)) {
         handleConfirmCoreSpecs();
       }
     }
@@ -233,7 +223,7 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
       }
 
       // Check if all 6 core specs are now verified in state
-      const isCoreComplete = checkCoreSpecsCompleted(candidateProperty);
+      const isCoreComplete = areCoreSpecsVerified(candidateProperty);
 
       // In-Flight Sync Gate: If Elena or the user requested the review modal while
       // extraction was in flight, open it now that all 6 specs have safely landed!
@@ -383,6 +373,7 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
           const newProp = json.data.property || {};
           const newKb = json.data.knowledgeBase || {};
           const newMatrix = json.data.negotiationMatrix || {};
+          const verified = getCoreSpecStatus(prev.property);
 
           return {
             property: {
@@ -391,21 +382,21 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
               slug: newProp.slug || prev.property.slug,
               description: newProp.description || prev.property.description,
               // Protect live-verified specs: do not let end-of-call synthesis clobber them
-              listingType: prev.property.listingType || newProp.listingType,
+              listingType: verified.listingType ? prev.property.listingType : newProp.listingType,
               propertyType: prev.property.propertyType || newProp.propertyType,
-              price: prev.property.price > 0 ? prev.property.price : (newProp.price || 0),
+              price: verified.price ? prev.property.price : (newProp.price || 0),
               securityDeposit: newProp.securityDeposit || prev.property.securityDeposit,
               minLeaseMonths: newProp.minLeaseMonths || prev.property.minLeaseMonths,
               hoaFeeMonthly: newProp.hoaFeeMonthly || prev.property.hoaFeeMonthly,
-              address: prev.property.address?.trim() ? prev.property.address : (newProp.address || ""),
+              address: verified.address ? prev.property.address : (newProp.address || ""),
               unitNumber: newProp.unitNumber || prev.property.unitNumber,
               city: prev.property.city?.trim() ? prev.property.city : (newProp.city || ""),
               state: prev.property.state?.trim() ? prev.property.state : (newProp.state || ""),
               zipCode: prev.property.zipCode?.trim() ? prev.property.zipCode : (newProp.zipCode || ""),
               country: "USA",
-              bedrooms: prev.property.bedrooms > 0 ? prev.property.bedrooms : (newProp.bedrooms || 0),
-              bathrooms: prev.property.bathrooms > 0 ? prev.property.bathrooms : (newProp.bathrooms || 0),
-              sqft: prev.property.sqft > 0 ? prev.property.sqft : (newProp.sqft || 0),
+              bedrooms: verified.bedrooms ? prev.property.bedrooms : (newProp.bedrooms || 0),
+              bathrooms: verified.bathrooms ? prev.property.bathrooms : (newProp.bathrooms || 0),
+              sqft: verified.sqft ? prev.property.sqft : (newProp.sqft || 0),
               yearBuilt: newProp.yearBuilt || prev.property.yearBuilt,
               availableDate: newProp.availableDate || prev.property.availableDate,
               amenities: (newProp.amenities && newProp.amenities.length > 0) ? newProp.amenities : prev.property.amenities,
