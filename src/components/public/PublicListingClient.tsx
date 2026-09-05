@@ -15,16 +15,14 @@ import {
   Sparkles,
   ShieldCheck,
   CheckCircle2,
-  Car,
-  PawPrint,
-  Zap,
   HelpCircle,
   Clock,
-  X,
-  Copy,
-  Check,
 } from "lucide-react";
 import { VoiceSalesAgentModal } from "@/components/voice/VoiceSalesAgentModal";
+import { TourBookingForm } from "./TourBookingForm";
+import { ShareListingModal } from "./ShareListingModal";
+import { TourBookingModal } from "./TourBookingModal";
+import { ListingPoliciesCard } from "./ListingPoliciesCard";
 import { defaultTourDateTime } from "@/lib/listing-helpers";
 import { BASE_PATH } from "@/lib/base-path";
 
@@ -446,63 +444,20 @@ export function PublicListingClient({
                 Tour this property with our property manager or via live video walkthrough.
               </p>
 
-              {bookingSuccess ? (
-                <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-center text-emerald-800 text-xs font-bold animate-in fade-in">
-                  <CheckCircle2 className="w-6 h-6 mx-auto mb-1 text-emerald-600" />
-                  <span>Your Viewing Request is Confirmed!</span>
-                </div>
-              ) : (
-                <form onSubmit={handleDirectTourBooking} className="space-y-3">
-                  <div>
-                    <label className="text-[11px] font-bold text-slate-600 block mb-1">
-                      Full Name
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="John Doe"
-                      value={bookName}
-                      onChange={(e) => setBookName(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-[11px] font-bold text-slate-600 block mb-1">
-                      Phone Number
-                    </label>
-                    <input
-                      type="tel"
-                      required
-                      placeholder="(415) 555-0199"
-                      value={bookPhone}
-                      onChange={(e) => setBookPhone(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-[11px] font-bold text-slate-600 block mb-1">
-                      Preferred Date & Time
-                    </label>
-                    <input
-                      type="datetime-local"
-                      required
-                      value={bookDate}
-                      onChange={(e) => setBookDate(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={isSubmittingBooking}
-                    className="w-full py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold text-xs shadow-md shadow-blue-600/20 transition-all cursor-pointer"
-                  >
-                    {isSubmittingBooking ? "Booking Tour..." : "Confirm Viewing Appointment"}
-                  </button>
-                </form>
-              )}
+              <TourBookingForm
+                name={bookName}
+                phone={bookPhone}
+                date={bookDate}
+                onNameChange={setBookName}
+                onPhoneChange={setBookPhone}
+                onDateChange={setBookDate}
+                onSubmit={handleDirectTourBooking}
+                isSubmitting={isSubmittingBooking}
+                success={bookingSuccess}
+                successTitle="Your Viewing Request is Confirmed!"
+                submitLabel="Confirm Viewing Appointment"
+                busyLabel="Booking Tour..."
+              />
 
               {/* FUD Shield */}
               <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-center gap-1.5 text-[11px] text-slate-500">
@@ -511,48 +466,11 @@ export function PublicListingClient({
               </div>
             </div>
 
-            {/* Verified Policies Card */}
-            <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-xs space-y-4">
-              <h3 className="text-sm font-extrabold text-slate-900">
-                Building & Lease Policies
-              </h3>
-
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-                  <PawPrint className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-900">Pet Policy</h4>
-                  <p className="text-xs text-slate-600 mt-0.5">
-                    {knowledgeBase?.petPolicyDetail || "Not specified by the owner. Ask the voice agent to arrange a broker follow-up."}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                  <Car className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-900">Parking</h4>
-                  <p className="text-xs text-slate-600 mt-0.5">
-                    {knowledgeBase?.parkingDetail || "Not specified by the owner."}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                  <Zap className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-900">Included Utilities</h4>
-                  <p className="text-xs text-slate-600 mt-0.5">
-                    {knowledgeBase?.utilitiesDetail || "Not specified by the owner."}
-                  </p>
-                </div>
-              </div>
-            </div>
+            <ListingPoliciesCard
+              petPolicyDetail={knowledgeBase?.petPolicyDetail}
+              parkingDetail={knowledgeBase?.parkingDetail}
+              utilitiesDetail={knowledgeBase?.utilitiesDetail}
+            />
           </div>
         </div>
       </main>
@@ -616,130 +534,34 @@ export function PublicListingClient({
         />
       )}
 
-      {/* Share / QR Code Modal */}
       {isShareModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 text-center relative">
-            <button
-              onClick={() => setIsShareModalOpen(false)}
-              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-700"
-            >
-              <X className="w-4 h-4" />
-            </button>
-
-            <h3 className="text-base font-extrabold text-slate-900 mb-1">
-              Share Property Listing
-            </h3>
-            <p className="text-xs text-slate-500 mb-4">
-              Scan QR code on mobile or share via WhatsApp
-            </p>
-
-            {property.qrCodeSvg && (
-              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 mb-4 flex items-center justify-center">
-                <div
-                  className="w-40 h-40 flex items-center justify-center"
-                  dangerouslySetInnerHTML={{ __html: property.qrCodeSvg }}
-                />
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <a
-                href={whatsAppUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-2"
-              >
-                <Share2 className="w-3.5 h-3.5" />
-                <span>Share to WhatsApp</span>
-              </a>
-
-              <button
-                onClick={handleCopy}
-                className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer"
-              >
-                {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                <span>{copied ? "Link Copied!" : "Copy Public Link"}</span>
-              </button>
-            </div>
-          </div>
-        </div>
+        <ShareListingModal
+          qrCodeSvg={property.qrCodeSvg}
+          whatsAppUrl={whatsAppUrl}
+          copied={copied}
+          onCopy={handleCopy}
+          onClose={() => setIsShareModalOpen(false)}
+        />
       )}
 
-      {/* In-App Tour Booking Modal */}
       {isBookingModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 relative">
-            <button
-              onClick={() => setIsBookingModalOpen(false)}
-              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-700"
-            >
-              <X className="w-4 h-4" />
-            </button>
-
-            <div className="text-center mb-4">
-              <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-2">
-                <Calendar className="w-6 h-6" />
-              </div>
-              <h3 className="text-base font-extrabold text-slate-900">
-                Book a Private Tour
-              </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                {property.title}
-              </p>
-            </div>
-
-            {bookingSuccess ? (
-              <div className="py-6 text-center text-emerald-700">
-                <CheckCircle2 className="w-8 h-8 mx-auto mb-2 text-emerald-600" />
-                <span className="font-bold text-sm block">Viewing Confirmed!</span>
-                <span className="text-xs text-slate-500">We will reach out to confirm your visit.</span>
-              </div>
-            ) : (
-              <form onSubmit={handleDirectTourBooking} className="space-y-3">
-                <div>
-                  <label className="text-[11px] font-bold text-slate-600 block mb-1">Your Full Name</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Jane Smith"
-                    value={bookName}
-                    onChange={(e) => setBookName(e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] font-bold text-slate-600 block mb-1">Phone Number</label>
-                  <input
-                    type="tel"
-                    required
-                    placeholder="(415) 555-0199"
-                    value={bookPhone}
-                    onChange={(e) => setBookPhone(e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] font-bold text-slate-600 block mb-1">Preferred Date & Time</label>
-                  <input
-                    type="datetime-local"
-                    required
-                    value={bookDate}
-                    onChange={(e) => setBookDate(e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={isSubmittingBooking}
-                  className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs"
-                >
-                  {isSubmittingBooking ? "Booking..." : "Submit Viewing Request"}
-                </button>
-              </form>
-            )}
-          </div>
-        </div>
+        <TourBookingModal propertyTitle={property.title} onClose={() => setIsBookingModalOpen(false)}>
+          <TourBookingForm
+            name={bookName}
+            phone={bookPhone}
+            date={bookDate}
+            onNameChange={setBookName}
+            onPhoneChange={setBookPhone}
+            onDateChange={setBookDate}
+            onSubmit={handleDirectTourBooking}
+            isSubmitting={isSubmittingBooking}
+            success={bookingSuccess}
+            successTitle="Viewing Confirmed!"
+            successNote="We will reach out to confirm your visit."
+            submitLabel="Submit Viewing Request"
+            busyLabel="Booking..."
+          />
+        </TourBookingModal>
       )}
     </div>
   );
