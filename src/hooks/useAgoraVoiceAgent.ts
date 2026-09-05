@@ -506,7 +506,7 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
         isStartingRef.current = false;
       }
     },
-    [teardownResources]
+    [teardownResources, triggerTurnExtraction]
   );
 
   // Toggle Mute

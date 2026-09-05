@@ -169,6 +169,7 @@ export function VoiceSalesAgentModal({
               {/* Property Mini Banner */}
               <div className="p-4 rounded-2xl bg-slate-100/70 border border-slate-200/80 flex items-center gap-4 mb-6">
                 {property.coverImageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={property.coverImageUrl}
                     alt={property.title}

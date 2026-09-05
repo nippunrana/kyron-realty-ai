@@ -7,7 +7,6 @@ export interface ScrapedListingResult {
   markdown: string;
   source: "apify";
   images: string[];
-  error?: string;
 }
 
 /**

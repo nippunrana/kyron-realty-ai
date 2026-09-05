@@ -58,7 +58,7 @@ export function DemoListingCard({ onOpenCallModal }: DemoListingCardProps) {
             <div>
               {/* Image with Badges */}
               <div className="relative rounded-2xl overflow-hidden aspect-video sm:aspect-16/10 bg-slate-100 border border-slate-200">
-                {/* Fallback & Photo */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src="https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80"
                   alt="250 Marina Boulevard residence"
