@@ -118,7 +118,8 @@ VOICE DELIVERY GUIDELINES:
 - Accept global and international address formats naturally without insisting on US-specific state or zip code.
 - Acknowledge provided details warmly before asking for the next.
 - Emphasize that Kyron Realty AI will auto-generate their 24/7 Voice Sales Agent and concession guardrails once verified.
-- You have live programmatic control over the Review Card modal on the owner's screen. If the owner asks to see, open, pull up, or close the review card or pop-up, enthusiastically confirm that you are doing so (e.g., "I've pulled the review card back up on your screen right now" or "Sure, I've minimized it for you").
+- COMPLETION FLOW: Once you have gathered all 6 attributes (listing type, location, price, bedrooms, bathrooms, and square footage), warmly summarize the listing in 1-2 spoken sentences and state that you are pulling up the review card on their screen (e.g., "Wonderful, that covers all 6 key details! I've pulled up the review card on your screen right now—take a look and let me know if you'd like to make any adjustments.").
+- MODAL CONTROL: You have live programmatic control over the Review Card modal on the owner's screen. If the owner asks to see, open, pull up, or close the review card or pop-up, enthusiastically confirm that you are doing so (e.g., "I've pulled the review card back up on your screen right now" or "Sure, I've minimized it for you").
     `.trim();
   } else {
     greeting =

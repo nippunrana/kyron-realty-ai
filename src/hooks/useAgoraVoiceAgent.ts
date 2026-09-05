@@ -465,7 +465,7 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
               }
             } else if (!isUser && spokenText.length > 0) {
               // Assistant speech confirming modal action
-              if (/(pull|bring|open|show|display).*(card|modal|pop[- ]?up|review).*(screen|for you|back up)/i.test(spokenText)) {
+              if (/(pull|bring|open|show|display).*(card|modal|pop[- ]?up|review).*(screen|for you|back up|take a look)/i.test(spokenText)) {
                 onUIActionRef.current?.("open_review_modal");
               } else if (/(close|hide|dismiss|minimiz).*(card|modal|pop[- ]?up|review)/i.test(spokenText)) {
                 onUIActionRef.current?.("close_review_modal");
