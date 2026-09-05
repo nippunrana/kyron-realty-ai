@@ -19,12 +19,14 @@ import {
   Sparkle,
 } from "lucide-react";
 import { useAgoraVoiceAgent } from "@/hooks/useAgoraVoiceAgent";
-import { extractHeuristicAttributes, ExtractedPropertyPayload } from "@/lib/kb-extractor";
+import { ExtractedPropertyPayload, TurnMessage } from "@/lib/kb-extractor";
 
 interface ConversationalPanelProps {
   onIngestUrl: (url: string) => Promise<void>;
   onSendMessage: (text: string) => Promise<void>;
   onQuickUpdate?: (updates: Partial<ExtractedPropertyPayload["property"]>) => void;
+  onTurnExtraction?: (slidingWindow: TurnMessage[]) => void;
+  onVoiceAgentReady?: (helpers: { sendTextMessage: (text: string) => void }) => void;
   isProcessing: boolean;
   activePipelineStep: string | null;
   currentProperty?: ExtractedPropertyPayload["property"];
@@ -34,6 +36,8 @@ export function ConversationalPanel({
   onIngestUrl,
   onSendMessage,
   onQuickUpdate,
+  onTurnExtraction,
+  onVoiceAgentReady,
   isProcessing,
   activePipelineStep,
   currentProperty,
@@ -44,18 +48,39 @@ export function ConversationalPanel({
 
   const handleCallEnd = useCallback(
     (finalTranscript: any[]) => {
-      // Filter to user/owner statements only to prevent assistant example contamination
-      const userUtterances = finalTranscript
-        .filter((m) => m.role === "user")
-        .map((m) => m.text)
-        .filter(Boolean)
-        .join("\n");
+      // Preserve full question & confirmation context with explicit role labels
+      const formattedTranscript = finalTranscript
+        .filter((m) => m.text && m.text.trim())
+        .map((m) => `[${m.role === "assistant" ? "ELENA VANCE" : "OWNER"}]: ${m.text.trim()}`)
+        .join("\n\n");
 
-      if (userUtterances.trim()) {
-        onSendMessage(userUtterances);
+      if (formattedTranscript.trim()) {
+        onSendMessage(formattedTranscript);
       }
     },
     [onSendMessage]
+  );
+
+  const handleAgentTurnComplete = useCallback(
+    (currentTranscript: any[]) => {
+      if (!currentTranscript || currentTranscript.length === 0) return;
+
+      const meaningful = currentTranscript
+        .filter((m) => m.text && m.text.trim())
+        .slice(-6)
+        .map((m) => ({
+          role: m.role as "assistant" | "user",
+          text: m.text.trim(),
+        }));
+
+      const hasUser = meaningful.some((m) => m.role === "user");
+      const hasAssistant = meaningful.some((m) => m.role === "assistant");
+
+      if (hasUser && hasAssistant && onTurnExtraction) {
+        onTurnExtraction(meaningful);
+      }
+    },
+    [onTurnExtraction]
   );
 
   const {
@@ -68,60 +93,30 @@ export function ConversationalPanel({
     startCall,
     toggleMute,
     endCall,
-  } = useAgoraVoiceAgent({ onCallEnd: handleCallEnd });
+    sendTextMessage,
+  } = useAgoraVoiceAgent({
+    onCallEnd: handleCallEnd,
+    onAgentTurnComplete: handleAgentTurnComplete,
+  });
+
+  useEffect(() => {
+    if (onVoiceAgentReady) {
+      onVoiceAgentReady({ sendTextMessage });
+    }
+  }, [onVoiceAgentReady, sendTextMessage]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const currentPropertyRef = useRef(currentProperty);
   currentPropertyRef.current = currentProperty;
-  const transcriptRef = useRef(transcript);
-  transcriptRef.current = transcript;
-  const recentExtractionsRef = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [transcript, isProcessing]);
 
   // Handler for speech captured via Agora SD-RTN live transcripts
-  const handleHandsFreeSpeech = useCallback(
-    async (spokenText: string) => {
-      const trimmed = spokenText.trim();
-      if (!trimmed) return;
-
-      // Deduplicate recent extractions
-      const normalized = trimmed.toLowerCase();
-      const now = Date.now();
-      const lastRun = recentExtractionsRef.current.get(normalized);
-      if (lastRun && now - lastRun < 15000) {
-        return;
-      }
-      recentExtractionsRef.current.set(normalized, now);
-
-      if (recentExtractionsRef.current.size > 50) {
-        for (const [key, timestamp] of recentExtractionsRef.current.entries()) {
-          if (now - timestamp > 60000) {
-            recentExtractionsRef.current.delete(key);
-          }
-        }
-      }
-
-      // Find the last assistant utterance to provide active question context
-      const lastAssistantMsg = [...transcriptRef.current]
-        .reverse()
-        .find((m) => m.role === "assistant");
-      const lastAssistantQuestion = lastAssistantMsg?.text;
-
-      // 1. Instant deterministic extraction (<10ms)
-      const quickAttrs = extractHeuristicAttributes(
-        trimmed,
-        currentPropertyRef.current,
-        lastAssistantQuestion
-      );
-      if (Object.keys(quickAttrs).length > 0 && onQuickUpdate) {
-        onQuickUpdate(quickAttrs);
-      }
-    },
-    [onQuickUpdate]
-  );
+  const handleHandsFreeSpeech = useCallback((spokenText: string) => {
+    console.log("[Agora Voice Agent] Verified user speech turn:", spokenText);
+  }, []);
 
   const handleUrlSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -33,6 +33,7 @@ interface LivePropertyInspectorProps {
   onPublish: () => void;
   isPublishing: boolean;
   isExtracting: boolean;
+  isTurnSyncing?: boolean;
 }
 
 export function LivePropertyInspector({
@@ -43,6 +44,7 @@ export function LivePropertyInspector({
   onPublish,
   isPublishing,
   isExtracting,
+  isTurnSyncing = false,
 }: LivePropertyInspectorProps) {
   const [activeImageIdx, setActiveImageIdx] = useState(0);
 
@@ -246,15 +248,23 @@ export function LivePropertyInspector({
           </span>
         </div>
 
-        <div
-          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-[11px] font-semibold transition-colors ${
-            isFullyVerified
-              ? "bg-emerald-50 border-emerald-200 text-emerald-700"
-              : "bg-blue-50 border-blue-200 text-blue-700"
-          }`}
-        >
-          <ShieldCheck className="w-3.5 h-3.5" />
-          <span>{isFullyVerified ? "6/6 Verified" : `${verifiedCount}/6 Verified`}</span>
+        <div className="flex items-center gap-2">
+          {isTurnSyncing && (
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-[11px] font-semibold text-blue-700 animate-pulse">
+              <Sparkles className="w-3 h-3 text-blue-600 animate-spin" />
+              <span>Syncing specs...</span>
+            </div>
+          )}
+          <div
+            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-[11px] font-semibold transition-colors ${
+              isFullyVerified
+                ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                : "bg-blue-50 border-blue-200 text-blue-700"
+            }`}
+          >
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span>{isFullyVerified ? "6/6 Verified" : `${verifiedCount}/6 Verified`}</span>
+          </div>
         </div>
       </div>
 

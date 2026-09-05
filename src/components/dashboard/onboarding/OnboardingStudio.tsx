@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { ConversationalPanel } from "./ConversationalPanel";
 import { LivePropertyInspector } from "./LivePropertyInspector";
 import { PublishSuccessModal } from "./PublishSuccessModal";
-import { ExtractedPropertyPayload } from "@/lib/kb-extractor";
+import { ReviewSpecsModal } from "./ReviewSpecsModal";
+import { ExtractedPropertyPayload, TurnMessage } from "@/lib/kb-extractor";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
@@ -62,6 +63,16 @@ export function OnboardingStudio() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [activePipelineStep, setActivePipelineStep] = useState<string | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isTurnSyncing, setIsTurnSyncing] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+
+  const dataRef = useRef(data);
+  dataRef.current = data;
+
+  const hasTriggeredCompletionReviewRef = useRef(false);
+  const voiceAgentActionsRef = useRef<{ sendTextMessage: (text: string) => void } | null>(null);
+  const turnSequenceRef = useRef<number>(0);
+  const turnAbortControllerRef = useRef<AbortController | null>(null);
 
   // Success Modal State
   const [publishedResult, setPublishedResult] = useState<{
@@ -96,6 +107,93 @@ export function OnboardingStudio() {
           }
         : prev.negotiationMatrix,
     }));
+  };
+
+  // Turn-level AI extraction with Latest-Wins concurrency
+  const handleTurnExtraction = async (slidingWindow: TurnMessage[]) => {
+    if (!slidingWindow || slidingWindow.length === 0) return;
+
+    if (turnAbortControllerRef.current) {
+      turnAbortControllerRef.current.abort();
+    }
+    const abortController = new AbortController();
+    turnAbortControllerRef.current = abortController;
+
+    const sequenceId = ++turnSequenceRef.current;
+    setIsTurnSyncing(true);
+
+    try {
+      const res = await fetch(`${basePath}/api/onboarding/extract-turn`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          slidingWindowMessages: slidingWindow,
+          currentPropertyState: dataRef.current.property,
+        }),
+        signal: abortController.signal,
+      });
+
+      if (abortController.signal.aborted) return;
+      if (sequenceId !== turnSequenceRef.current) return;
+
+      const json = await res.json();
+      if (json.success && json.data?.updates && Object.keys(json.data.updates).length > 0) {
+        const updates = json.data.updates;
+
+        setData((prev) => {
+          const updatedProperty = { ...prev.property, ...updates };
+
+          const hasListingType = Boolean(updatedProperty.listingType);
+          const hasAddress = Boolean(updatedProperty.address?.trim());
+          const hasPrice = Number(updatedProperty.price) > 0;
+          const hasBeds = Number(updatedProperty.bedrooms) > 0;
+          const hasBaths = Number(updatedProperty.bathrooms) > 0;
+          const hasSqft = Number(updatedProperty.sqft) > 0;
+
+          const verifiedCount = [
+            hasListingType,
+            hasAddress,
+            hasPrice,
+            hasBeds,
+            hasBaths,
+            hasSqft,
+          ].filter(Boolean).length;
+
+          // If all 6 parameters are verified, trigger the review modal & signal Elena via RTM
+          if (verifiedCount === 6 && !hasTriggeredCompletionReviewRef.current) {
+            hasTriggeredCompletionReviewRef.current = true;
+            setShowReviewModal(true);
+
+            if (voiceAgentActionsRef.current?.sendTextMessage) {
+              const summarySnippet = `Listing Type: ${updatedProperty.listingType === "rent" ? "For Rent" : "For Sale"}, Price: $${Number(updatedProperty.price).toLocaleString()}${updatedProperty.listingType === "rent" ? "/mo" : ""}, Address: ${updatedProperty.address || ""}, ${updatedProperty.bedrooms} Beds, ${updatedProperty.bathrooms} Baths, ${Number(updatedProperty.sqft).toLocaleString()} sqft`;
+              voiceAgentActionsRef.current.sendTextMessage(
+                `[SYSTEM NOTIFICATION]: All 6 listing attributes are verified: (${summarySnippet}). Please warmly summarize these core specs to the owner in 1-2 spoken sentences and invite them to check the review card on their screen and let you know if any corrections are needed.`
+              );
+            }
+          }
+
+          return {
+            ...prev,
+            property: updatedProperty,
+            negotiationMatrix: updates.price
+              ? {
+                  ...prev.negotiationMatrix,
+                  targetPrice: updates.price,
+                  minFloorPrice: Math.round(updates.price * 0.94),
+                }
+              : prev.negotiationMatrix,
+          };
+        });
+      }
+    } catch (err: any) {
+      if (err.name !== "AbortError") {
+        console.error("[Turn Extraction Client Error]:", err);
+      }
+    } finally {
+      if (sequenceId === turnSequenceRef.current) {
+        setIsTurnSyncing(false);
+      }
+    }
   };
 
   const handleUpdateKnowledgeBase = (
@@ -170,9 +268,9 @@ export function OnboardingStudio() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           conversationText: text,
-          markdown: data.knowledgeBase.rawScrapedMarkdown || "",
-          existingImages: data.property.images,
-          currentPropertyState: data,
+          markdown: dataRef.current.knowledgeBase.rawScrapedMarkdown || "",
+          existingImages: dataRef.current.property.images,
+          currentPropertyState: dataRef.current,
         }),
       });
 
@@ -189,21 +287,22 @@ export function OnboardingStudio() {
               title: newProp.title || prev.property.title,
               slug: newProp.slug || prev.property.slug,
               description: newProp.description || prev.property.description,
-              listingType: newProp.listingType || prev.property.listingType,
-              propertyType: newProp.propertyType || prev.property.propertyType,
-              price: newProp.price || prev.property.price,
+              // Protect live-verified specs: do not let end-of-call synthesis clobber them
+              listingType: prev.property.listingType || newProp.listingType,
+              propertyType: prev.property.propertyType || newProp.propertyType,
+              price: prev.property.price > 0 ? prev.property.price : (newProp.price || 0),
               securityDeposit: newProp.securityDeposit || prev.property.securityDeposit,
               minLeaseMonths: newProp.minLeaseMonths || prev.property.minLeaseMonths,
               hoaFeeMonthly: newProp.hoaFeeMonthly || prev.property.hoaFeeMonthly,
-              address: newProp.address || prev.property.address,
+              address: prev.property.address?.trim() ? prev.property.address : (newProp.address || ""),
               unitNumber: newProp.unitNumber || prev.property.unitNumber,
-              city: newProp.city || prev.property.city,
-              state: newProp.state || prev.property.state,
-              zipCode: newProp.zipCode || prev.property.zipCode,
-              country: newProp.country || prev.property.country,
-              bedrooms: newProp.bedrooms || prev.property.bedrooms,
-              bathrooms: newProp.bathrooms || prev.property.bathrooms,
-              sqft: newProp.sqft || prev.property.sqft,
+              city: prev.property.city?.trim() ? prev.property.city : (newProp.city || ""),
+              state: prev.property.state?.trim() ? prev.property.state : (newProp.state || ""),
+              zipCode: prev.property.zipCode?.trim() ? prev.property.zipCode : (newProp.zipCode || ""),
+              country: "USA",
+              bedrooms: prev.property.bedrooms > 0 ? prev.property.bedrooms : (newProp.bedrooms || 0),
+              bathrooms: prev.property.bathrooms > 0 ? prev.property.bathrooms : (newProp.bathrooms || 0),
+              sqft: prev.property.sqft > 0 ? prev.property.sqft : (newProp.sqft || 0),
               yearBuilt: newProp.yearBuilt || prev.property.yearBuilt,
               availableDate: newProp.availableDate || prev.property.availableDate,
               amenities: (newProp.amenities && newProp.amenities.length > 0) ? newProp.amenities : prev.property.amenities,
@@ -314,6 +413,10 @@ export function OnboardingStudio() {
             onIngestUrl={handleIngestUrl}
             onSendMessage={handleSendMessage}
             onQuickUpdate={handleQuickUpdate}
+            onTurnExtraction={handleTurnExtraction}
+            onVoiceAgentReady={(actions) => {
+              voiceAgentActionsRef.current = actions;
+            }}
             isProcessing={isProcessing}
             activePipelineStep={activePipelineStep}
             currentProperty={data.property}
@@ -330,9 +433,21 @@ export function OnboardingStudio() {
             onPublish={handlePublish}
             isPublishing={isPublishing}
             isExtracting={isProcessing}
+            isTurnSyncing={isTurnSyncing}
           />
         </div>
       </div>
+
+      {/* Review Specs Modal (Pops up when 6/6 parameters are verified) */}
+      {showReviewModal && (
+        <ReviewSpecsModal
+          isOpen={showReviewModal}
+          onClose={() => setShowReviewModal(false)}
+          property={data.property}
+          onPublish={handlePublish}
+          isPublishing={isPublishing}
+        />
+      )}
 
       {/* Success Launchpad Modal */}
       {publishedResult && (

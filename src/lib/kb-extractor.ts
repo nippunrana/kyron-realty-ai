@@ -678,3 +678,132 @@ Return a strictly valid JSON object matching this schema:
     };
   }
 }
+
+export interface TurnMessage {
+  role: "assistant" | "user";
+  text: string;
+}
+
+export interface ExtractTurnInput {
+  slidingWindowMessages: TurnMessage[];
+  currentPropertyState?: Partial<ExtractedPropertyPayload["property"]>;
+}
+
+export interface TurnSpecUpdates {
+  listingType?: "rent" | "sale";
+  price?: number;
+  bedrooms?: number;
+  bathrooms?: number;
+  sqft?: number;
+  address?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+}
+
+/**
+ * Asynchronous, out-of-band turn extractor powered by Gemini 3.5 Flash-Lite.
+ * Uses a sliding window of recent role-labeled turns ([ELENA VANCE] and [OWNER])
+ * to repair ASR phonetic speech-to-text slips through conversational question & confirmation context.
+ */
+export async function extractTurnSpecs(
+  input: ExtractTurnInput
+): Promise<{ updates: TurnSpecUpdates }> {
+  const { slidingWindowMessages, currentPropertyState } = input;
+
+  if (!slidingWindowMessages || slidingWindowMessages.length === 0) {
+    return { updates: {} };
+  }
+
+  const apiKey =
+    process.env.GEMINI_API_KEY ||
+    process.env.GOOGLE_API_KEY ||
+    process.env.GOOGLE_GENAI_API_KEY;
+
+  if (!apiKey || apiKey.trim() === "") {
+    console.warn("[Turn Extraction] Missing GEMINI_API_KEY in environment.");
+    return { updates: {} };
+  }
+
+  const formattedDialogue = slidingWindowMessages
+    .map((m) => `[${m.role === "assistant" ? "ELENA VANCE" : "OWNER"}]: ${m.text}`)
+    .join("\n");
+
+  const currentVerifiedSummary = currentPropertyState
+    ? `
+CURRENT VERIFIED STATE:
+- listingType: ${currentPropertyState.listingType || "pending"}
+- address: ${currentPropertyState.address || "pending"}
+- price: ${currentPropertyState.price ? `$${currentPropertyState.price}` : "pending"}
+- bedrooms: ${currentPropertyState.bedrooms !== undefined && currentPropertyState.bedrooms !== null ? currentPropertyState.bedrooms : "pending"}
+- bathrooms: ${currentPropertyState.bathrooms !== undefined && currentPropertyState.bathrooms !== null ? currentPropertyState.bathrooms : "pending"}
+- sqft: ${currentPropertyState.sqft ? `${currentPropertyState.sqft} sqft` : "pending"}
+`.trim()
+    : "";
+
+  const prompt = `
+You are the Real Estate Turn Extractor for Kyron Realty AI.
+Your job is to analyze the recent conversation turns between Elena Vance (AI Real Estate Specialist) and the property owner, and extract or update any of the 6 core listing specifications:
+1. listingType: "rent" or "sale"
+2. price: target price or monthly rent number (e.g. 3500)
+3. bedrooms: bedroom count number (e.g. 2, 0 for studio)
+4. bathrooms: bathroom count number (e.g. 1.5, 2)
+5. sqft: interior square footage number (e.g. 1200)
+6. address: street address (e.g. "250 Marina Blvd")
+Optional location fields: city, state, zipCode.
+
+CRITICAL INSTRUCTIONS FOR DIALOGUE REASONING & ASR ROBUSTNESS:
+- Dialogue is labeled with [ELENA VANCE] and [OWNER].
+- Automatic Speech Recognition (ASR) phonetic slips: Spoken owner words may be transcribed with slight errors (e.g. "It's Oren" instead of "It's for rent"). Use Elena's subsequent confirmations and preceding questions as context to disambiguate the owner's true intent.
+- Extract facts EXCLUSIVELY from what the owner states or agrees to. Never treat Elena's hypothetical examples as facts.
+- Check the ENTIRE provided sliding window: If ANY of the specifications above were mentioned, answered, or corrected by the owner anywhere in the provided dialogue, include them in "updates".
+- If no property specs were mentioned or changed in this dialogue, return an empty "updates" object: { "updates": {} }.
+
+${currentVerifiedSummary}
+
+RECENT DIALOGUE (Sliding Window):
+${formattedDialogue}
+`.trim();
+
+  try {
+    const ai = new GoogleGenAI({ apiKey });
+    const modelName = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
+
+    const response = await ai.models.generateContent({
+      model: modelName,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: "object",
+          properties: {
+            updates: {
+              type: "object",
+              properties: {
+                listingType: { type: "string", enum: ["rent", "sale"] },
+                price: { type: "number" },
+                bedrooms: { type: "number" },
+                bathrooms: { type: "number" },
+                sqft: { type: "number" },
+                address: { type: "string" },
+                city: { type: "string" },
+                state: { type: "string" },
+                zipCode: { type: "string" },
+              },
+            },
+          },
+          required: ["updates"],
+        },
+      },
+    });
+
+    const parsed = JSON.parse(response.text || "{}");
+    return {
+      updates: parsed.updates || {},
+    };
+  } catch (err: any) {
+    console.error("[Turn Extraction Error]:", err.message || err);
+    return { updates: {} };
+  }
+}
+

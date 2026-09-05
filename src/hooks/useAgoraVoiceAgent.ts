@@ -39,6 +39,7 @@ export interface UseAgoraVoiceAgentReturn {
 
 export interface UseAgoraVoiceAgentOptions {
   onCallEnd?: (transcript: VoiceMessage[]) => void;
+  onAgentTurnComplete?: (transcript: VoiceMessage[]) => void;
 }
 
 export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgoraVoiceAgentReturn {
@@ -66,6 +67,10 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
   const onSpeechDetectedRef = useRef<((text: string) => void) | undefined>(undefined);
   const onCallEndRef = useRef<((transcript: VoiceMessage[]) => void) | undefined>(options?.onCallEnd);
   onCallEndRef.current = options?.onCallEnd;
+  const onAgentTurnCompleteRef = useRef<((transcript: VoiceMessage[]) => void) | undefined>(options?.onAgentTurnComplete);
+  onAgentTurnCompleteRef.current = options?.onAgentTurnComplete;
+  const transcriptRef = useRef<VoiceMessage[]>([]);
+  const prevAgentStateRef = useRef<string | null>(null);
   const rtmClientRef = useRef<any>(null);
   const voiceAiRef = useRef<any>(null);
   const agentUidRef = useRef<number>(999001);
@@ -73,6 +78,9 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
   const processedTurnIdsRef = useRef<Set<number>>(new Set());
   const localMessagesRef = useRef<VoiceMessage[]>([]);
   const mappedRemoteRef = useRef<VoiceMessage[]>([]);
+  const lastExtractedAssistantTextRef = useRef<string>("");
+  const hasAgentSpokenInTurnRef = useRef<boolean>(false);
+  const transcriptDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "/projects/kyron-realty-ai";
 
@@ -105,6 +113,13 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
       } catch {}
       rtmClientRef.current = null;
     }
+
+    if (transcriptDebounceTimerRef.current) {
+      clearTimeout(transcriptDebounceTimerRef.current);
+      transcriptDebounceTimerRef.current = null;
+    }
+    lastExtractedAssistantTextRef.current = "";
+    hasAgentSpokenInTurnRef.current = false;
 
     localMessagesRef.current = [];
     mappedRemoteRef.current = [];
@@ -202,6 +217,39 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
       console.warn("Could not start Web Audio visualizer:", e);
     }
   };
+
+  // Turn Extraction Dispatcher with Deduplication & Sliding Window
+  const triggerTurnExtraction = useCallback(() => {
+    const fullTranscript = transcriptRef.current;
+    if (!fullTranscript || fullTranscript.length === 0) return;
+
+    // Must have at least one user utterance
+    const hasUserMessage = fullTranscript.some(
+      (m) => m.role === "user" && m.text && m.text.trim().length > 0
+    );
+    if (!hasUserMessage) return;
+
+    // Find the latest assistant message
+    const assistantMessages = fullTranscript.filter(
+      (m) => m.role === "assistant" && m.text && m.text.trim().length > 0
+    );
+    if (assistantMessages.length === 0) return;
+    const latestAssistant = assistantMessages[assistantMessages.length - 1];
+
+    // Deduplicate: Don't extract again for the exact same assistant turn text
+    if (latestAssistant.text.trim() === lastExtractedAssistantTextRef.current) {
+      return;
+    }
+    lastExtractedAssistantTextRef.current = latestAssistant.text.trim();
+
+    console.log(
+      "[Agora Voice Agent] Firing live turn extraction for assistant turn:",
+      latestAssistant.text.slice(0, 50)
+    );
+    if (onAgentTurnCompleteRef.current) {
+      onAgentTurnCompleteRef.current(fullTranscript);
+    }
+  }, []);
 
   // Start Call (Single-flight protected)
   const startCall = useCallback(
@@ -365,6 +413,7 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
             ? [{ id: "init-greeting", role: "assistant" as const, text: sessionData.greeting, timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }, ...mapped, ...localMessagesRef.current]
             : [...mapped, ...localMessagesRef.current];
 
+          transcriptRef.current = fullList;
           setTranscript(fullList);
 
           // Deduplicated checklist extraction for user turns
@@ -393,19 +442,69 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
               }
             }
           }
+
+          // Fallback debounce: When an assistant turn settles for 800ms, trigger extraction
+          if (transcriptDebounceTimerRef.current) {
+            clearTimeout(transcriptDebounceTimerRef.current);
+            transcriptDebounceTimerRef.current = null;
+          }
+          const lastMsg = fullList[fullList.length - 1];
+          if (lastMsg && lastMsg.role === "assistant" && lastMsg.text.trim().length > 0) {
+            transcriptDebounceTimerRef.current = setTimeout(() => {
+              triggerTurnExtraction();
+            }, 800);
+          }
         });
 
+        // Dual-Signal 1: Agent speaking state changed (Cloud Gateway activity stream)
+        ai.on(AgoraVoiceAIEvents.AGENT_SPEAKING_CHANGED, (_agentUserId: string, isSpeaking: boolean) => {
+          setIsAgentSpeaking(isSpeaking);
+          if (isSpeaking) {
+            setCallState("agent_speaking");
+            hasAgentSpokenInTurnRef.current = true;
+          } else {
+            setCallState("connected");
+            if (hasAgentSpokenInTurnRef.current) {
+              hasAgentSpokenInTurnRef.current = false;
+              // Elena finished speaking. Give 200ms for final ASR transcript to settle, then extract
+              setTimeout(() => {
+                triggerTurnExtraction();
+              }, 200);
+            }
+          }
+        });
+
+        // Dual-Signal 2: Agent listening state changed
+        ai.on(AgoraVoiceAIEvents.AGENT_LISTENING_CHANGED, (_agentUserId: string, isListening: boolean) => {
+          if (isListening && hasAgentSpokenInTurnRef.current) {
+            hasAgentSpokenInTurnRef.current = false;
+            setTimeout(() => {
+              triggerTurnExtraction();
+            }, 200);
+          }
+        });
+
+        // Auxiliary Fallback: Legacy/Alternate Agent state change
         ai.on(AgoraVoiceAIEvents.AGENT_STATE_CHANGED, (_agentUserId: string, event: any) => {
-          if (event?.state === "speaking") {
+          const newState = event?.state;
+          const prevState = prevAgentStateRef.current;
+          prevAgentStateRef.current = newState;
+
+          if (newState === "speaking") {
             setIsAgentSpeaking(true);
             setCallState("agent_speaking");
+            hasAgentSpokenInTurnRef.current = true;
           } else if (
-            event?.state === "listening" ||
-            event?.state === "thinking" ||
-            event?.state === "idle"
+            newState === "listening" ||
+            newState === "thinking" ||
+            newState === "idle"
           ) {
             setIsAgentSpeaking(false);
             setCallState("connected");
+
+            if (prevState === "speaking" && (newState === "listening" || newState === "idle")) {
+              triggerTurnExtraction();
+            }
           }
         });
 
