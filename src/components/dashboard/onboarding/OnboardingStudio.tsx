@@ -7,6 +7,7 @@ import { PublishSuccessModal } from "./PublishSuccessModal";
 import { ReviewSpecsModal } from "./ReviewSpecsModal";
 import { ExtractedPropertyPayload, TurnMessage } from "@/lib/kb-extractor";
 import { computeFloorPrice } from "@/lib/listing-helpers";
+import { BASE_PATH } from "@/lib/base-path";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
@@ -113,8 +114,6 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
     shareUrl: string;
   } | null>(null);
 
-  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "/projects/kyron-realty-ai";
-
   const handleUpdateProperty = (updates: Partial<ExtractedPropertyPayload["property"]>) => {
     setData((prev) => ({
       ...prev,
@@ -176,7 +175,7 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
     setIsTurnSyncing(true);
 
     try {
-      const res = await fetch(`${basePath}/api/onboarding/extract-turn`, {
+      const res = await fetch(`${BASE_PATH}/api/onboarding/extract-turn`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -317,7 +316,7 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
 
     try {
       // Step 1: Scrape URL
-      const scrapeRes = await fetch(`${basePath}/api/onboarding/scrape`, {
+      const scrapeRes = await fetch(`${BASE_PATH}/api/onboarding/scrape`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url }),
@@ -328,7 +327,7 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
 
       // Step 2: Extract structured intelligence with Gemini
       setActivePipelineStep("Synthesizing property specs, FAQs, and voice sales pitch with AI...");
-      const extractRes = await fetch(`${basePath}/api/onboarding/extract`, {
+      const extractRes = await fetch(`${BASE_PATH}/api/onboarding/extract`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -359,7 +358,7 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
     setActivePipelineStep("Synthesizing voice intelligence & knowledge base...");
 
     try {
-      const res = await fetch(`${basePath}/api/onboarding/extract`, {
+      const res = await fetch(`${BASE_PATH}/api/onboarding/extract`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -445,7 +444,7 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
   const handlePublish = async () => {
     setIsPublishing(true);
     try {
-      const res = await fetch(`${basePath}/api/properties/create`, {
+      const res = await fetch(`${BASE_PATH}/api/properties/create`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

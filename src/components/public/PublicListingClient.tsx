@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { VoiceSalesAgentModal } from "@/components/voice/VoiceSalesAgentModal";
 import { defaultTourDateTime } from "@/lib/listing-helpers";
+import { BASE_PATH } from "@/lib/base-path";
 
 interface PublicListingClientProps {
   property: any;
@@ -83,10 +84,9 @@ export function PublicListingClient({
   const handleDirectTourBooking = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmittingBooking(true);
-    const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "/projects/kyron-realty-ai";
 
     try {
-      const res = await fetch(`${basePath}/api/leads/capture`, {
+      const res = await fetch(`${BASE_PATH}/api/leads/capture`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

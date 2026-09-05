@@ -7,11 +7,12 @@ import { users, accounts, sessions, verificationTokens } from "@/db/schema";
 import { verifyPassword } from "@/lib/auth-passwords";
 import { eq } from "drizzle-orm";
 import { getGoogleOAuthConfig } from "@/lib/google-oauth";
+import { AUTH_BASE_PATH } from "@/lib/base-path";
 
 const googleOAuth = getGoogleOAuthConfig();
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  basePath: "/projects/kyron-realty-ai/api/auth",
+  basePath: AUTH_BASE_PATH,
   adapter: DrizzleAdapter(db, {
     usersTable: users,
     accountsTable: accounts,

@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useAgoraVoiceAgent } from "@/hooks/useAgoraVoiceAgent";
 import { TurnMessage } from "@/lib/kb-extractor";
+import { BASE_PATH } from "@/lib/base-path";
 
 interface ConversationalPanelProps {
   onIngestUrl: (url: string) => Promise<void>;
@@ -45,8 +46,6 @@ export function ConversationalPanel({
   user,
 }: ConversationalPanelProps) {
   const [urlInput, setUrlInput] = useState("");
-
-  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "/projects/kyron-realty-ai";
 
   const handleCallEnd = useCallback(
     (finalTranscript: any[]) => {
@@ -222,7 +221,7 @@ export function ConversationalPanel({
           >
             <div className="w-full h-full rounded-[22px] overflow-hidden bg-slate-100 relative">
               <Image
-                src={`${basePath}/images/elena-vance-agent.jpg`}
+                src={`${BASE_PATH}/images/elena-vance-agent.jpg`}
                 alt="Elena Vance - Principal AI Listing Specialist"
                 fill
                 sizes="112px"

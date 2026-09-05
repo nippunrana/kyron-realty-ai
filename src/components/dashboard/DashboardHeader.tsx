@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
 import { Building2, LogOut, Loader2, Sparkles } from "lucide-react";
+import { BASE_PATH } from "@/lib/base-path";
 
 interface DashboardHeaderProps {
   user?: {
@@ -19,7 +20,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
   const handleSignOut = async () => {
     setIsSigningOut(true);
     try {
-      await signOut({ callbackUrl: "/projects/kyron-realty-ai/login" });
+      await signOut({ callbackUrl: `${BASE_PATH}/login` });
     } catch (err) {
       console.error("Sign out error:", err);
       setIsSigningOut(false);

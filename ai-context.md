@@ -43,8 +43,8 @@ To prevent duplicate code or assuming features that do not yet exist:
 
 ## 3. Subpath & `basePath` Rules (`/projects/kyron-realty-ai`)
 The application runs under the subpath prefix **`/projects/kyron-realty-ai`**:
-- **`next.config.ts`**: Configures `basePath: "/projects/kyron-realty-ai"`.
-- **Client-side Fetch Calls**: Must explicitly prepend `${BASE_PATH}` (e.g. `fetch('/projects/kyron-realty-ai/api/auth/status')`).
+- **`src/lib/base-path.ts`** is the only declaration of the prefix; `next.config.ts` imports it for `basePath`. Never write the literal anywhere else.
+- **Client-side Fetch Calls**: Must explicitly prepend `BASE_PATH` imported from `@/lib/base-path` (e.g. `fetch(`${BASE_PATH}/api/auth/status`)`).
 - **Static Assets & Next/Image**: Static assets in `public/images/` must be referenced using `${BASE_PATH}/images/filename.jpg` with `unoptimized={true}` on `<Image />` to prevent Next.js image optimizer 400 path mismatches.
 - **NextAuth Callbacks**: Redirect URLs must specify `${BASE_PATH}/` (e.g. callbackUrl: `/projects/kyron-realty-ai/`).
 

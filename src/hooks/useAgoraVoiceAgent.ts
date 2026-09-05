@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { BASE_PATH } from "@/lib/base-path";
 
 export type CallState =
   | "idle"
@@ -90,8 +91,6 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
   const hasAgentSpokenInTurnRef = useRef<boolean>(false);
   const transcriptDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "/projects/kyron-realty-ai";
-
   const updateAgentSpeaking = useCallback((isSpeaking: boolean) => {
     setIsAgentSpeaking(isSpeaking);
     onAgentSpeakingChangedRef.current?.(isSpeaking);
@@ -171,7 +170,7 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
 
     if (currentSessionId && currentChannelName) {
       try {
-        await fetch(`${basePath}/api/agora/session/stop`, {
+        await fetch(`${BASE_PATH}/api/agora/session/stop`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -183,7 +182,7 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
         // Ignore background teardown error
       }
     }
-  }, [basePath]);
+  }, []);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -286,7 +285,7 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
 
       try {
         // Step 1: Start Agora Agent Session on backend
-        const sessionRes = await fetch(`${basePath}/api/agora/session/start`, {
+        const sessionRes = await fetch(`${BASE_PATH}/api/agora/session/start`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -310,7 +309,7 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
         if (abortController.signal.aborted) {
           // If aborted while fetching, stop the created remote session
           if (sessionData.sessionId && sessionData.channelName) {
-            fetch(`${basePath}/api/agora/session/stop`, {
+            fetch(`${BASE_PATH}/api/agora/session/stop`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -616,7 +615,7 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
         isStartingRef.current = false;
       }
     },
-    [basePath, teardownResources]
+    [teardownResources]
   );
 
   // Toggle Mute

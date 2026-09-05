@@ -1,7 +1,6 @@
 import Image from "next/image";
 import { Sparkles, Zap, Star, TrendingUp } from "lucide-react";
-
-const BASE_PATH = "/projects/kyron-realty-ai";
+import { BASE_PATH } from "@/lib/base-path";
 
 export function LoginShowcase() {
   return (

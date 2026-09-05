@@ -10,6 +10,7 @@ import {
 import QRCode from "qrcode";
 import { eq } from "drizzle-orm";
 import { buildDefaultTitle, computeFloorPrice, randomSlugSuffix, slugify } from "@/lib/listing-helpers";
+import { BASE_PATH } from "@/lib/base-path";
 
 export async function POST(req: NextRequest) {
   try {
@@ -33,7 +34,6 @@ export async function POST(req: NextRequest) {
     // Determine public URL with subpath
     const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || "localhost:3000";
     const protocol = req.headers.get("x-forwarded-proto") || (host.includes("localhost") ? "http" : "https");
-    const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "/projects/kyron-realty-ai";
 
     let slug = property.slug || slugify(property.title);
 
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
       slug = `${slug}-${randomSlugSuffix()}`;
     }
 
-    const shareUrl = `${protocol}://${host}${basePath}/listings/${slug}`;
+    const shareUrl = `${protocol}://${host}${BASE_PATH}/listings/${slug}`;
 
     // Generate high-res vector QR code
     const qrCodeSvg = await QRCode.toString(shareUrl, {

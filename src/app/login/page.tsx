@@ -20,8 +20,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { LoginShowcase } from "@/components/login/LoginShowcase";
-
-const BASE_PATH = "/projects/kyron-realty-ai";
+import { BASE_PATH } from "@/lib/base-path";
 
 function LoginFormContent() {
   const searchParams = useSearchParams();

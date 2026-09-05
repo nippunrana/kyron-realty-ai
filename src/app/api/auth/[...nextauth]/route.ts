@@ -1,7 +1,6 @@
 import { handlers } from "@/auth";
 import { NextRequest } from "next/server";
-
-const BASE_PATH = "/projects/kyron-realty-ai";
+import { BASE_PATH } from "@/lib/base-path";
 
 function wrapRequest(req: NextRequest): NextRequest {
   const url = new URL(req.url);

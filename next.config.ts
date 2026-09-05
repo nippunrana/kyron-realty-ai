@@ -1,8 +1,9 @@
 import type { NextConfig } from "next";
+import { BASE_PATH } from "./src/lib/base-path";
 
 const nextConfig: NextConfig = {
   output: "standalone",
-  basePath: "/projects/kyron-realty-ai",
+  basePath: BASE_PATH,
   reactStrictMode: true,
 };
 
