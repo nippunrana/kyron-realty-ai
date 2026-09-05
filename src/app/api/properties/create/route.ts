@@ -15,7 +15,10 @@ import { BASE_PATH } from "@/lib/base-path";
 export async function POST(req: NextRequest) {
   try {
     const session = await auth();
-    const userId = session?.user?.id || null;
+    if (!session?.user) {
+      return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+    }
+    const userId = session.user.id || null;
 
     const body = await req.json();
     const { property, knowledgeBase, negotiationMatrix } = body || {};

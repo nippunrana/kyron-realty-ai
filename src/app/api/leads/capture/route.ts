@@ -3,22 +3,29 @@ import { db } from "@/db";
 import { inquiriesAndLeads, viewingAppointments, properties } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
+/** Public endpoint: every free-text field is trimmed and length-capped before it reaches the DB. */
+const text = (value: unknown, max: number): string =>
+  typeof value === "string" ? value.trim().slice(0, max) : "";
+
+const parseDate = (value: unknown): Date | null => {
+  if (typeof value !== "string" || !value) return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const {
-      propertySlug,
-      propertyId,
-      name,
-      email,
-      phone,
-      intent,
-      budgetMax,
-      moveInTargetDate,
-      tourType,
-      scheduledStart,
-      notes,
-    } = body || {};
+    const { propertySlug, propertyId } = body || {};
+    const name = text(body?.name, 120);
+    const email = text(body?.email, 255);
+    const phone = text(body?.phone, 40);
+    const intent = text(body?.intent, 20);
+    const tourType = text(body?.tourType, 30);
+    const notes = text(body?.notes, 2000);
+    const budgetMax = Number(body?.budgetMax);
+    const moveInTargetDate = parseDate(body?.moveInTargetDate);
+    const scheduledStart = parseDate(body?.scheduledStart);
 
     if (!name || !phone) {
       return NextResponse.json(
@@ -50,12 +57,12 @@ export async function POST(req: NextRequest) {
       .insert(inquiriesAndLeads)
       .values({
         propertyId: resolvedPropertyId,
-        name: name.trim(),
-        email: email ? email.trim() : null,
-        phone: phone.trim(),
+        name,
+        email: email || null,
+        phone,
         intent: intent || "rent",
-        budgetMax: budgetMax ? String(budgetMax) : null,
-        moveInTargetDate: moveInTargetDate ? new Date(moveInTargetDate) : null,
+        budgetMax: Number.isFinite(budgetMax) && budgetMax > 0 ? String(budgetMax) : null,
+        moveInTargetDate,
         leadStatus: scheduledStart ? "viewing_scheduled" : "new",
         leadScore: scheduledStart ? 85 : 60,
         notes: notes || "Captured via public listing engagement",
@@ -65,7 +72,7 @@ export async function POST(req: NextRequest) {
     // 2. Insert Viewing Appointment (if scheduled)
     let appointment = null;
     if (scheduledStart) {
-      const start = new Date(scheduledStart);
+      const start = scheduledStart;
       const end = new Date(start.getTime() + 45 * 60 * 1000); // 45-minute tour
 
       const [appt] = await db
@@ -77,9 +84,9 @@ export async function POST(req: NextRequest) {
           scheduledStart: start,
           scheduledEnd: end,
           status: "confirmed",
-          attendeeName: name.trim(),
-          attendeeEmail: email ? email.trim() : null,
-          attendeePhone: phone.trim(),
+          attendeeName: name,
+          attendeeEmail: email || null,
+          attendeePhone: phone,
           specialRequests: notes || null,
         })
         .returning();

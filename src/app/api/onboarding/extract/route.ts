@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
 import { extractPropertyKnowledgeBase } from "@/lib/kb-extractor";
 
 export async function POST(req: NextRequest) {
   try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+    }
+
     const body = await req.json();
     const { markdown, conversationText, url, existingImages, currentPropertyState } = body || {};
 

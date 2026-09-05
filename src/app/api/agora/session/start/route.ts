@@ -8,11 +8,19 @@ export async function POST(req: NextRequest) {
     const sessionUser = session?.user;
 
     const body = await req.json();
-    const { channelName, propertySlug, propertyId, userUid, callerType } = body || {};
+    const { channelName, propertySlug, propertyId, userUid } = body || {};
+    const callerType: "buyer_inquiry" | "owner_onboarding" =
+      body?.callerType === "owner_onboarding" ? "owner_onboarding" : "buyer_inquiry";
 
-    const ownerName = body?.ownerName ?? sessionUser?.name ?? null;
-    const ownerEmail = body?.ownerEmail ?? sessionUser?.email ?? null;
-    const userId = body?.userId ?? sessionUser?.id ?? null;
+    // Owner onboarding is only reachable from the authenticated studio; buyer calls stay public.
+    if (callerType === "owner_onboarding" && !sessionUser) {
+      return NextResponse.json({ success: false, error: "Authentication required." }, { status: 401 });
+    }
+
+    // The signed-in identity always wins over client-supplied values.
+    const ownerName = sessionUser?.name ?? body?.ownerName ?? null;
+    const ownerEmail = sessionUser?.email ?? body?.ownerEmail ?? null;
+    const userId = sessionUser?.id ?? body?.userId ?? null;
 
     const resolvedChannelName =
       channelName ||
@@ -25,7 +33,7 @@ export async function POST(req: NextRequest) {
       propertySlug,
       propertyId,
       userUid: Number(userUid) || 1001,
-      callerType: callerType || "buyer_inquiry",
+      callerType,
       ownerName,
       ownerEmail,
       userId,
