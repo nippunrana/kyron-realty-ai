@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { extractTurnSpecs } from "@/lib/kb-extractor";
+import { extractTurnSpecs } from "@/lib/turn-extractor";
 
 export async function POST(req: NextRequest) {
   try {

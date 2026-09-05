@@ -19,7 +19,7 @@ import {
   Sparkle,
 } from "lucide-react";
 import { useAgoraVoiceAgent } from "@/hooks/useAgoraVoiceAgent";
-import { TurnMessage } from "@/lib/kb-extractor";
+import { TurnMessage } from "@/lib/turn-extractor";
 import { BASE_PATH } from "@/lib/base-path";
 
 interface ConversationalPanelProps {
