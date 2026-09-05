@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { Metadata } from "next";
 import { db } from "@/db";
-import { properties, propertyKnowledgeBases, negotiationMatrices, propertyMedia } from "@/db/schema";
+import { properties, propertyKnowledgeBases, propertyMedia } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { PublicListingClient } from "@/components/public/PublicListingClient";
 
@@ -66,14 +66,7 @@ export default async function PublicListingPage({ params }: ListingPageProps) {
     .where(eq(propertyKnowledgeBases.propertyId, property.id))
     .limit(1);
 
-  // 3. Fetch Negotiation Matrix
-  const [negotiationMatrix] = await db
-    .select()
-    .from(negotiationMatrices)
-    .where(eq(negotiationMatrices.propertyId, property.id))
-    .limit(1);
-
-  // 4. Fetch Media
+  // 3. Fetch Media
   const media = await db
     .select()
     .from(propertyMedia)
@@ -86,7 +79,6 @@ export default async function PublicListingPage({ params }: ListingPageProps) {
     <PublicListingClient
       property={property}
       knowledgeBase={knowledgeBase}
-      negotiationMatrix={negotiationMatrix}
       media={media}
       shareUrl={shareUrl}
     />

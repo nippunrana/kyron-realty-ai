@@ -113,19 +113,6 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
     }));
   };
 
-  const handleQuickUpdate = (updates: Partial<ExtractedPropertyPayload["property"]>) => {
-    setData((prev) => ({
-      ...prev,
-      property: { ...prev.property, ...updates },
-      negotiationMatrix: updates.price
-        ? {
-            ...prev.negotiationMatrix,
-            targetPrice: updates.price,
-          }
-        : prev.negotiationMatrix,
-    }));
-  };
-
   // Transition from Stage 1 (Core Specs) to Stage 2 (Additional Specs)
   const handleConfirmCoreSpecs = () => {
     setShowCoreModal(false);
@@ -267,15 +254,6 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
     setData((prev) => ({
       ...prev,
       knowledgeBase: { ...prev.knowledgeBase, ...updates },
-    }));
-  };
-
-  const handleUpdateNegotiationMatrix = (
-    updates: Partial<ExtractedPropertyPayload["negotiationMatrix"]>
-  ) => {
-    setData((prev) => ({
-      ...prev,
-      negotiationMatrix: { ...prev.negotiationMatrix, ...updates },
     }));
   };
 
@@ -478,7 +456,6 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
           <ConversationalPanel
             onIngestUrl={handleIngestUrl}
             onSendMessage={handleSendMessage}
-            onQuickUpdate={handleQuickUpdate}
             onTurnExtraction={handleTurnExtraction}
             onVoiceAgentReady={(actions) => {
               voiceAgentActionsRef.current = actions;
@@ -486,7 +463,6 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
             onUIAction={handleUIAction}
             isProcessing={isProcessing}
             activePipelineStep={activePipelineStep}
-            currentProperty={data.property}
             user={user}
           />
         </div>
@@ -499,7 +475,6 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
             onboardingStage={onboardingStage}
             onUpdateProperty={handleUpdateProperty}
             onUpdateKnowledgeBase={handleUpdateKnowledgeBase}
-            onUpdateNegotiationMatrix={handleUpdateNegotiationMatrix}
             onPublish={handlePublish}
             onOpenCoreModal={() => setShowCoreModal(true)}
             onOpenFinalModal={() => setShowFinalModal(true)}

@@ -29,7 +29,6 @@ import { VoiceSalesAgentModal } from "@/components/voice/VoiceSalesAgentModal";
 interface PublicListingClientProps {
   property: any;
   knowledgeBase: any;
-  negotiationMatrix: any;
   media: any[];
   shareUrl: string;
 }
@@ -37,7 +36,6 @@ interface PublicListingClientProps {
 export function PublicListingClient({
   property,
   knowledgeBase,
-  negotiationMatrix,
   media,
   shareUrl,
 }: PublicListingClientProps) {

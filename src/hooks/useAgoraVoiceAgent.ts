@@ -27,8 +27,6 @@ export interface UseAgoraVoiceAgentReturn {
   callState: CallState;
   isMuted: boolean;
   isAgentSpeaking: boolean;
-  userVolume: number;
-  agentVolume: number;
   audioFrequencies: number[];
   transcript: VoiceMessage[];
   errorMessage: string | null;
@@ -36,7 +34,6 @@ export interface UseAgoraVoiceAgentReturn {
     propertySlug?: string,
     propertyId?: number,
     callerType?: "buyer_inquiry" | "owner_onboarding",
-    onSpeechDetected?: (text: string) => void,
     ownerContext?: OwnerContext
   ) => Promise<void>;
   toggleMute: () => void;
@@ -51,12 +48,13 @@ export interface UseAgoraVoiceAgentOptions {
   onUIAction?: (action: "open_review_modal" | "close_review_modal") => void;
 }
 
+const formatTimestamp = (ms?: number) =>
+  new Date(ms ?? Date.now()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
 export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgoraVoiceAgentReturn {
   const [callState, setCallState] = useState<CallState>("idle");
   const [isMuted, setIsMuted] = useState(false);
   const [isAgentSpeaking, setIsAgentSpeaking] = useState(false);
-  const [userVolume, setUserVolume] = useState(0);
-  const [agentVolume, setAgentVolume] = useState(0);
   const [audioFrequencies, setAudioFrequencies] = useState<number[]>(new Array(16).fill(10));
   const [transcript, setTranscript] = useState<VoiceMessage[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -66,14 +64,11 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
   const sessionIdRef = useRef<string | null>(null);
   const channelNameRef = useRef<string | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
   const animFrameRef = useRef<number | null>(null);
   const isStartingRef = useRef<boolean>(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const callActiveRef = useRef<boolean>(false);
-  const isMutedRef = useRef<boolean>(false);
-  const onSpeechDetectedRef = useRef<((text: string) => void) | undefined>(undefined);
   const onCallEndRef = useRef<((transcript: VoiceMessage[]) => void) | undefined>(options?.onCallEnd);
   onCallEndRef.current = options?.onCallEnd;
   const onAgentTurnCompleteRef = useRef<((transcript: VoiceMessage[]) => void) | undefined>(options?.onAgentTurnComplete);
@@ -208,7 +203,6 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
 
       const analyser = audioCtx.createAnalyser();
       analyser.fftSize = 64;
-      analyserRef.current = analyser;
 
       if (mediaStreamTrack) {
         const stream = new MediaStream([mediaStreamTrack]);
@@ -260,10 +254,6 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
     }
     lastExtractedAssistantTextRef.current = latestAssistant.text.trim();
 
-    console.log(
-      "[Agora Voice Agent] Firing live turn extraction for assistant turn:",
-      latestAssistant.text.slice(0, 50)
-    );
     if (onAgentTurnCompleteRef.current) {
       onAgentTurnCompleteRef.current(fullTranscript);
     }
@@ -275,7 +265,6 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
       propertySlug?: string,
       propertyId?: number,
       callerType: "buyer_inquiry" | "owner_onboarding" = "buyer_inquiry",
-      onSpeechDetected?: (text: string) => void,
       ownerContext?: OwnerContext
     ) => {
       // Prevent duplicate or overlapping starts
@@ -284,7 +273,6 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
         return;
       }
       isStartingRef.current = true;
-      onSpeechDetectedRef.current = onSpeechDetected;
 
       // Create new abort controller for this call attempt
       if (abortControllerRef.current) {
@@ -396,11 +384,22 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
             id: `greeting-${Date.now()}`,
             role: "assistant",
             text: sessionData.greeting,
-            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            timestamp: formatTimestamp(),
           };
           mappedRemoteRef.current = [greetingMsg];
           setTranscript([greetingMsg]);
         }
+
+        const isUserTranscription = (item: any) => {
+          const uidStr = String(item.uid ?? "");
+          return (
+            uidStr === "0" ||
+            uidStr === stringUserUid ||
+            uidStr === String(userUidRef.current) ||
+            item.metadata?.object === "user.transcription" ||
+            item.object === "user.transcription"
+          );
+        };
 
         // Attach live transcript updates
         ai.on(AgoraVoiceAIEvents.TRANSCRIPT_UPDATED, (transcriptions: any[]) => {
@@ -409,22 +408,13 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
           const mapped: VoiceMessage[] = transcriptions
             .filter((item: any) => (item.text || "").trim().length > 0)
             .map((item: any, idx: number) => {
-              const uidStr = String(item.uid ?? "");
-              const isUser =
-                uidStr === "0" ||
-                uidStr === stringUserUid ||
-                uidStr === String(userUidRef.current) ||
-                item.metadata?.object === "user.transcription" ||
-                item.object === "user.transcription";
+              const isUser = isUserTranscription(item);
 
               return {
                 id: `turn-${item.turn_id ?? idx}-${isUser ? "user" : "agent"}`,
                 role: isUser ? "user" : "assistant",
                 text: (item.text || "").trim(),
-                timestamp: new Date(item._time || Date.now()).toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                }),
+                timestamp: formatTimestamp(item._time || undefined),
               };
             });
 
@@ -436,7 +426,7 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
 
           // Preserve initial greeting if remote transcript doesn't repeat it yet
           const fullList = sessionData.greeting && !mapped.some((m) => m.role === "assistant")
-            ? [{ id: "init-greeting", role: "assistant" as const, text: sessionData.greeting, timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }, ...mapped, ...localMessagesRef.current]
+            ? [{ id: "init-greeting", role: "assistant" as const, text: sessionData.greeting, timestamp: formatTimestamp() }, ...mapped, ...localMessagesRef.current]
             : [...mapped, ...localMessagesRef.current];
 
           transcriptRef.current = fullList;
@@ -444,13 +434,7 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
 
           // Deduplicated checklist extraction for user turns
           for (const item of transcriptions) {
-            const uidStr = String(item.uid ?? "");
-            const isUser =
-              uidStr === "0" ||
-              uidStr === stringUserUid ||
-              uidStr === String(userUidRef.current) ||
-              item.metadata?.object === "user.transcription" ||
-              item.object === "user.transcription";
+            const isUser = isUserTranscription(item);
 
             const spokenText = (item.text || "").trim();
             if (isUser && spokenText.length > 0) {
@@ -461,20 +445,13 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
               const turnKey = `${item.turn_id ?? "turn"}_${spokenText.toLowerCase()}`;
               if (isFinished && !processedTurnIdsRef.current.has(turnKey as any)) {
                 processedTurnIdsRef.current.add(turnKey as any);
-                console.log("[Agora Voice Agent] Verified user speech turn:", spokenText);
-                if (onSpeechDetectedRef.current) {
-                  onSpeechDetectedRef.current(spokenText);
-                }
-
                 // Fast verbal UI modal intent matching
                 const OPEN_MODAL_REGEX = /(pull|bring|open|show|display|pop|bring back|pull back|pull it back|bring it back).*(card|modal|pop[- ]?up|review|summary|details|specs)/i;
                 const CLOSE_MODAL_REGEX = /(close|hide|dismiss|minimize|shut).*(card|modal|pop[- ]?up|review|summary)/i;
 
                 if (OPEN_MODAL_REGEX.test(spokenText)) {
-                  console.log("[Agora Voice Agent] Verbal UI open command detected:", spokenText);
                   onUIActionRef.current?.("open_review_modal");
                 } else if (CLOSE_MODAL_REGEX.test(spokenText)) {
-                  console.log("[Agora Voice Agent] Verbal UI close command detected:", spokenText);
                   onUIActionRef.current?.("close_review_modal");
                 }
               }
@@ -558,13 +535,11 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
         client.on("volume-indicator", (volumes) => {
           for (const volume of volumes) {
             if (volume.uid === 0 || volume.uid === userUid) {
-              setUserVolume(volume.level);
               if (volume.level > 15) {
                 setCallState("user_speaking");
                 setIsAgentSpeaking(false);
               }
             } else if (volume.uid === agentUid) {
-              setAgentVolume(volume.level);
               if (volume.level > 10) {
                 setCallState("agent_speaking");
                 setIsAgentSpeaking(true);
@@ -629,7 +604,6 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
         setCallState("connected");
       } catch (err: any) {
         if (err.name === "AbortError" || abortController.signal.aborted) {
-          console.log("[Agora Voice Agent] Call startup aborted.");
           await teardownResources();
           return;
         }
@@ -650,7 +624,6 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
       const nextMuted = !isMuted;
       localAudioTrackRef.current.setEnabled(!nextMuted);
       setIsMuted(nextMuted);
-      isMutedRef.current = nextMuted;
     }
   }, [isMuted]);
 
@@ -660,8 +633,6 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
     await teardownResources();
     setCallState("idle");
     setIsAgentSpeaking(false);
-    setUserVolume(0);
-    setAgentVolume(0);
     setAudioFrequencies(new Array(16).fill(10));
 
     if (onCallEndRef.current && finalTranscript.some((m) => m.role === "user")) {
@@ -679,12 +650,11 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
       return;
     }
 
-    const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     const localMsg: VoiceMessage = {
       id: `local-text-${Date.now()}`,
       role: "user",
       text: trimmed,
-      timestamp: now,
+      timestamp: formatTimestamp(),
     };
 
     // Optimistically render pending local message
@@ -716,8 +686,6 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
     callState,
     isMuted,
     isAgentSpeaking,
-    userVolume,
-    agentVolume,
     audioFrequencies,
     transcript,
     errorMessage,

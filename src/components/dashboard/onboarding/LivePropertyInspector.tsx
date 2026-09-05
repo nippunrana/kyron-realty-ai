@@ -31,7 +31,6 @@ interface LivePropertyInspectorProps {
   onboardingStage?: "core" | "additional_specs" | "final_review";
   onUpdateProperty: (updates: Partial<ExtractedPropertyPayload["property"]>) => void;
   onUpdateKnowledgeBase: (updates: Partial<ExtractedPropertyPayload["knowledgeBase"]>) => void;
-  onUpdateNegotiationMatrix: (updates: Partial<ExtractedPropertyPayload["negotiationMatrix"]>) => void;
   onPublish: () => void;
   onOpenReviewModal?: () => void;
   onOpenCoreModal?: () => void;
@@ -47,7 +46,6 @@ export function LivePropertyInspector({
   onboardingStage = "core",
   onUpdateProperty,
   onUpdateKnowledgeBase,
-  onUpdateNegotiationMatrix,
   onPublish,
   onOpenReviewModal,
   onOpenCoreModal,

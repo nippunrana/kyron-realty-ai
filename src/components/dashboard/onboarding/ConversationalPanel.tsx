@@ -19,33 +19,29 @@ import {
   Sparkle,
 } from "lucide-react";
 import { useAgoraVoiceAgent } from "@/hooks/useAgoraVoiceAgent";
-import { ExtractedPropertyPayload, TurnMessage } from "@/lib/kb-extractor";
+import { TurnMessage } from "@/lib/kb-extractor";
 
 interface ConversationalPanelProps {
   onIngestUrl: (url: string) => Promise<void>;
   onSendMessage: (text: string) => Promise<void>;
-  onQuickUpdate?: (updates: Partial<ExtractedPropertyPayload["property"]>) => void;
   onTurnExtraction?: (slidingWindow: TurnMessage[]) => void;
   onVoiceAgentReady?: (helpers: { sendTextMessage: (text: string) => void }) => void;
   onAgentSpeakingChanged?: (isSpeaking: boolean) => void;
   onUIAction?: (action: "open_review_modal" | "close_review_modal") => void;
   isProcessing: boolean;
   activePipelineStep: string | null;
-  currentProperty?: ExtractedPropertyPayload["property"];
   user?: { id?: string; name?: string | null; email?: string | null };
 }
 
 export function ConversationalPanel({
   onIngestUrl,
   onSendMessage,
-  onQuickUpdate,
   onTurnExtraction,
   onVoiceAgentReady,
   onAgentSpeakingChanged,
   onUIAction,
   isProcessing,
   activePipelineStep,
-  currentProperty,
   user,
 }: ConversationalPanelProps) {
   const [urlInput, setUrlInput] = useState("");
@@ -114,17 +110,10 @@ export function ConversationalPanel({
   }, [onVoiceAgentReady, sendTextMessage]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const currentPropertyRef = useRef(currentProperty);
-  currentPropertyRef.current = currentProperty;
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [transcript, isProcessing]);
-
-  // Handler for speech captured via Agora SD-RTN live transcripts
-  const handleHandsFreeSpeech = useCallback((spokenText: string) => {
-    console.log("[Agora Voice Agent] Verified user speech turn:", spokenText);
-  }, []);
 
   const handleUrlSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -402,7 +391,6 @@ export function ConversationalPanel({
                       undefined,
                       undefined,
                       "owner_onboarding",
-                      handleHandsFreeSpeech,
                       {
                         name: user?.name,
                         email: user?.email,
