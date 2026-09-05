@@ -17,7 +17,7 @@ export default async function NewPropertyPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col justify-between bg-slate-50 text-slate-900 selection:bg-blue-100 selection:text-blue-900 relative">
+    <div className="h-[100dvh] max-h-[100dvh] flex flex-col bg-slate-50 text-slate-900 selection:bg-blue-100 selection:text-blue-900 relative overflow-hidden">
       {/* Ambient Light Luxury Glow */}
       <div className="absolute top-0 inset-x-0 h-[400px] luxury-gradient pointer-events-none -z-10" />
 
@@ -25,7 +25,7 @@ export default async function NewPropertyPage() {
       <DashboardHeader user={session.user} />
 
       {/* Main Studio Workspace */}
-      <main className="flex-1 flex flex-col">
+      <main className="flex-1 min-h-0 flex flex-col overflow-hidden">
         <OnboardingStudio user={session.user} />
       </main>
     </div>

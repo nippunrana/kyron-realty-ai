@@ -164,11 +164,7 @@ Guide the owner to discover these 6 essential listing attributes sequentially:
 
 CRITICAL INTAKE RULES:
 - Ask for these attributes one by one. If the owner only provided Listing Type (Rent or Sale), your immediate next question MUST be the street address and city.
-- NEVER decide or declare on your own that all 6 core details are finished.
-- NEVER claim or say you are pulling up the review card on screen until you receive the explicit message: [SYSTEM CUE: ALL 6 CORE SPECS VERIFIED].
-
-STAGE 2: CORE REVIEW MODAL PRESENTATION (SYSTEM-CUED)
-- As soon as you receive the message [SYSTEM CUE: ALL 6 CORE SPECS VERIFIED: ...], warmly summarize the 6 specs in 1-2 spoken sentences and state that you have pulled up the Core Specs Review Card on their screen for their confirmation:
+- Once all 6 core attributes have been stated by the owner, warmly announce that all 6 core details are locked in, summarize them concisely in 1-2 spoken sentences, and state that you have pulled up the Core Specs Review Card on their screen for their confirmation:
   "Wonderful, that covers all 6 core details! I've pulled up your core specs review card on your screen right now—take a look and let me know if that looks good or if you'd like to adjust anything."
 - If the owner asks for adjustments (e.g. "change price to 3200"), acknowledge and confirm the change warmly.
 - VERBAL CLOSURE & PROCEED: If the owner says "This all looks good, we can proceed further", "looks good", "continue", "let's move on", or confirms the card, enthusiastically confirm you are minimizing the card, and immediately transition into Stage 3 below.
@@ -302,20 +298,25 @@ ${contactEmail ? `5. If asked for direct owner or leasing office contact, provid
 
   let llmConfig: any = null;
   if (geminiApiKey) {
+    const geminiModel = process.env.GEMINI_MODEL || "gemini-2.5-flash";
     llmConfig = {
-      url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-      api_key: geminiApiKey,
+      url: `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:streamGenerateContent?alt=sse&key=${geminiApiKey}`,
       system_messages: [
         {
-          role: "system",
-          content: systemPrompt,
+          role: "user",
+          parts: [
+            {
+              text: systemPrompt,
+            },
+          ],
         },
       ],
       greeting_message: greeting,
       params: {
-        model: process.env.GEMINI_MODEL || "gemini-3.5-flash-lite",
-        temperature: 0.6,
+        model: geminiModel,
       },
+      style: "gemini",
+      ignore_empty: true,
     };
   } else if (openaiApiKey) {
     llmConfig = {
@@ -364,6 +365,7 @@ ${contactEmail ? `5. If asked for direct owner or leasing office contact, provid
           id: process.env.CARTESIA_VOICE_ID?.trim() || "a0e99841-438c-4a64-b679-ae501e7d6091",
         },
       },
+      skip_patterns: [4],
     };
   } else if (process.env.ELEVENLABS_API_KEY?.trim()) {
     ttsConfig = {
@@ -373,6 +375,7 @@ ${contactEmail ? `5. If asked for direct owner or leasing office contact, provid
         voice_id: process.env.ELEVENLABS_VOICE_ID?.trim() || "21m00Tcm4TlvDq8ikWAM",
         model_id: "eleven_turbo_v2_5",
       },
+      skip_patterns: [4],
     };
   } else if (process.env.MICROSOFT_TTS_KEY?.trim()) {
     ttsConfig = {
@@ -382,6 +385,7 @@ ${contactEmail ? `5. If asked for direct owner or leasing office contact, provid
         region: process.env.MICROSOFT_TTS_REGION?.trim() || "eastus",
         voice_name: process.env.MICROSOFT_TTS_VOICE?.trim() || "en-US-JennyMultilingualNeural",
       },
+      skip_patterns: [4],
     };
   } else if (openaiApiKey) {
     ttsConfig = {
@@ -391,6 +395,7 @@ ${contactEmail ? `5. If asked for direct owner or leasing office contact, provid
         model: "tts-1",
         voice: "alloy",
       },
+      skip_patterns: [4],
     };
   } else {
     // Transparent auto-fallback to Agora Managed TTS (No 3rd-party vendor key required)
@@ -411,6 +416,7 @@ ${contactEmail ? `5. If asked for direct owner or leasing office contact, provid
           sample_rate: 24000,
         },
       },
+      skip_patterns: [4],
     };
   }
 

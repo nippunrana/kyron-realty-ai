@@ -9,7 +9,7 @@ import type {
   UseAgoraVoiceAgentReturn,
   VoiceMessage,
 } from "./voice-agent-types";
-import { findNewAssistantTurn, formatTimestamp, isUserTranscriptionItem, mapTranscriptionsToMessages } from "./voice-transcript";
+import { formatTimestamp, isUserTranscriptionItem, mapTranscriptionsToMessages } from "./voice-transcript";
 import { startFrequencyVisualizer } from "./audio-visualizer";
 import { detectAssistantModalIntent, detectUserModalIntent } from "./voice-intents";
 
@@ -158,9 +158,18 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
   // Turn Extraction Dispatcher with Deduplication & Sliding Window
   const triggerTurnExtraction = useCallback(() => {
     const fullTranscript = transcriptRef.current;
-    const newAssistantText = findNewAssistantTurn(fullTranscript, lastExtractedAssistantTextRef.current);
-    if (newAssistantText === null) return;
-    lastExtractedAssistantTextRef.current = newAssistantText;
+    if (!fullTranscript || fullTranscript.length === 0) return;
+
+    const hasUser = fullTranscript.some((m) => m.role === "user" && m.text?.trim().length > 0);
+    if (!hasUser) return;
+
+    const lastMsg = fullTranscript[fullTranscript.length - 1];
+    if (!lastMsg || !lastMsg.text?.trim()) return;
+
+    const turnKey = `${fullTranscript.length}_${lastMsg.role}_${lastMsg.text.trim().toLowerCase()}`;
+    if (turnKey === lastExtractedAssistantTextRef.current) return;
+    lastExtractedAssistantTextRef.current = turnKey;
+
     onAgentTurnCompleteRef.current?.(fullTranscript);
   }, []);
 
@@ -334,6 +343,11 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
                 // Fast verbal UI modal intent matching
                 const intent = detectUserModalIntent(spokenText);
                 if (intent) onUIActionRef.current?.(intent);
+
+                // Immediate parallel extraction: Run Gemini while Elena begins speaking
+                setTimeout(() => {
+                  triggerTurnExtraction();
+                }, 100);
               }
             } else if (!isUser && spokenText.length > 0) {
               // Assistant speech confirming modal action
@@ -404,6 +418,14 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
             if (prevState === "speaking" && (newState === "listening" || newState === "idle")) {
               triggerTurnExtraction();
             }
+          }
+        });
+
+        // Cloud Gateway Pipeline Error Handler
+        ai.on(AgoraVoiceAIEvents.AGENT_ERROR, (agentUserId: string, error: any) => {
+          console.warn(`[AgoraVoiceAI Agent Error] (${agentUserId}):`, error);
+          if (error?.code && error.code >= 500) {
+            setErrorMessage(`Voice AI service error: ${error?.message || "Internal gateway issue"}`);
           }
         });
 

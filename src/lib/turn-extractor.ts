@@ -82,42 +82,29 @@ CURRENT VERIFIED STATE:
 
   const prompt = `
 You are the Real Estate Turn Extractor for Kyron Realty AI.
-Your job is to analyze the recent conversation turns between Elena Vance (AI Real Estate Specialist) and the property owner, and extract or update any of the Core or Additional property specifications:
+Your job is to analyze the recent conversation turns between Elena Vance (AI Real Estate Specialist) and the property owner, and extract or update all property specifications into structured JSON:
 
-1. CORE SPECS (Stage 1):
-- listingType: "rent" or "sale"
-- price: target price or monthly rent number (e.g. 3500)
-- bedrooms: bedroom count number (e.g. 2, 0 for studio)
-- bathrooms: bathroom count number (e.g. 1.5, 2)
-- sqft: interior square footage number (e.g. 1200)
-- address: street address (e.g. "250 Marina Blvd")
-Optional location fields: city, state, zipCode.
-- contactEmail: verified public contact email for listing (e.g. "alex@example.com") if the owner confirms or provides an email.
-
-2. ADDITIONAL SPECS & KNOWLEDGE BASE (Stage 2):
-- parkingDetail: parking arrangement (e.g. "2-car garage included", "1 assigned stall", "Street parking only", "No parking")
-- petPolicyDetail: for rentals only (e.g. "Cats and dogs allowed with deposit", "Cats only", "No pets allowed")
-- utilitiesDetail: utilities included vs tenant responsibility (e.g. "Water and trash included", "Tenant pays electric and gas", "All utilities included")
-- hoaFeeMonthly: monthly HOA / condo dues dollar amount (e.g. 350)
-- securityDeposit: security deposit dollar amount (e.g. 2500)
-- minLeaseMonths: minimum lease duration in months (e.g. 12, 6)
-- availableDate: move-in availability date or timing (e.g. "Immediate", "Available in 30 days", "October 1st")
-- features: notable features mentioned (e.g. "Central A/C", "In-unit washer/dryer", "Private balcony", "Newly renovated kitchen", "Vacant and move-in ready")
-- amenities: building amenities mentioned (e.g. "Pool", "Fitness center", "Elevator", "Doorman")
-
-CRITICAL INSTRUCTIONS FOR DIALOGUE REASONING & ASR ROBUSTNESS:
-- Dialogue is labeled with [ELENA VANCE] and [OWNER].
-- Automatic Speech Recognition (ASR) phonetic slips: Spoken owner words may be transcribed with slight errors (e.g. "It's Oren" instead of "It's for rent"). Use Elena's subsequent confirmations and preceding questions as context to disambiguate the owner's true intent.
-- Extract facts EXCLUSIVELY from what the owner states or agrees to. Never treat Elena's hypothetical examples as facts.
-- If no property specs were mentioned or changed in this dialogue, return an empty "updates" object: { "updates": {} }.
-
-UI MODAL INTENT DETECTION:
-- "open_core" (or "open"): Elena or owner is EXPLICITLY announcing, showing, pulling up, or opening the Core Specs review card (e.g. Elena says "I've pulled up your core specs review card on your screen", or owner asks "open the review card" / "show me the card").
-  CRITICAL: If the owner or Elena is simply asking or answering regular property intake questions (such as stating "for rent", giving an address, stating a price, bedrooms, bathrooms, or sqft), modalAction MUST BE "none". NEVER return "open_core" during intake answers!
-- "close_core" (or "close"): The owner confirms or approves the core specs (e.g. "looks good", "this all looks good", "we can proceed further", "let's proceed", "confirmed", "that's right", "continue", "let's move on") or explicitly asks to close/minimize the review card.
-- "open_final": Elena or owner is pulling up the Final Complete / Deploy review card.
-- "close_final": Owner asks to close or minimize the final review card.
-- Otherwise: "none".
+MANDATORY EXTRACTION WORKFLOW:
+1. First, summarize all spoken facts, numbers, and agreed details in 'spokenSummary' (e.g. "rent 25000, 4 bedrooms, 3 bathrooms, 3000 sqft, 41 Sector 64 Noida UP"). This ensures full attention across all clauses.
+2. Next, evaluate EVERY field in 'coreSpecs'. If a value was spoken in the dialogue or already confirmed in CURRENT VERIFIED STATE, output its number or clean string. If an attribute is completely unknown or not yet mentioned, output null.
+   - listingType: "rent" or "sale" (or null)
+   - price: numerical monthly rent or purchase price (e.g. 25000, or null)
+   - bedrooms: number of bedrooms (e.g. 4, 0 for studio, or null)
+   - bathrooms: number of full/half bathrooms (e.g. 3, 1.5, or null)
+   - sqft: interior square footage (e.g. 3000, or null)
+   - address: street address (e.g. "41 Sector 64", or null)
+   - city: city name (e.g. "Noida", or null)
+   - state: state name (e.g. "Uttar Pradesh", or null)
+   - zipCode: postal code (or null)
+   CRITICAL: If the owner stated multiple specs in one sentence (e.g. "rent of 25,000, 4 bedrooms, 3 bathrooms, 3,000 sqft"), you MUST populate price: 25000, bedrooms: 4, bathrooms: 3, and sqft: 3000. NEVER leave bedrooms or bathrooms as null if the owner stated them!
+3. Populate any mentioned 'additionalSpecs' (parking, pets, utilities, HOA, deposit, lease length, move-in date, features, amenities, email).
+4. Determine 'modalAction':
+   - "open_core": Elena or owner EXPLICITLY announces, pulls up, or asks to show the Core Specs review card (e.g. "I've pulled up your core specs review card on your screen", "open the review card", "show me the card").
+     CRITICAL: If the owner or Elena is simply asking or answering regular intake questions (such as stating "for rent", giving an address, stating price/beds/baths), modalAction MUST BE "none".
+   - "close_core": Owner confirms or approves the core specs (e.g. "looks good", "proceed", "confirmed", "that's right", "continue") or asks to close/minimize the review card.
+   - "open_final": Elena or owner announces/opens the Final Complete review card.
+   - "close_final": Owner asks to close or minimize the final card.
+   - Otherwise: "none".
 
 ${currentVerifiedSummary}
 
@@ -137,18 +124,29 @@ ${formattedDialogue}
         responseSchema: {
           type: "object",
           properties: {
-            updates: {
+            spokenSummary: {
+              type: "string",
+              description: "Concise scratchpad summarizing all facts and numbers spoken in this dialogue",
+            },
+            coreSpecs: {
+              type: "object",
+              description: "Core property specifications. Output the value if spoken or confirmed, or null if unknown.",
+              properties: {
+                listingType: { type: "string", enum: ["rent", "sale"], nullable: true },
+                price: { type: "number", nullable: true },
+                bedrooms: { type: "number", nullable: true },
+                bathrooms: { type: "number", nullable: true },
+                sqft: { type: "number", nullable: true },
+                address: { type: "string", nullable: true },
+                city: { type: "string", nullable: true },
+                state: { type: "string", nullable: true },
+                zipCode: { type: "string", nullable: true },
+              },
+              required: ["listingType", "price", "bedrooms", "bathrooms", "sqft", "address"],
+            },
+            additionalSpecs: {
               type: "object",
               properties: {
-                listingType: { type: "string", enum: ["rent", "sale"] },
-                price: { type: "number" },
-                bedrooms: { type: "number" },
-                bathrooms: { type: "number" },
-                sqft: { type: "number" },
-                address: { type: "string" },
-                city: { type: "string" },
-                state: { type: "string" },
-                zipCode: { type: "string" },
                 contactEmail: { type: "string" },
                 parkingDetail: { type: "string" },
                 petPolicyDetail: { type: "string" },
@@ -174,14 +172,80 @@ ${formattedDialogue}
               ],
             },
           },
-          required: ["updates", "modalAction"],
+          required: ["spokenSummary", "coreSpecs", "modalAction"],
         },
       },
     });
 
     const parsed = JSON.parse(response.text || "{}");
+    const rawCore = parsed.coreSpecs || {};
+    const rawAdditional = parsed.additionalSpecs || {};
+
+    // Filter out null, undefined, and placeholder strings
+    const updates: TurnSpecUpdates = {};
+
+    const cleanString = (val: any) => {
+      if (typeof val !== "string") return undefined;
+      const t = val.trim();
+      if (!t || t.toLowerCase() === "null" || t.toLowerCase() === "pending" || t.toLowerCase() === "undefined" || t.toLowerCase() === "n/a") {
+        return undefined;
+      }
+      return t;
+    };
+
+    if (rawCore.listingType === "rent" || rawCore.listingType === "sale") {
+      updates.listingType = rawCore.listingType;
+    }
+    if (typeof rawCore.price === "number" && !isNaN(rawCore.price) && rawCore.price > 0) {
+      updates.price = rawCore.price;
+    }
+    if (typeof rawCore.bedrooms === "number" && !isNaN(rawCore.bedrooms) && rawCore.bedrooms >= 0) {
+      updates.bedrooms = rawCore.bedrooms;
+    }
+    if (typeof rawCore.bathrooms === "number" && !isNaN(rawCore.bathrooms) && rawCore.bathrooms > 0) {
+      updates.bathrooms = rawCore.bathrooms;
+    }
+    if (typeof rawCore.sqft === "number" && !isNaN(rawCore.sqft) && rawCore.sqft > 0) {
+      updates.sqft = rawCore.sqft;
+    }
+    const cleanAddr = cleanString(rawCore.address);
+    if (cleanAddr) updates.address = cleanAddr;
+    const cleanCity = cleanString(rawCore.city);
+    if (cleanCity) updates.city = cleanCity;
+    const cleanState = cleanString(rawCore.state);
+    if (cleanState) updates.state = cleanState;
+    const cleanZip = cleanString(rawCore.zipCode);
+    if (cleanZip) updates.zipCode = cleanZip;
+
+    // Additional specs
+    const cleanEmail = cleanString(rawAdditional.contactEmail);
+    if (cleanEmail) updates.contactEmail = cleanEmail;
+    const cleanParking = cleanString(rawAdditional.parkingDetail);
+    if (cleanParking) updates.parkingDetail = cleanParking;
+    const cleanPets = cleanString(rawAdditional.petPolicyDetail);
+    if (cleanPets) updates.petPolicyDetail = cleanPets;
+    const cleanUtils = cleanString(rawAdditional.utilitiesDetail);
+    if (cleanUtils) updates.utilitiesDetail = cleanUtils;
+    if (typeof rawAdditional.hoaFeeMonthly === "number" && !isNaN(rawAdditional.hoaFeeMonthly)) {
+      updates.hoaFeeMonthly = rawAdditional.hoaFeeMonthly;
+    }
+    if (typeof rawAdditional.securityDeposit === "number" && !isNaN(rawAdditional.securityDeposit)) {
+      updates.securityDeposit = rawAdditional.securityDeposit;
+    }
+    if (typeof rawAdditional.minLeaseMonths === "number" && !isNaN(rawAdditional.minLeaseMonths)) {
+      updates.minLeaseMonths = rawAdditional.minLeaseMonths;
+    }
+    const cleanAvail = cleanString(rawAdditional.availableDate);
+    if (cleanAvail) updates.availableDate = cleanAvail;
+    if (Array.isArray(rawAdditional.features) && rawAdditional.features.length > 0) {
+      updates.features = rawAdditional.features.filter((f: any) => typeof f === "string" && f.trim());
+    }
+    if (Array.isArray(rawAdditional.amenities) && rawAdditional.amenities.length > 0) {
+      updates.amenities = rawAdditional.amenities.filter((a: any) => typeof a === "string" && a.trim());
+    }
+
     return {
-      updates: parsed.updates || {},
+      updates,
       modalAction: parsed.modalAction || "none",
     };
   } catch (err: any) {

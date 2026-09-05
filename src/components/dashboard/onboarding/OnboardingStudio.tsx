@@ -108,8 +108,10 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
     sendTextMessage: (text: string, priority?: "INTERRUPTED" | "APPEND") => void;
   } | null>(null);
   const turnSequenceRef = useRef<number>(0);
-  const turnAbortControllerRef = useRef<AbortController | null>(null);
-  const hasCuedCoreReviewRef = useRef<boolean>(false);
+  const isExtractionBusyRef = useRef<boolean>(false);
+  const pendingExtractionWindowRef = useRef<TurnMessage[] | null>(null);
+  const pendingModalOpenRef = useRef<boolean>(false);
+  const isTurnSyncingRef = useRef<boolean>(false);
 
   // Success Modal State
   const [publishedResult, setPublishedResult] = useState<{
@@ -135,21 +137,19 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
   const handleConfirmCoreSpecs = useCallback(() => {
     setShowCoreModal(false);
     setOnboardingStage("additional_specs");
-    // Send conversational context trigger to Elena Vance if live voice session active
-    if (voiceAgentActionsRef.current?.sendTextMessage) {
-      voiceAgentActionsRef.current.sendTextMessage(
-        "The owner confirmed the core specs. Please now enthusiastically introduce and ask for the extra property details (parking, pets if rental, utilities, HOA if sale).",
-        "APPEND"
-      );
-    }
   }, []);
 
   const handleUIAction = useCallback((action: "open_review_modal" | "close_review_modal") => {
     if (action === "open_review_modal") {
       if (onboardingStageRef.current === "core") {
-        // Strictly guard against popping Core Review Modal unless 6/6 core specs are verified
+        // If all 6 specs are already verified, open immediately
         if (checkCoreSpecsCompleted(dataRef.current.property)) {
           setShowCoreModal(true);
+          pendingModalOpenRef.current = false;
+        } else if (isTurnSyncingRef.current) {
+          // If turn extraction is currently in flight, latch the modal open request
+          // so it pops the instant the 6/6 specs arrive from Gemini with zero blanks
+          pendingModalOpenRef.current = true;
         }
       } else {
         setShowFinalModal(true);
@@ -157,24 +157,20 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
     } else if (action === "close_review_modal") {
       setShowCoreModal(false);
       setShowFinalModal(false);
+      pendingModalOpenRef.current = false;
       if (onboardingStageRef.current === "core" && checkCoreSpecsCompleted(dataRef.current.property)) {
         handleConfirmCoreSpecs();
       }
     }
   }, [handleConfirmCoreSpecs]);
 
-  // Turn-level AI extraction with Latest-Wins concurrency
-  const handleTurnExtraction = async (slidingWindow: TurnMessage[]) => {
-    if (!slidingWindow || slidingWindow.length === 0) return;
-
-    if (turnAbortControllerRef.current) {
-      turnAbortControllerRef.current.abort();
-    }
-    const abortController = new AbortController();
-    turnAbortControllerRef.current = abortController;
-
-    const sequenceId = ++turnSequenceRef.current;
+  // Trailing Conflating Queue: In-flight Gemini extractions run to completion
+  // without being cancelled. Consecutive or fast turns coalesce into a single follow-up call.
+  const executeTurnExtraction = async (slidingWindow: TurnMessage[]) => {
+    isExtractionBusyRef.current = true;
     setIsTurnSyncing(true);
+    isTurnSyncingRef.current = true;
+    const sequenceId = ++turnSequenceRef.current;
 
     try {
       const res = await fetch(`${BASE_PATH}/api/onboarding/extract-turn`, {
@@ -184,14 +180,9 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
           slidingWindowMessages: slidingWindow,
           currentPropertyState: dataRef.current.property,
         }),
-        signal: abortController.signal,
       });
 
-      if (abortController.signal.aborted) return;
-      if (sequenceId !== turnSequenceRef.current) return;
-
       const json = await res.json();
-
       let candidateProperty = { ...dataRef.current.property };
 
       if (json.success && json.data?.updates && Object.keys(json.data.updates).length > 0) {
@@ -246,16 +237,11 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
       // Check if all 6 core specs are now verified in state
       const isCoreComplete = checkCoreSpecsCompleted(candidateProperty);
 
-      // State-Driven Handoff to Elena Vance via Agora RTM (APPEND priority)
-      if (isCoreComplete && !hasCuedCoreReviewRef.current && onboardingStageRef.current === "core") {
-        hasCuedCoreReviewRef.current = true;
-        const typeLabel = candidateProperty.listingType === "rent" ? "Rental" : "For Sale";
-        const priceLabel =
-          candidateProperty.listingType === "rent"
-            ? `$${Number(candidateProperty.price).toLocaleString()}/month`
-            : `$${Number(candidateProperty.price).toLocaleString()}`;
-        const cueMsg = `[SYSTEM CUE: ALL 6 CORE SPECS VERIFIED]: ${typeLabel}, Address: ${candidateProperty.address}, Price: ${priceLabel}, ${candidateProperty.bedrooms} Beds, ${candidateProperty.bathrooms} Baths, ${candidateProperty.sqft} sqft. Please now warmly announce that all 6 core details are locked in, summarize them concisely in 1-2 spoken sentences, and present the Core Specs Review Card on screen for the owner's confirmation.`;
-        voiceAgentActionsRef.current?.sendTextMessage(cueMsg, "APPEND");
+      // In-Flight Sync Gate: If Elena or the user requested the review modal while
+      // extraction was in flight, open it now that all 6 specs have safely landed!
+      if (isCoreComplete && pendingModalOpenRef.current && onboardingStageRef.current === "core") {
+        pendingModalOpenRef.current = false;
+        setShowCoreModal(true);
       }
 
       // Handle modal action intent returned by turn extractor
@@ -265,6 +251,9 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
           // Strictly guard: Only open if all 6 core specs are truly verified
           if (isCoreComplete) {
             setShowCoreModal(true);
+          } else {
+            // Latch pending modal open until specs land
+            pendingModalOpenRef.current = true;
           }
         } else if (action === "close_core") {
           handleConfirmCoreSpecs();
@@ -276,6 +265,8 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
           if (onboardingStageRef.current === "core") {
             if (isCoreComplete) {
               setShowCoreModal(true);
+            } else {
+              pendingModalOpenRef.current = true;
             }
           } else {
             setShowFinalModal(true);
@@ -289,14 +280,34 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
         }
       }
     } catch (err: any) {
-      if (err.name !== "AbortError") {
-        console.error("[Turn Extraction Client Error]:", err);
-      }
+      console.error("[Turn Extraction Client Error]:", err);
     } finally {
-      if (sequenceId === turnSequenceRef.current) {
-        setIsTurnSyncing(false);
+      // If new turns arrived while this extraction was in flight, execute the latest coalesced snapshot
+      const pendingSnapshot = pendingExtractionWindowRef.current;
+      pendingExtractionWindowRef.current = null;
+
+      if (pendingSnapshot && pendingSnapshot.length > 0) {
+        executeTurnExtraction(pendingSnapshot);
+      } else {
+        isExtractionBusyRef.current = false;
+        if (sequenceId === turnSequenceRef.current) {
+          setIsTurnSyncing(false);
+          isTurnSyncingRef.current = false;
+        }
       }
     }
+  };
+
+  const handleTurnExtraction = (slidingWindow: TurnMessage[]) => {
+    if (!slidingWindow || slidingWindow.length === 0) return;
+
+    if (isExtractionBusyRef.current) {
+      // Coalesce into pending snapshot: latest conversational state always wins
+      pendingExtractionWindowRef.current = slidingWindow;
+      return;
+    }
+
+    executeTurnExtraction(slidingWindow);
   };
 
   const handleUpdateKnowledgeBase = (
@@ -472,11 +483,11 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
   };
 
   return (
-    <div className="flex flex-col flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div className="flex flex-col flex-1 h-full min-h-0 overflow-hidden max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
       {/* Studio Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3 shrink-0">
         <div>
-          <div className="flex items-center gap-2 mb-1.5">
+          <div className="flex items-center gap-2 mb-1">
             <Link
               href="/dashboard"
               className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-900 transition-colors"
@@ -488,22 +499,22 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
             <span className="text-xs font-bold text-blue-700">Studio Onboarding</span>
           </div>
 
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 flex items-center gap-2">
+          <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900 flex items-center gap-2">
             <span>Property Onboarding Studio</span>
             <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-blue-50 text-blue-700 border border-blue-200">
               Voice & AI
             </span>
           </h1>
-          <p className="text-xs sm:text-sm text-slate-600 mt-1">
+          <p className="text-xs text-slate-600 mt-0.5">
             Converse naturally with Elena Vance or import a listing URL to dynamically extract property specs and deploy a 24/7 Voice Sales Agent.
           </p>
         </div>
       </div>
 
       {/* Split-Screen 2-Column Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 min-h-[640px]">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 flex-1 min-h-0 overflow-hidden">
         {/* Left Column: Conversational Ingestion Panel (5 cols) */}
-        <div className="lg:col-span-5 flex flex-col h-full min-h-[500px]">
+        <div className="lg:col-span-5 flex flex-col h-full min-h-0 overflow-hidden">
           <ConversationalPanel
             onIngestUrl={handleIngestUrl}
             onSendMessage={handleSendMessage}
@@ -519,7 +530,7 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
         </div>
 
         {/* Right Column: Live Real-Time Property Inspector (7 cols) */}
-        <div className="lg:col-span-7 flex flex-col h-full min-h-[500px]">
+        <div className="lg:col-span-7 flex flex-col h-full min-h-0 overflow-hidden">
           <LivePropertyInspector
             data={data}
             ownerName={user?.name || ""}
