@@ -30,17 +30,3 @@ export function mapTranscriptionsToMessages(
       };
     });
 }
-
-/**
- * Returns the latest assistant utterance when the transcript holds at least one
- * user turn and that utterance differs from the last one extracted; otherwise null.
- */
-export function findNewAssistantTurn(transcript: VoiceMessage[], lastExtractedText: string): string | null {
-  if (!transcript || transcript.length === 0) return null;
-  const hasText = (m: VoiceMessage) => Boolean(m.text && m.text.trim().length > 0);
-  if (!transcript.some((m) => m.role === "user" && hasText(m))) return null;
-  const assistantMessages = transcript.filter((m) => m.role === "assistant" && hasText(m));
-  if (assistantMessages.length === 0) return null;
-  const latest = assistantMessages[assistantMessages.length - 1].text.trim();
-  return latest === lastExtractedText ? null : latest;
-}
