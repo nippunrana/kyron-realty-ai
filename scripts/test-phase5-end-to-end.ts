@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { db } from "../src/db";
 import { properties, inquiriesAndLeads, viewingAppointments } from "../src/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { desc } from "drizzle-orm";
 
 async function testPhase5EndToEnd() {
   console.log("=== Testing Phase 5: Public Listing & Lead Capture Pipeline ===\n");

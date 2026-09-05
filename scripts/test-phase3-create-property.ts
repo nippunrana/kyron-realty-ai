@@ -1,7 +1,6 @@
 import "dotenv/config";
 import { db } from "../src/db";
 import { properties, propertyKnowledgeBases, negotiationMatrices } from "../src/db/schema";
-import { eq } from "drizzle-orm";
 import QRCode from "qrcode";
 
 async function testPropertyCreation() {
