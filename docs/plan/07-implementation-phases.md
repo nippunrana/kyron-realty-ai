@@ -61,8 +61,7 @@
 # Database
 DATABASE_URL="postgresql://kyron_realty_ai_user:password@localhost:5432/kyron_realty_ai"
 
-# Subpath & App Config
-NEXT_PUBLIC_BASE_PATH="/projects/kyron-realty-ai"
+# Subpath & App Config (NEXT_PUBLIC_BASE_PATH was dropped on 2026-09-05; the prefix lives in src/lib/base-path.ts)
 NEXTAUTH_URL="https://egnitech.com/projects/kyron-realty-ai"
 NEXTAUTH_SECRET="your-32-char-secret"
 

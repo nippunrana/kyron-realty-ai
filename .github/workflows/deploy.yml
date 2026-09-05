@@ -33,6 +33,13 @@ jobs:
       - name: Install Dependencies
         run: npm ci || npm install
 
+      # Lint and unused-code checks run before the build so a rule violation fails fast.
+      - name: Lint
+        run: npm run lint
+
+      - name: Unused exports and dependencies
+        run: npm run lint:unused
+
       - name: Type Check & Build Test
         run: npm run build
 

@@ -27,6 +27,8 @@ The voice architecture leverages the **Agora Conversational AI Cloud Gateway** t
 ## 2. Dynamic Token Generation & Security
 
 ### 2.1 RTC Token Dispatcher (`/api/agora/token`)
+> **Superseded (2026-09-05):** this route and the `agora-access-token` package were removed. Tokens are minted only inside the session-start route via `src/lib/agora-token.ts`.
+
 - Uses `agora-access-token` package with `RtcTokenBuilder2`.
 - Generates 1-hour expiring tokens tied to unique channel IDs.
 - Caller receives:

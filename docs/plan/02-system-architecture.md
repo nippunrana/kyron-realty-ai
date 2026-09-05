@@ -46,11 +46,11 @@
 - **Framework**: Next.js 16 (React 19, TypeScript) with Turbopack.
 - **Styling & UI**: Tailwind CSS v4, Lucide React icons, dual-theme styling (Clean Editorial Light & Midnight Luxury Dark).
 - **Voice SDK**: `agora-rtc-sdk-ng` (v4.x) for browser microphone capture, audio track publishing, remote agent track subscription, and real-time audio level visualizer.
-- **QR Code & Sharing**: `qrcode.react` / SVG QR generator with embedded branding + native Web Share API / WhatsApp deep linking.
+- **QR Code & Sharing**: `qrcode.react` / SVG QR generator with embedded branding + native Web Share API / WhatsApp deep linking. *(Superseded: `qrcode.react` was never used and is removed; the share modal uses the `qrcode` package.)*
 
 ### 2.2 Application Backend Layer (Next.js Server Actions & API Routes)
 All endpoints reside under the `/projects/kyron-realty-ai/api/` subpath:
-- **`POST /api/agora/token`**: Generates short-lived RTC tokens using `agora-access-token` for authenticated and anonymous callers.
+- **`POST /api/agora/token`**: ~~Generates short-lived RTC tokens using `agora-access-token` for authenticated and anonymous callers.~~ *(Superseded: removed on 2026-09-05; the session-start route mints its own token.)*
 - **`POST /api/agora/session/start`**: Dispatches a start request to the Agora Conversational AI Cloud Gateway REST API with the property-specific system prompt, knowledge base context, and tool definitions.
 - **`POST /api/agora/session/stop`**: Gracefully terminates an active agent session in the RTC channel and triggers session transcript summarization.
 - **`POST /api/onboarding/scrape`**: Dispatches an Apify run task for a given property URL, monitors execution, and fetches raw markdown content.
