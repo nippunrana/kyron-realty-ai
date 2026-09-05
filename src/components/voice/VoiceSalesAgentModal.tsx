@@ -299,10 +299,11 @@ export function VoiceSalesAgentModal({
               </div>
 
               {/* Animated Waveform Visualizer Bars */}
-              <div className="flex items-center justify-center gap-1.5 h-16 w-full max-w-sm px-4">
+              <div className={`flex items-center justify-center gap-1.5 h-16 w-full max-w-sm px-4 ${isAgentSpeaking ? "animate-pulse" : ""}`}>
                 {audioFrequencies.map((freq, idx) => {
+                  // While the agent talks the local mic is silent, so draw a fixed wave shape and pulse it
                   const height = isAgentSpeaking
-                    ? Math.max(20, Math.min(100, Math.round(Math.sin(idx + Date.now() / 200) * 30 + 50)))
+                    ? Math.max(20, Math.min(100, Math.round(Math.sin(idx * 1.3) * 30 + 50)))
                     : freq;
 
                   return (

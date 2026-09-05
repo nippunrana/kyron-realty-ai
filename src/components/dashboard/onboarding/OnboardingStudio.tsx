@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { ConversationalPanel } from "./ConversationalPanel";
 import { LivePropertyInspector } from "./LivePropertyInspector";
 import { PublishSuccessModal } from "./PublishSuccessModal";
@@ -68,7 +68,7 @@ interface OnboardingStudioProps {
   };
 }
 
-export function checkCoreSpecsCompleted(prop: ExtractedPropertyPayload["property"]): boolean {
+function checkCoreSpecsCompleted(prop: ExtractedPropertyPayload["property"]): boolean {
   const hasListingType = prop.listingType === "rent" || prop.listingType === "sale";
   const hasAddress = Boolean(prop.address && prop.address.trim().length > 3);
   const hasPrice = Boolean(Number(prop.price) > 0);
@@ -95,10 +95,13 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
   const [showCoreModal, setShowCoreModal] = useState(false);
   const [showFinalModal, setShowFinalModal] = useState(false);
 
+  // Latest state for async turn-extraction and voice callbacks; synced after each commit
   const dataRef = useRef(data);
-  dataRef.current = data;
   const onboardingStageRef = useRef(onboardingStage);
-  onboardingStageRef.current = onboardingStage;
+  useEffect(() => {
+    dataRef.current = data;
+    onboardingStageRef.current = onboardingStage;
+  }, [data, onboardingStage]);
 
   const voiceAgentActionsRef = useRef<{
     sendTextMessage: (text: string, priority?: "INTERRUPTED" | "APPEND") => void;
@@ -146,8 +149,6 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
         // Strictly guard against popping Core Review Modal unless 6/6 core specs are verified
         if (checkCoreSpecsCompleted(dataRef.current.property)) {
           setShowCoreModal(true);
-        } else {
-          console.log("[OnboardingStudio] Core specs not yet 6/6 verified, suppressing premature modal pop-up.");
         }
       } else {
         setShowFinalModal(true);
@@ -247,7 +248,6 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
       // State-Driven Handoff to Elena Vance via Agora RTM (APPEND priority)
       if (isCoreComplete && !hasCuedCoreReviewRef.current && onboardingStageRef.current === "core") {
         hasCuedCoreReviewRef.current = true;
-        console.log("[OnboardingStudio] 6/6 Core Specs Verified! Sending state-driven cue via Agora RTM (APPEND)...");
         const typeLabel = candidateProperty.listingType === "rent" ? "Rental" : "For Sale";
         const priceLabel =
           candidateProperty.listingType === "rent"
@@ -264,8 +264,6 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
           // Strictly guard: Only open if all 6 core specs are truly verified
           if (isCoreComplete) {
             setShowCoreModal(true);
-          } else {
-            console.log("[OnboardingStudio] Suppressing open_core from turn extractor: core specs not yet 6/6 complete.");
           }
         } else if (action === "close_core") {
           handleConfirmCoreSpecs();

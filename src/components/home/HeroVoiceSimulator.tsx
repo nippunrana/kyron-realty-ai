@@ -61,19 +61,20 @@ interface HeroVoiceSimulatorProps {
 export function HeroVoiceSimulator({ onOpenCallModal }: HeroVoiceSimulatorProps) {
   const [activeScenarioId, setActiveScenarioId] = useState<string>("negotiate");
   const [isPlaying, setIsPlaying] = useState<boolean>(true);
-  const [typedText, setTypedText] = useState<string>("");
+  const [typed, setTyped] = useState<{ scenarioId: string; text: string }>({ scenarioId: "negotiate", text: "" });
 
   const activeScenario =
     SCENARIOS.find((s) => s.id === activeScenarioId) || SCENARIOS[0];
+  // A scenario switch starts from an empty string without a synchronous reset inside the effect
+  const typedText = typed.scenarioId === activeScenario.id ? typed.text : "";
 
   // Typing effect when switching scenario
   useEffect(() => {
-    setTypedText("");
     let currentIdx = 0;
-    const fullText = activeScenario.agentReply;
+    const { id: scenarioId, agentReply: fullText } = activeScenario;
     const interval = setInterval(() => {
       if (currentIdx <= fullText.length) {
-        setTypedText(fullText.slice(0, currentIdx));
+        setTyped({ scenarioId, text: fullText.slice(0, currentIdx) });
         currentIdx += 3;
       } else {
         clearInterval(interval);

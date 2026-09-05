@@ -7,7 +7,7 @@
 export type ListingType = "rent" | "sale" | "";
 
 /** Share of the target price the voice agent may never go below when no floor is set. */
-export const DEFAULT_FLOOR_PRICE_RATIO = 0.94;
+const DEFAULT_FLOOR_PRICE_RATIO = 0.94;
 
 export function computeFloorPrice(targetPrice: number): number {
   return targetPrice > 0 ? Math.round(targetPrice * DEFAULT_FLOOR_PRICE_RATIO) : 0;
@@ -30,11 +30,13 @@ export function buildDefaultTitle(address: string, bedrooms?: number, listingTyp
   return `${bedrooms ? `${bedrooms}-Bedroom ` : ""}${typeLabel} at ${address}`;
 }
 
-/** Tomorrow at the given local hour, formatted for `<input type="datetime-local">`. */
+/**
+ * Tomorrow (UTC calendar day) at the given hour, formatted for `<input type="datetime-local">`.
+ * Uses UTC so the server-rendered value and the client's hydration value are identical.
+ */
 export function defaultTourDateTime(hour = 14): string {
   const d = new Date();
-  d.setDate(d.getDate() + 1);
-  d.setHours(hour, 0, 0, 0);
+  d.setUTCDate(d.getUTCDate() + 1);
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}T${pad(hour)}:00`;
 }

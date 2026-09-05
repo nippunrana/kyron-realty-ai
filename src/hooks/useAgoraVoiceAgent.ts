@@ -71,13 +71,16 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
 
   const callActiveRef = useRef<boolean>(false);
   const onCallEndRef = useRef<((transcript: VoiceMessage[]) => void) | undefined>(options?.onCallEnd);
-  onCallEndRef.current = options?.onCallEnd;
   const onAgentTurnCompleteRef = useRef<((transcript: VoiceMessage[]) => void) | undefined>(options?.onAgentTurnComplete);
-  onAgentTurnCompleteRef.current = options?.onAgentTurnComplete;
   const onAgentSpeakingChangedRef = useRef<((isSpeaking: boolean) => void) | undefined>(options?.onAgentSpeakingChanged);
-  onAgentSpeakingChangedRef.current = options?.onAgentSpeakingChanged;
   const onUIActionRef = useRef<((action: "open_review_modal" | "close_review_modal") => void) | undefined>(options?.onUIAction);
-  onUIActionRef.current = options?.onUIAction;
+  // Keep the latest callbacks reachable from long-lived SDK listeners without re-subscribing
+  useEffect(() => {
+    onCallEndRef.current = options?.onCallEnd;
+    onAgentTurnCompleteRef.current = options?.onAgentTurnComplete;
+    onAgentSpeakingChangedRef.current = options?.onAgentSpeakingChanged;
+    onUIActionRef.current = options?.onUIAction;
+  });
   const transcriptRef = useRef<VoiceMessage[]>([]);
   const prevAgentStateRef = useRef<string | null>(null);
   const rtmClientRef = useRef<any>(null);

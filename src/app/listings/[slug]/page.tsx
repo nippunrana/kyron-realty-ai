@@ -39,7 +39,7 @@ export async function generateMetadata({ params }: ListingPageProps): Promise<Me
         images: property.coverImageUrl ? [{ url: property.coverImageUrl }] : [],
       },
     };
-  } catch (err) {
+  } catch {
     return {
       title: "Property Listing | Kyron Realty AI",
     };

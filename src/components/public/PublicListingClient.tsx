@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import {
   Building2,
@@ -50,14 +50,9 @@ export function PublicListingClient({
   // Booking Form State
   const [bookName, setBookName] = useState("");
   const [bookPhone, setBookPhone] = useState("");
-  const [bookDate, setBookDate] = useState("");
+  const [bookDate, setBookDate] = useState(() => defaultTourDateTime(14));
   const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
-
-  // Computed after mount so the server-rendered markup never carries a timezone-dependent value
-  useEffect(() => {
-    setBookDate(defaultTourDateTime(14));
-  }, []);
 
   const images =
     Array.isArray(property.images) && property.images.length > 0
@@ -357,7 +352,7 @@ export function PublicListingClient({
                       <span>AI Leasing Advisor Preview</span>
                     </div>
                     <p className="text-sm sm:text-base font-medium leading-relaxed italic">
-                      "{knowledgeBase.synthesizedSalesPitch}"
+                      &ldquo;{knowledgeBase.synthesizedSalesPitch}&rdquo;
                     </p>
                     <div className="mt-4 flex items-center gap-3">
                       <button

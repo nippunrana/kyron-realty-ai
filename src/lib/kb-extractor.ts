@@ -86,7 +86,7 @@ function parseCountWord(word: string): number {
  * Deterministic real-time attribute extractor for instantaneous (<10ms) hands-free voice updates.
  * Parses listing type, price, beds, baths, sqft, and address from spoken user text.
  */
-export function extractHeuristicAttributes(
+function extractHeuristicAttributes(
   text: string,
   prevProperty?: Partial<ExtractedPropertyPayload["property"]>
 ): Partial<ExtractedPropertyPayload["property"]> {

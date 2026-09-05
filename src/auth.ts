@@ -11,7 +11,7 @@ import { AUTH_BASE_PATH } from "@/lib/base-path";
 
 const googleOAuth = getGoogleOAuthConfig();
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+export const { handlers, auth } = NextAuth({
   basePath: AUTH_BASE_PATH,
   adapter: DrizzleAdapter(db, {
     usersTable: users,

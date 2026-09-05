@@ -11,7 +11,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "lint:unused": "knip"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.3",
@@ -40,6 +41,7 @@
     "drizzle-kit": "^0.30.0",
     "eslint": "^9.0.0",
     "eslint-config-next": "^16.3.3",
+    "knip": "^6.34.0",
     "postcss": "^8.4.38",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.7.0"

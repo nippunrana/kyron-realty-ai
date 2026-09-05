@@ -26,6 +26,16 @@ function LoginFormContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
+  const authErrorParam = searchParams.get("error");
+  const initialAuthError =
+    authErrorParam === "OAuthSignin" || authErrorParam === "OAuthCallback"
+      ? "Google sign-in could not be completed. Please try again or sign in with email."
+      : authErrorParam === "Configuration"
+      ? "Google OAuth is not configured properly. Please verify AUTH_GOOGLE_ID & AUTH_GOOGLE_SECRET in .env."
+      : authErrorParam === "CredentialsSignin"
+      ? "Invalid email or password. Please try again."
+      : "";
+
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -34,24 +44,11 @@ function LoginFormContent() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
+  const [errorMsg, setErrorMsg] = useState(initialAuthError);
   const [infoMsg, setInfoMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
   const [googleOAuthConfigured, setGoogleOAuthConfigured] = useState<boolean | null>(null);
-  const [showOAuthNotice, setShowOAuthNotice] = useState(false);
-
-  // Check auth error in URL or query params
-  useEffect(() => {
-    const errorParam = searchParams.get("error");
-    if (errorParam === "OAuthSignin" || errorParam === "OAuthCallback") {
-      setErrorMsg("Google sign-in could not be completed. Please try again or sign in with email.");
-    } else if (errorParam === "Configuration") {
-      setShowOAuthNotice(true);
-      setErrorMsg("Google OAuth is not configured properly. Please verify AUTH_GOOGLE_ID & AUTH_GOOGLE_SECRET in .env.");
-    } else if (errorParam === "CredentialsSignin") {
-      setErrorMsg("Invalid email or password. Please try again.");
-    }
-  }, [searchParams]);
+  const [showOAuthNotice, setShowOAuthNotice] = useState(authErrorParam === "Configuration");
 
   // Check if Google OAuth is configured via backend status check
   useEffect(() => {
