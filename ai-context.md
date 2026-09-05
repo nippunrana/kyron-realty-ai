@@ -20,7 +20,7 @@ Before writing or modifying features, consult the canonical source files and the
 ### Strict Agora-Only Conversational AI Policy (Zero Browser Fallbacks)
 For this project, all conversational AI voice capabilities must run strictly and exclusively on **Agora SD-RTN WebRTC** and **Agora Signaling (RTM)** via the Agora Conversational AI Cloud Gateway:
 - **Strictly Prohibited**: Browser SpeechSynthesis (`window.speechSynthesis`), browser speech recognition (`webkitSpeechRecognition`), client-side fake assistant reply scripts, and silent backend fake-success fallbacks.
-- **Approved Cloud Services**: Agora-managed cloud services (such as Agora Managed TTS via MiniMax `speech-2.6-turbo` and Agora Cloud ASR) and configured cloud LLMs (Gemini/OpenAI) are standard approved components.
+- **Approved Cloud Services**: Agora-managed cloud services and the ASR, TTS, and LLM vendors wired in `src/lib/agora-agent-client.ts` (selected by which API keys are present) are standard approved components. The restriction is on browser-local speech, not on cloud vendors.
 - **Fail-Fast Error Contract**: If Agora Cloud Gateway or RTC/RTM connection fails, the system must fail explicitly, mark the DB session as `failed`, and surface the error to the user immediately. Never fake success.
 
 ---
