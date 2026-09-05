@@ -23,15 +23,19 @@ import {
 } from "lucide-react";
 import { ExtractedPropertyPayload } from "@/lib/kb-extractor";
 import { VerificationChecklist, ChecklistItemData } from "./VerificationChecklist";
+import { ExtraSpecsSuggestionBar } from "./ExtraSpecsSuggestionBar";
 
 interface LivePropertyInspectorProps {
   data: ExtractedPropertyPayload;
   ownerName?: string;
+  onboardingStage?: "core" | "additional_specs" | "final_review";
   onUpdateProperty: (updates: Partial<ExtractedPropertyPayload["property"]>) => void;
   onUpdateKnowledgeBase: (updates: Partial<ExtractedPropertyPayload["knowledgeBase"]>) => void;
   onUpdateNegotiationMatrix: (updates: Partial<ExtractedPropertyPayload["negotiationMatrix"]>) => void;
   onPublish: () => void;
   onOpenReviewModal?: () => void;
+  onOpenCoreModal?: () => void;
+  onOpenFinalModal?: () => void;
   isPublishing: boolean;
   isExtracting: boolean;
   isTurnSyncing?: boolean;
@@ -40,11 +44,14 @@ interface LivePropertyInspectorProps {
 export function LivePropertyInspector({
   data,
   ownerName,
+  onboardingStage = "core",
   onUpdateProperty,
   onUpdateKnowledgeBase,
   onUpdateNegotiationMatrix,
   onPublish,
   onOpenReviewModal,
+  onOpenCoreModal,
+  onOpenFinalModal,
   isPublishing,
   isExtracting,
   isTurnSyncing = false,
@@ -233,6 +240,67 @@ export function LivePropertyInspector({
     });
   }
 
+  // 8. Parking Setup
+  if (knowledgeBase.parkingDetail && knowledgeBase.parkingDetail.trim().length > 0) {
+    additionalSpecs.push({
+      id: "parking_detail",
+      label: "Parking Setup",
+      value: knowledgeBase.parkingDetail,
+      icon: Car,
+      color: "blue",
+    });
+  }
+
+  // 9. Pet Policy (For rent or if specified)
+  if (knowledgeBase.petPolicyDetail && knowledgeBase.petPolicyDetail.trim().length > 0) {
+    additionalSpecs.push({
+      id: "pet_policy",
+      label: "Pet Policy",
+      value: knowledgeBase.petPolicyDetail,
+      icon: PawPrint,
+      color: "emerald",
+    });
+  }
+
+  // 10. Utilities Detail
+  if (knowledgeBase.utilitiesDetail && knowledgeBase.utilitiesDetail.trim().length > 0) {
+    additionalSpecs.push({
+      id: "utilities_detail",
+      label: "Utilities",
+      value: knowledgeBase.utilitiesDetail,
+      icon: Zap,
+      color: "amber",
+    });
+  }
+
+  // 11. Features
+  if (property.features && property.features.length > 0) {
+    property.features.forEach((feat, idx) => {
+      additionalSpecs.push({
+        id: `feature_${idx}`,
+        label: "Feature Highlight",
+        value: feat,
+        icon: Sparkles,
+        color: "indigo",
+      });
+    });
+  }
+
+  const handleApplyChip = (field: string, value: any) => {
+    if (field === "parkingDetail" || field === "petPolicyDetail" || field === "utilitiesDetail") {
+      onUpdateKnowledgeBase({ [field]: value });
+    } else if (field === "hoaFeeMonthly") {
+      onUpdateProperty({ hoaFeeMonthly: Number(value) });
+    } else if (field === "availableDate") {
+      onUpdateProperty({ availableDate: value });
+    } else if (field === "feature") {
+      const existing = property.features || [];
+      if (!existing.includes(value)) {
+        onUpdateProperty({ features: [...existing, value] });
+      }
+    }
+  };
+
   const hasAnyIntelligence = Boolean(
     knowledgeBase.synthesizedSalesPitch ||
       (property.amenities && property.amenities.length > 0) ||
@@ -284,15 +352,31 @@ export function LivePropertyInspector({
               <span>Syncing specs...</span>
             </div>
           )}
-          {isFullyVerified && onOpenReviewModal ? (
-            <button
-              type="button"
-              onClick={onOpenReviewModal}
-              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-[11px] font-bold text-emerald-700 shadow-xs transition-all cursor-pointer hover:scale-105 active:scale-95"
-            >
-              <Eye className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Review Card</span>
-            </button>
+          {isFullyVerified && (onOpenReviewModal || onOpenFinalModal || onOpenCoreModal) ? (
+            <div className="flex items-center gap-1.5">
+              {onOpenCoreModal && (
+                <button
+                  type="button"
+                  onClick={onOpenCoreModal}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-200 text-[11px] font-bold text-slate-700 shadow-2xs transition-all cursor-pointer"
+                >
+                  <Eye className="w-3 h-3 text-slate-500" />
+                  <span>Core Specs</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onOpenFinalModal || onOpenReviewModal}
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-[11px] font-bold text-emerald-700 shadow-xs transition-all cursor-pointer hover:scale-105 active:scale-95"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                <span>
+                  {onboardingStage === "additional_specs" || onboardingStage === "final_review"
+                    ? "Review & Deploy"
+                    : "Review Card"}
+                </span>
+              </button>
+            </div>
           ) : (
             <div
               className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-[11px] font-semibold transition-colors ${
@@ -429,6 +513,22 @@ export function LivePropertyInspector({
 
         {/* 6-Point Dynamic Verification Checklist */}
         <VerificationChecklist items={checklistItems} verifiedCount={verifiedCount} />
+
+        {/* Suggestion Chips Bar for Extra Specs */}
+        {(isFullyVerified || onboardingStage === "additional_specs" || onboardingStage === "final_review" || additionalSpecs.length > 0) && (
+          <ExtraSpecsSuggestionBar
+            listingType={property.listingType === "sale" ? "sale" : "rent"}
+            currentValues={{
+              parkingDetail: knowledgeBase.parkingDetail,
+              petPolicyDetail: knowledgeBase.petPolicyDetail,
+              utilitiesDetail: knowledgeBase.utilitiesDetail,
+              hoaFeeMonthly: Number(property.hoaFeeMonthly) || 0,
+              availableDate: property.availableDate,
+              features: property.features,
+            }}
+            onApplyChip={handleApplyChip}
+          />
+        )}
 
         {/* SECTION 1: ADDITIONAL PROPERTY SPECS (Dynamically revealed) */}
         <div>

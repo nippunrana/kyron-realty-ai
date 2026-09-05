@@ -703,6 +703,16 @@ export interface TurnSpecUpdates {
   state?: string;
   zipCode?: string;
   contactEmail?: string;
+  // Additional Specs
+  parkingDetail?: string;
+  petPolicyDetail?: string;
+  utilitiesDetail?: string;
+  hoaFeeMonthly?: number;
+  securityDeposit?: number;
+  minLeaseMonths?: number;
+  availableDate?: string;
+  features?: string[];
+  amenities?: string[];
 }
 
 /**
@@ -712,7 +722,10 @@ export interface TurnSpecUpdates {
  */
 export async function extractTurnSpecs(
   input: ExtractTurnInput
-): Promise<{ updates: TurnSpecUpdates; modalAction?: "open" | "close" | "none" }> {
+): Promise<{
+  updates: TurnSpecUpdates;
+  modalAction?: "open_core" | "close_core" | "open_final" | "close_final" | "open" | "close" | "none";
+}> {
   const { slidingWindowMessages, currentPropertyState } = input;
 
   if (!slidingWindowMessages || slidingWindowMessages.length === 0) {
@@ -742,28 +755,49 @@ CURRENT VERIFIED STATE:
 - bedrooms: ${currentPropertyState.bedrooms !== undefined && currentPropertyState.bedrooms !== null ? currentPropertyState.bedrooms : "pending"}
 - bathrooms: ${currentPropertyState.bathrooms !== undefined && currentPropertyState.bathrooms !== null ? currentPropertyState.bathrooms : "pending"}
 - sqft: ${currentPropertyState.sqft ? `${currentPropertyState.sqft} sqft` : "pending"}
+- hoaFeeMonthly: ${currentPropertyState.hoaFeeMonthly ? `$${currentPropertyState.hoaFeeMonthly}/mo` : "0"}
+- securityDeposit: ${currentPropertyState.securityDeposit ? `$${currentPropertyState.securityDeposit}` : "0"}
+- availableDate: ${currentPropertyState.availableDate || "pending"}
 `.trim()
     : "";
 
   const prompt = `
 You are the Real Estate Turn Extractor for Kyron Realty AI.
-Your job is to analyze the recent conversation turns between Elena Vance (AI Real Estate Specialist) and the property owner, and extract or update any of the 6 core listing specifications:
-1. listingType: "rent" or "sale"
-2. price: target price or monthly rent number (e.g. 3500)
-3. bedrooms: bedroom count number (e.g. 2, 0 for studio)
-4. bathrooms: bathroom count number (e.g. 1.5, 2)
-5. sqft: interior square footage number (e.g. 1200)
-6. address: street address (e.g. "250 Marina Blvd")
+Your job is to analyze the recent conversation turns between Elena Vance (AI Real Estate Specialist) and the property owner, and extract or update any of the Core or Additional property specifications:
+
+1. CORE SPECS (Stage 1):
+- listingType: "rent" or "sale"
+- price: target price or monthly rent number (e.g. 3500)
+- bedrooms: bedroom count number (e.g. 2, 0 for studio)
+- bathrooms: bathroom count number (e.g. 1.5, 2)
+- sqft: interior square footage number (e.g. 1200)
+- address: street address (e.g. "250 Marina Blvd")
 Optional location fields: city, state, zipCode.
-7. contactEmail: verified public contact email for listing (e.g. "alex@example.com") if the owner confirms their email or provides an alternate email.
+- contactEmail: verified public contact email for listing (e.g. "alex@example.com") if the owner confirms or provides an email.
+
+2. ADDITIONAL SPECS & KNOWLEDGE BASE (Stage 2):
+- parkingDetail: parking arrangement (e.g. "2-car garage included", "1 assigned stall", "Street parking only", "No parking")
+- petPolicyDetail: for rentals only (e.g. "Cats and dogs allowed with deposit", "Cats only", "No pets allowed")
+- utilitiesDetail: utilities included vs tenant responsibility (e.g. "Water and trash included", "Tenant pays electric and gas", "All utilities included")
+- hoaFeeMonthly: monthly HOA / condo dues dollar amount (e.g. 350)
+- securityDeposit: security deposit dollar amount (e.g. 2500)
+- minLeaseMonths: minimum lease duration in months (e.g. 12, 6)
+- availableDate: move-in availability date or timing (e.g. "Immediate", "Available in 30 days", "October 1st")
+- features: notable features mentioned (e.g. "Central A/C", "In-unit washer/dryer", "Private balcony", "Newly renovated kitchen", "Vacant and move-in ready")
+- amenities: building amenities mentioned (e.g. "Pool", "Fitness center", "Elevator", "Doorman")
 
 CRITICAL INSTRUCTIONS FOR DIALOGUE REASONING & ASR ROBUSTNESS:
 - Dialogue is labeled with [ELENA VANCE] and [OWNER].
 - Automatic Speech Recognition (ASR) phonetic slips: Spoken owner words may be transcribed with slight errors (e.g. "It's Oren" instead of "It's for rent"). Use Elena's subsequent confirmations and preceding questions as context to disambiguate the owner's true intent.
 - Extract facts EXCLUSIVELY from what the owner states or agrees to. Never treat Elena's hypothetical examples as facts.
-- Check the ENTIRE provided sliding window: If ANY of the specifications above were mentioned, answered, or corrected by the owner anywhere in the provided dialogue, include them in "updates".
 - If no property specs were mentioned or changed in this dialogue, return an empty "updates" object: { "updates": {} }.
-- UI MODAL INTENT DETECTION: If the dialogue indicates that the owner or Elena is asking to view, open, show, or pull back up the review modal/card/pop-up, set "modalAction": "open". If the owner or Elena is asking to close, hide, or minimize the review card, set "modalAction": "close". Otherwise, set "modalAction": "none".
+
+UI MODAL INTENT DETECTION:
+- "open_core" (or "open"): Elena or owner is showing, pulling up, or opening the Core Specs review card.
+- "close_core" (or "close"): The owner confirms the core specs (e.g. "looks good", "confirmed", "that's right", "continue") or asks to minimize the core card.
+- "open_final": Elena or owner is pulling up the Final Complete / Deploy review card.
+- "close_final": Owner asks to close or minimize the final review card.
+- Otherwise: "none".
 
 ${currentVerifiedSummary}
 
@@ -796,11 +830,28 @@ ${formattedDialogue}
                 state: { type: "string" },
                 zipCode: { type: "string" },
                 contactEmail: { type: "string" },
+                parkingDetail: { type: "string" },
+                petPolicyDetail: { type: "string" },
+                utilitiesDetail: { type: "string" },
+                hoaFeeMonthly: { type: "number" },
+                securityDeposit: { type: "number" },
+                minLeaseMonths: { type: "number" },
+                availableDate: { type: "string" },
+                features: { type: "array", items: { type: "string" } },
+                amenities: { type: "array", items: { type: "string" } },
               },
             },
             modalAction: {
               type: "string",
-              enum: ["open", "close", "none"],
+              enum: [
+                "open_core",
+                "close_core",
+                "open_final",
+                "close_final",
+                "open",
+                "close",
+                "none",
+              ],
             },
           },
           required: ["updates", "modalAction"],

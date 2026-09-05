@@ -78,10 +78,14 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
   const [activePipelineStep, setActivePipelineStep] = useState<string | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
   const [isTurnSyncing, setIsTurnSyncing] = useState(false);
-  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [onboardingStage, setOnboardingStage] = useState<"core" | "additional_specs" | "final_review">("core");
+  const [showCoreModal, setShowCoreModal] = useState(false);
+  const [showFinalModal, setShowFinalModal] = useState(false);
 
   const dataRef = useRef(data);
   dataRef.current = data;
+  const onboardingStageRef = useRef(onboardingStage);
+  onboardingStageRef.current = onboardingStage;
 
   const voiceAgentActionsRef = useRef<{ sendTextMessage: (text: string) => void } | null>(null);
   const turnSequenceRef = useRef<number>(0);
@@ -122,11 +126,28 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
     }));
   };
 
+  // Transition from Stage 1 (Core Specs) to Stage 2 (Additional Specs)
+  const handleConfirmCoreSpecs = () => {
+    setShowCoreModal(false);
+    setOnboardingStage("additional_specs");
+    // Send conversational context trigger to Elena Vance if live voice session active
+    if (voiceAgentActionsRef.current?.sendTextMessage) {
+      voiceAgentActionsRef.current.sendTextMessage(
+        "The owner confirmed the core specs. Please now enthusiastically introduce and ask for the extra property details (parking, pets if rental, utilities, HOA if sale)."
+      );
+    }
+  };
+
   const handleUIAction = useCallback((action: "open_review_modal" | "close_review_modal") => {
     if (action === "open_review_modal") {
-      setShowReviewModal(true);
+      if (onboardingStageRef.current === "core") {
+        setShowCoreModal(true);
+      } else {
+        setShowFinalModal(true);
+      }
     } else if (action === "close_review_modal") {
-      setShowReviewModal(false);
+      setShowCoreModal(false);
+      setShowFinalModal(false);
     }
   }, []);
 
@@ -159,26 +180,66 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
 
       const json = await res.json();
       if (json.success && json.data?.modalAction) {
-        if (json.data.modalAction === "open") {
-          setShowReviewModal(true);
-        } else if (json.data.modalAction === "close") {
-          setShowReviewModal(false);
+        const action = json.data.modalAction;
+        if (action === "open_core") {
+          setShowCoreModal(true);
+        } else if (action === "close_core") {
+          setShowCoreModal(false);
+          setOnboardingStage("additional_specs");
+        } else if (action === "open_final") {
+          setShowFinalModal(true);
+        } else if (action === "close_final") {
+          setShowFinalModal(false);
+        } else if (action === "open") {
+          if (onboardingStageRef.current === "core") {
+            setShowCoreModal(true);
+          } else {
+            setShowFinalModal(true);
+          }
+        } else if (action === "close") {
+          setShowCoreModal(false);
+          setShowFinalModal(false);
         }
       }
 
       if (json.success && json.data?.updates && Object.keys(json.data.updates).length > 0) {
         const updates = json.data.updates;
-        const { contactEmail, ...propertyUpdates } = updates;
+        const {
+          contactEmail,
+          parkingDetail,
+          petPolicyDetail,
+          utilitiesDetail,
+          features: newFeatures,
+          amenities: newAmenities,
+          ...propertyUpdates
+        } = updates;
 
         setData((prev) => {
-          const updatedProperty = { ...prev.property, ...propertyUpdates };
+          const updatedProperty = {
+            ...prev.property,
+            ...propertyUpdates,
+            features:
+              newFeatures && newFeatures.length > 0
+                ? Array.from(new Set([...(prev.property.features || []), ...newFeatures]))
+                : prev.property.features,
+            amenities:
+              newAmenities && newAmenities.length > 0
+                ? Array.from(new Set([...(prev.property.amenities || []), ...newAmenities]))
+                : prev.property.amenities,
+          };
+
+          const updatedKb = {
+            ...prev.knowledgeBase,
+            ...(contactEmail ? { contactEmail } : {}),
+            ...(parkingDetail ? { parkingDetail } : {}),
+            ...(petPolicyDetail ? { petPolicyDetail } : {}),
+            ...(utilitiesDetail ? { utilitiesDetail } : {}),
+          };
 
           return {
             ...prev,
             property: updatedProperty,
-            knowledgeBase: contactEmail
-              ? { ...prev.knowledgeBase, contactEmail }
-              : prev.knowledgeBase,
+            knowledgeBase: updatedKb,
             negotiationMatrix: propertyUpdates.price
               ? {
                   ...prev.negotiationMatrix,
@@ -435,11 +496,20 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
           <LivePropertyInspector
             data={data}
             ownerName={user?.name || ""}
+            onboardingStage={onboardingStage}
             onUpdateProperty={handleUpdateProperty}
             onUpdateKnowledgeBase={handleUpdateKnowledgeBase}
             onUpdateNegotiationMatrix={handleUpdateNegotiationMatrix}
             onPublish={handlePublish}
-            onOpenReviewModal={() => setShowReviewModal(true)}
+            onOpenCoreModal={() => setShowCoreModal(true)}
+            onOpenFinalModal={() => setShowFinalModal(true)}
+            onOpenReviewModal={() => {
+              if (onboardingStage === "core") {
+                setShowCoreModal(true);
+              } else {
+                setShowFinalModal(true);
+              }
+            }}
             isPublishing={isPublishing}
             isExtracting={isProcessing}
             isTurnSyncing={isTurnSyncing}
@@ -447,12 +517,30 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
         </div>
       </div>
 
-      {/* Review Specs Modal (Pops up when 6/6 parameters are verified) */}
-      {showReviewModal && (
+      {/* 1. Core Specs Review Modal (Stage 2: 6/6 Core Specs Verified) */}
+      {showCoreModal && (
         <ReviewSpecsModal
-          isOpen={showReviewModal}
-          onClose={() => setShowReviewModal(false)}
+          isOpen={showCoreModal}
+          mode="core"
+          onClose={() => setShowCoreModal(false)}
           property={data.property}
+          knowledgeBase={data.knowledgeBase}
+          contactEmail={data.knowledgeBase.contactEmail || user?.email || ""}
+          ownerName={user?.name || ""}
+          onConfirmCore={handleConfirmCoreSpecs}
+          onPublish={handlePublish}
+          isPublishing={isPublishing}
+        />
+      )}
+
+      {/* 2. Final Unified Review Modal (Stage 5: Final Review & Deploy) */}
+      {showFinalModal && (
+        <ReviewSpecsModal
+          isOpen={showFinalModal}
+          mode="final"
+          onClose={() => setShowFinalModal(false)}
+          property={data.property}
+          knowledgeBase={data.knowledgeBase}
           contactEmail={data.knowledgeBase.contactEmail || user?.email || ""}
           ownerName={user?.name || ""}
           onPublish={handlePublish}
