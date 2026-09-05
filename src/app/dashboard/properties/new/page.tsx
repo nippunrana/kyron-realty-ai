@@ -17,7 +17,7 @@ export default async function NewPropertyPage() {
   }
 
   return (
-    <div className="h-[100dvh] max-h-[100dvh] flex flex-col bg-slate-50 text-slate-900 selection:bg-blue-100 selection:text-blue-900 relative overflow-hidden">
+    <div className="fixed inset-0 flex flex-col bg-slate-50 text-slate-900 selection:bg-blue-100 selection:text-blue-900 overflow-hidden">
       {/* Ambient Light Luxury Glow */}
       <div className="absolute top-0 inset-x-0 h-[400px] luxury-gradient pointer-events-none -z-10" />
 
