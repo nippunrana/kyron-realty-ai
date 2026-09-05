@@ -64,10 +64,12 @@ export function VoiceSalesAgentModal({
   const [bookingConfirmed, setBookingConfirmed] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
 
-  const transcriptEndRef = useRef<HTMLDivElement>(null);
+  const transcriptContainerRef = useRef<HTMLDivElement>(null);
 
+  // Scroll the transcript container itself, never an ancestor (the transcript rule in the onboarding doc)
   useEffect(() => {
-    transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const container = transcriptContainerRef.current;
+    if (container) container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
   }, [transcript]);
 
   // When user clicks the top "X" or backdrop
@@ -323,7 +325,7 @@ export function VoiceSalesAgentModal({
             </div>
 
             {/* Live Conversation Transcript Stream */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3 bg-slate-50/50">
+            <div ref={transcriptContainerRef} className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3 bg-slate-50/50">
               {transcript.map((msg) => (
                 <div
                   key={msg.id}
@@ -360,7 +362,6 @@ export function VoiceSalesAgentModal({
                   </div>
                 </div>
               ))}
-              <div ref={transcriptEndRef} />
             </div>
 
             {/* Quick Suggestion Chips */}

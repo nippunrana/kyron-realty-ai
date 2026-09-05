@@ -136,7 +136,7 @@ export function HeroVoiceSimulator({ onOpenCallModal }: HeroVoiceSimulatorProps)
       </div>
 
       {/* Interactive Voice Simulator Card */}
-      <div className="mt-12 w-full max-w-4xl">
+      <div id="hero-simulator" className="mt-12 w-full max-w-4xl">
         <div className="luxury-card rounded-2xl p-6 sm:p-8 border border-slate-200/90 shadow-xl shadow-slate-200/50 relative overflow-hidden bg-white/95">
           {/* Subtle Accent Glow */}
           <div className="absolute top-0 right-0 w-80 h-80 bg-radial from-blue-400/10 via-indigo-300/5 to-transparent blur-2xl pointer-events-none -z-10" />
