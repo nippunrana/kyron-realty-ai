@@ -3,8 +3,6 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
-  Mic,
-  Volume2,
   Sparkles,
   ArrowRight,
   PhoneCall,
@@ -15,7 +13,6 @@ import {
   Bot,
   User,
   Building2,
-  CheckCircle2,
 } from "lucide-react";
 
 interface Scenario {

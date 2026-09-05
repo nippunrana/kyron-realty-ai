@@ -1,6 +1,6 @@
 "use client";
 
-import { XCircle, CheckCircle2, PhoneOff, PhoneCall, Clock, TrendingUp, Sparkles, Users } from "lucide-react";
+import { XCircle, CheckCircle2, PhoneOff, PhoneCall, Sparkles } from "lucide-react";
 
 export function SpeedToLeadComparison() {
   return (

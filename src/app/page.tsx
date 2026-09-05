@@ -4,11 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import {
   Building2,
-  Sparkles,
   PhoneCall,
-  LogIn,
-  ArrowRight,
-  ShieldCheck,
   Radio,
 } from "lucide-react";
 import { HeroVoiceSimulator } from "@/components/home/HeroVoiceSimulator";

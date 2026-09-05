@@ -14,7 +14,6 @@ import {
   ExternalLink,
   ShieldCheck,
   Sparkles,
-  CheckCircle2,
   Car,
   Zap,
   Dog,

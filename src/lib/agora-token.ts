@@ -4,7 +4,6 @@ import agoraToken from "agora-token";
 const agoraModule = (agoraToken as any)?.default || agoraToken;
 const RtcTokenBuilder = agoraModule.RtcTokenBuilder;
 const RtmTokenBuilder = agoraModule.RtmTokenBuilder;
-const ConvoAITokenBuilder = agoraModule.ConvoAITokenBuilder;
 const RtcRole = agoraModule.RtcRole || { PUBLISHER: 1, SUBSCRIBER: 2 };
 
 export interface AgoraRtcTokenResult {

@@ -5,13 +5,8 @@ import {
   ShieldAlert,
   ShieldCheck,
   Scale,
-  Sparkles,
   Sliders,
-  DollarSign,
-  Calendar,
   CheckCircle2,
-  ArrowRight,
-  TrendingDown,
   Bot,
 } from "lucide-react";
 

@@ -3,15 +3,11 @@
 import Link from "next/link";
 import {
   Globe,
-  Sparkles,
   QrCode,
-  Share2,
   PhoneCall,
   ArrowRight,
-  ShieldCheck,
   CheckCircle2,
   Layers,
-  CalendarCheck,
 } from "lucide-react";
 
 export function ThreeStepEngine() {

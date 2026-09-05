@@ -4,16 +4,12 @@ import { useState } from "react";
 import Link from "next/link";
 import {
   TrendingUp,
-  Clock,
-  ShieldCheck,
-  Zap,
   Mail,
   ArrowRight,
   CheckCircle2,
   Sparkles,
   Lock,
   Loader2,
-  Building,
 } from "lucide-react";
 
 export function AgencyMetricsAndWaitlist() {

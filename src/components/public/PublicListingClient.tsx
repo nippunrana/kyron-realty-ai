@@ -20,10 +20,6 @@ import {
   Zap,
   HelpCircle,
   Clock,
-  ArrowLeft,
-  ChevronRight,
-  ExternalLink,
-  ChevronDown,
   X,
   Copy,
   Check,
@@ -54,7 +50,6 @@ export function PublicListingClient({
   // Booking Form State
   const [bookName, setBookName] = useState("");
   const [bookPhone, setBookPhone] = useState("");
-  const [bookEmail, setBookEmail] = useState("");
   const [bookDate, setBookDate] = useState("2026-09-06T14:00");
   const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
@@ -94,7 +89,6 @@ export function PublicListingClient({
           propertySlug: property.slug,
           name: bookName,
           phone: bookPhone,
-          email: bookEmail,
           scheduledStart: bookDate,
           tourType: "in_person",
         }),

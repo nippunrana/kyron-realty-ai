@@ -1,6 +1,6 @@
 "use client";
 
-import { Car, PawPrint, Zap, Calendar, Building2, ShieldCheck, Sparkles, Check, Home, Wrench } from "lucide-react";
+import { Car, PawPrint, Zap, Calendar, Building2, Sparkles, Check, Home, Wrench } from "lucide-react";
 
 interface SuggestionGroup {
   id: string;

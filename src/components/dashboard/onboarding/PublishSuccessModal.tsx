@@ -9,7 +9,6 @@ import {
   Share2,
   PhoneCall,
   Download,
-  ExternalLink,
   Sparkles,
   ShieldCheck,
   X,

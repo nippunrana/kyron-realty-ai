@@ -361,7 +361,7 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
 
         // Step 2: Initialize Agora RTM and log in BEFORE RTC join
         const AgoraRTM = (await import("agora-rtm")).default;
-        const { AgoraVoiceAI, AgoraVoiceAIEvents, TurnStatus, TranscriptHelperMode } = await import(
+        const { AgoraVoiceAI, AgoraVoiceAIEvents, TranscriptHelperMode } = await import(
           "agora-agent-client-toolkit"
         );
 
@@ -583,7 +583,7 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
           }
         });
 
-        client.on("user-unpublished", (user, mediaType) => {
+        client.on("user-unpublished", (_user, mediaType) => {
           if (mediaType === "audio") {
             setIsAgentSpeaking(false);
             setCallState("connected");
