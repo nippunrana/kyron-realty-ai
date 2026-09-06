@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     const userId = session.user.id || null;
 
     const body = await req.json();
-    const { property, knowledgeBase, negotiationMatrix } = body || {};
+    const { property, knowledgeBase, negotiationMatrix, draftId } = body || {};
 
     if (property && !property.title && property.address) {
       property.title = buildDefaultTitle(property.address, property.bedrooms);
@@ -40,14 +40,14 @@ export async function POST(req: NextRequest) {
 
     let slug = property.slug || slugify(property.title);
 
-    // Check if slug exists
+    // Check if slug exists on another property
     const [existing] = await db
       .select({ id: properties.id })
       .from(properties)
       .where(eq(properties.slug, slug))
       .limit(1);
 
-    if (existing) {
+    if (existing && (!draftId || existing.id !== Number(draftId))) {
       slug = `${slug}-${randomSlugSuffix()}`;
     }
 
@@ -63,42 +63,96 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // 1. Insert Property
-    const [insertedProperty] = await db
-      .insert(properties)
-      .values({
-        ownerId: userId,
-        slug,
-        title: property.title,
-        description: property.description || "",
-        listingType: property.listingType,
-        propertyType: property.propertyType || "apartment",
-        status: "active",
-        price: String(property.price),
-        securityDeposit: property.securityDeposit ? String(property.securityDeposit) : null,
-        minLeaseMonths: property.minLeaseMonths ? Number(property.minLeaseMonths) : null,
-        hoaFeeMonthly: property.hoaFeeMonthly ? String(property.hoaFeeMonthly) : "0",
-        address: property.address,
-        unitNumber: property.unitNumber || null,
-        city: property.city || null,
-        state: property.state || null,
-        zipCode: property.zipCode || null,
-        country: property.country || "USA",
-        bedrooms: property.bedrooms ? Number(property.bedrooms) : null,
-        bathrooms: property.bathrooms ? String(property.bathrooms) : null,
-        sqft: property.sqft ? Number(property.sqft) : null,
-        yearBuilt: property.yearBuilt ? Number(property.yearBuilt) : null,
-        availableDate: property.availableDate ? new Date(property.availableDate) : null,
-        coverImageUrl: property.coverImageUrl || (property.images && property.images[0]) || null,
-        images: property.images || [],
-        amenities: property.amenities || [],
-        features: property.features || [],
-        qrCodeSvg,
-        shareUrl,
-        onboardingSource: property.onboardingSource || "conversational_wizard",
-        sourceUrl: property.sourceUrl || null,
-      })
-      .returning();
+    let insertedProperty: any;
+
+    if (draftId) {
+      const [updated] = await db
+        .update(properties)
+        .set({
+          slug,
+          title: property.title,
+          description: property.description || "",
+          listingType: property.listingType,
+          propertyType: property.propertyType || "apartment",
+          status: "active",
+          price: String(property.price),
+          securityDeposit: property.securityDeposit ? String(property.securityDeposit) : null,
+          minLeaseMonths: property.minLeaseMonths ? Number(property.minLeaseMonths) : null,
+          hoaFeeMonthly: property.hoaFeeMonthly ? String(property.hoaFeeMonthly) : "0",
+          address: property.address,
+          unitNumber: property.unitNumber || null,
+          city: property.city || null,
+          state: property.state || null,
+          zipCode: property.zipCode || null,
+          country: property.country || "USA",
+          bedrooms: property.bedrooms ? Number(property.bedrooms) : null,
+          bathrooms: property.bathrooms ? String(property.bathrooms) : null,
+          sqft: property.sqft ? Number(property.sqft) : null,
+          yearBuilt: property.yearBuilt ? Number(property.yearBuilt) : null,
+          availableDate: property.availableDate ? new Date(property.availableDate) : null,
+          coverImageUrl: property.coverImageUrl || (property.images && property.images[0]) || null,
+          images: property.images || [],
+          amenities: property.amenities || [],
+          features: property.features || [],
+          qrCodeSvg,
+          shareUrl,
+          onboardingSource: property.onboardingSource || "conversational_wizard",
+          sourceUrl: property.sourceUrl || null,
+          updatedAt: new Date(),
+        })
+        .where(eq(properties.id, Number(draftId)))
+        .returning();
+
+      insertedProperty = updated;
+
+      // Clean up previous draft knowledgebase & matrix rows if present to prevent duplicate conflicts
+      if (insertedProperty) {
+        await db.delete(propertyKnowledgeBases).where(eq(propertyKnowledgeBases.propertyId, insertedProperty.id));
+        await db.delete(negotiationMatrices).where(eq(negotiationMatrices.propertyId, insertedProperty.id));
+        await db.delete(propertyMedia).where(eq(propertyMedia.propertyId, insertedProperty.id));
+      }
+    }
+
+    if (!insertedProperty) {
+      // 1. Insert New Property
+      const [inserted] = await db
+        .insert(properties)
+        .values({
+          ownerId: userId,
+          slug,
+          title: property.title,
+          description: property.description || "",
+          listingType: property.listingType,
+          propertyType: property.propertyType || "apartment",
+          status: "active",
+          price: String(property.price),
+          securityDeposit: property.securityDeposit ? String(property.securityDeposit) : null,
+          minLeaseMonths: property.minLeaseMonths ? Number(property.minLeaseMonths) : null,
+          hoaFeeMonthly: property.hoaFeeMonthly ? String(property.hoaFeeMonthly) : "0",
+          address: property.address,
+          unitNumber: property.unitNumber || null,
+          city: property.city || null,
+          state: property.state || null,
+          zipCode: property.zipCode || null,
+          country: property.country || "USA",
+          bedrooms: property.bedrooms ? Number(property.bedrooms) : null,
+          bathrooms: property.bathrooms ? String(property.bathrooms) : null,
+          sqft: property.sqft ? Number(property.sqft) : null,
+          yearBuilt: property.yearBuilt ? Number(property.yearBuilt) : null,
+          availableDate: property.availableDate ? new Date(property.availableDate) : null,
+          coverImageUrl: property.coverImageUrl || (property.images && property.images[0]) || null,
+          images: property.images || [],
+          amenities: property.amenities || [],
+          features: property.features || [],
+          qrCodeSvg,
+          shareUrl,
+          onboardingSource: property.onboardingSource || "conversational_wizard",
+          sourceUrl: property.sourceUrl || null,
+        })
+        .returning();
+
+      insertedProperty = inserted;
+    }
 
     // 2. Insert Knowledge Base
     if (knowledgeBase) {

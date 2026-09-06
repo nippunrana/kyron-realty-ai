@@ -27,8 +27,9 @@ interface ReviewSpecsModalProps {
   knowledgeBase?: ExtractedPropertyPayload["knowledgeBase"];
   contactEmail?: string;
   ownerName?: string;
-  mode?: "core" | "final";
+  mode?: "core" | "additional" | "final";
   onConfirmCore?: () => void;
+  onProceedToUpload?: () => void;
   onPublish: () => Promise<void>;
   isPublishing: boolean;
 }
@@ -41,6 +42,7 @@ export function ReviewSpecsModal({
   ownerName,
   mode = "core",
   onConfirmCore,
+  onProceedToUpload,
   onPublish,
   isPublishing,
 }: ReviewSpecsModalProps) {
@@ -73,6 +75,7 @@ export function ReviewSpecsModal({
     .join(", ") || "Address pending";
 
   const isFinalMode = mode === "final";
+  const isAdditionalMode = mode === "additional";
 
   // Check which additional specs have been captured
   const hasParking = Boolean(knowledgeBase?.parkingDetail && knowledgeBase.parkingDetail.trim().length > 0);
@@ -105,14 +108,26 @@ export function ReviewSpecsModal({
           </div>
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold mb-1.5">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>{isFinalMode ? "Complete Property Intelligence Ready" : `Stage 1: Core Specs Verified (${verifiedCoreCount}/6)`}</span>
+            <span>
+              {isFinalMode
+                ? "Complete Property Intelligence Ready"
+                : isAdditionalMode
+                ? "Stage 2: Additional Specifications Verified"
+                : `Stage 1: Core Specs Verified (${verifiedCoreCount}/6)`}
+            </span>
           </div>
           <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
-            {isFinalMode ? "Final Listing Review & Deploy" : "Review Core Specifications"}
+            {isFinalMode
+              ? "Final Listing Review & Deploy"
+              : isAdditionalMode
+              ? "Review Additional Details"
+              : "Review Core Specifications"}
           </h2>
           <p className="text-xs sm:text-sm text-slate-600 mt-1 max-w-lg mx-auto">
             {isFinalMode
-              ? "Elena Vance has assembled your complete profile. Review both your core specs and extra details below before deploying."
+              ? "Elena Vance has assembled your complete profile with verified specs and photos. Review below before deploying."
+              : isAdditionalMode
+              ? "Elena Vance has captured your property terms and policies. Confirm below to proceed to photo upload."
               : "Elena Vance has locked in your 6 core parameters. Confirm them below to move to extra property specs."}
           </p>
         </div>
@@ -326,6 +341,52 @@ export function ReviewSpecsModal({
             </div>
           )}
 
+          {/* Attached Property Photos Section */}
+          {Array.isArray(property.images) && property.images.length > 0 && (
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                    Attached Photos ({property.images.length})
+                  </span>
+                  <span className="px-2 py-0.2 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                    Ready
+                  </span>
+                </div>
+                {onProceedToUpload && (
+                  <button
+                    type="button"
+                    onClick={onProceedToUpload}
+                    className="text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors cursor-pointer"
+                  >
+                    Manage Photos
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                {property.images.slice(0, 6).map((img, idx) => (
+                  <div
+                    key={`${img}-${idx}`}
+                    className="w-16 h-12 rounded-lg overflow-hidden border border-slate-200 bg-slate-900 shrink-0 relative"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={img} alt="Property thumbnail" className="w-full h-full object-cover" />
+                    {idx === 0 && (
+                      <span className="absolute bottom-0 inset-x-0 bg-black/70 text-[8px] font-bold text-white text-center">
+                        Cover
+                      </span>
+                    )}
+                  </div>
+                ))}
+                {property.images.length > 6 && (
+                  <div className="w-16 h-12 rounded-lg border border-dashed border-slate-300 bg-white flex items-center justify-center text-xs font-bold text-slate-500 shrink-0">
+                    +{property.images.length - 6}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Verified Listing Contact Spotlight */}
           {contactEmail && (
             <div className="p-3 rounded-2xl bg-slate-50/90 border border-slate-200/80 flex items-center justify-between gap-3">
@@ -362,7 +423,7 @@ export function ReviewSpecsModal({
 
         {/* Action Buttons */}
         <div className="shrink-0 pt-2 border-t border-slate-100">
-          {!isFinalMode ? (
+          {mode === "core" ? (
             <div className="flex flex-col sm:flex-row gap-2.5">
               <button
                 type="button"
@@ -381,7 +442,7 @@ export function ReviewSpecsModal({
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
-          ) : (
+          ) : mode === "additional" ? (
             <div className="flex flex-col sm:flex-row gap-2.5">
               <button
                 type="button"
@@ -390,6 +451,27 @@ export function ReviewSpecsModal({
               >
                 Back to Inspector
               </button>
+
+              <button
+                type="button"
+                onClick={onProceedToUpload}
+                className="flex-1 py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer hover:scale-[1.01]"
+              >
+                <span>Confirm & Attach Photos</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-col sm:flex-row gap-2.5">
+              {onProceedToUpload && (
+                <button
+                  type="button"
+                  onClick={onProceedToUpload}
+                  className="py-2.5 px-4 rounded-xl border border-slate-200 hover:bg-slate-100 active:bg-slate-200 text-xs font-bold text-slate-700 transition-all text-center cursor-pointer"
+                >
+                  Adjust Photos
+                </button>
+              )}
 
               <button
                 type="button"

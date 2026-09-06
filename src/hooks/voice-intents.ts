@@ -2,6 +2,10 @@ import type { UIAction } from "./voice-agent-types";
 
 const USER_OPEN_CORE =
   /(pull|bring|open|show|display|pop).*(core specs|core details|6 core)/i;
+const USER_OPEN_PHOTOS =
+  /(pull|bring|open|show|display|pop).*(photo|photos|image|images|upload window|upload modal)/i;
+const USER_CLOSE_PHOTOS =
+  /(close|hide|dismiss|minimize|shut).*(photo|photos|image|images|upload)/i;
 const USER_OPEN_FINAL =
   /(pull|bring|open|show|display|pop).*(final|deploy|complete property card)/i;
 const USER_OPEN =
@@ -12,6 +16,8 @@ const USER_APPROVE =
 
 const ASSISTANT_OPEN_CORE =
   /(pull|bring|open|show|display).*(core specs|core details|6 core).*(screen|for you|back up|take a look|right now)/i;
+const ASSISTANT_OPEN_PHOTOS =
+  /(pull|bring|open|show|display).*(photo|photos|image|images|upload window|upload modal).*(screen|for you|right now)/i;
 const ASSISTANT_OPEN_FINAL =
   /(pull|bring|open|show|display).*(final|complete property card|hit deploy|ready to deploy).*(screen|for you|back up|take a look|right now)/i;
 const ASSISTANT_OPEN_GENERIC =
@@ -21,8 +27,10 @@ const ASSISTANT_CLOSE = /(close|closed|hide|dismiss|minimiz).*(card|modal|pop[- 
 /** Verbal review-card commands from the owner: open wins over close/approve. */
 export function detectUserModalIntent(text: string): UIAction | null {
   if (USER_OPEN_CORE.test(text)) return "open_core_modal";
+  if (USER_OPEN_PHOTOS.test(text)) return "open_upload_modal";
   if (USER_OPEN_FINAL.test(text)) return "open_final_modal";
   if (USER_OPEN.test(text)) return "open_review_modal";
+  if (USER_CLOSE_PHOTOS.test(text)) return "close_upload_modal";
   if (USER_CLOSE.test(text) || USER_APPROVE.test(text)) return "close_review_modal";
   return null;
 }
@@ -31,6 +39,7 @@ export function detectUserModalIntent(text: string): UIAction | null {
 export function detectAssistantModalIntent(text: string): UIAction | null {
   if (ASSISTANT_CLOSE.test(text)) return "close_review_modal";
   if (ASSISTANT_OPEN_CORE.test(text)) return "open_core_modal";
+  if (ASSISTANT_OPEN_PHOTOS.test(text)) return "open_upload_modal";
   if (ASSISTANT_OPEN_FINAL.test(text)) return "open_final_modal";
   if (ASSISTANT_OPEN_GENERIC.test(text)) return "open_review_modal";
   return null;

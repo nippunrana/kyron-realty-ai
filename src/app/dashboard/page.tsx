@@ -4,7 +4,7 @@ import { Metadata } from "next";
 import { auth } from "@/auth";
 import { db } from "@/db";
 import { properties } from "@/db/schema";
-import { desc, eq, isNull, or } from "drizzle-orm";
+import { desc, eq, isNull, or, and, ne } from "drizzle-orm";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import {
   BrainCircuit,
@@ -63,7 +63,12 @@ export default async function DashboardPage() {
     userProperties = await db
       .select(listingCardColumns)
       .from(properties)
-      .where(or(eq(properties.ownerId, user.id ?? ""), isNull(properties.ownerId)))
+      .where(
+        and(
+          or(eq(properties.ownerId, user.id ?? ""), isNull(properties.ownerId)),
+          ne(properties.status, "draft")
+        )
+      )
       .orderBy(desc(properties.createdAt));
   } catch (err) {
     console.error("Error fetching properties for dashboard:", err);

@@ -27,7 +27,7 @@ import { ExtraSpecsSuggestionBar } from "./ExtraSpecsSuggestionBar";
 interface LivePropertyInspectorProps {
   data: ExtractedPropertyPayload;
   ownerName?: string;
-  onboardingStage?: "core" | "additional_specs" | "final_review";
+  onboardingStage?: "core" | "additional_specs" | "photos" | "final_review";
   pillLabels?: PillLabels;
   onUpdateProperty: (updates: Partial<ExtractedPropertyPayload["property"]>) => void;
   onUpdateKnowledgeBase: (updates: Partial<ExtractedPropertyPayload["knowledgeBase"]>) => void;
@@ -61,7 +61,7 @@ export function LivePropertyInspector({
 
   // Smoothly bring Additional Specs into focus when progressing past core specs
   useEffect(() => {
-    if (onboardingStage === "additional_specs" || onboardingStage === "final_review") {
+    if (onboardingStage === "additional_specs" || onboardingStage === "photos" || onboardingStage === "final_review") {
       const timer = setTimeout(() => {
         const container = scrollContainerRef.current;
         const target = suggestionBarSectionRef.current;
@@ -180,7 +180,7 @@ export function LivePropertyInspector({
               >
                 <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
                 <span>
-                  {onboardingStage === "additional_specs" || onboardingStage === "final_review"
+                  {onboardingStage === "additional_specs" || onboardingStage === "photos" || onboardingStage === "final_review"
                     ? "Review & Deploy"
                     : "Review Card"}
                 </span>
@@ -324,7 +324,7 @@ export function LivePropertyInspector({
         <VerificationChecklist items={checklistItems} verifiedCount={verifiedCount} />
 
         {/* Suggestion Chips Bar for Extra Specs */}
-        {(isFullyVerified || onboardingStage === "additional_specs" || onboardingStage === "final_review" || additionalSpecs.length > 0) && (
+        {(isFullyVerified || onboardingStage === "additional_specs" || onboardingStage === "photos" || onboardingStage === "final_review" || additionalSpecs.length > 0) && (
           <div
             ref={suggestionBarSectionRef}
             className={onboardingStage === "additional_specs" ? "ring-2 ring-indigo-400/40 rounded-2xl transition-all duration-300 shadow-sm" : ""}

@@ -55,7 +55,7 @@ export default async function PublicListingPage({ params }: ListingPageProps) {
   // 1. Fetch Property (memoized with generateMetadata for this request)
   const property = await getPropertyBySlug(slug);
 
-  if (!property) {
+  if (!property || property.status === "draft") {
     notFound();
   }
 

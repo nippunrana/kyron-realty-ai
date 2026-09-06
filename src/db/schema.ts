@@ -49,6 +49,7 @@ export const properties = pgTable("properties", {
   features: jsonb("features").$type<string[]>().default([]),
   qrCodeSvg: text("qr_code_svg"),
   shareUrl: text("share_url"),
+  uploadToken: text("upload_token"),
   
   // Automated Valuation & Ingestion Source
   aiValuationEstimate: numeric("ai_valuation_estimate", { precision: 12, scale: 2 }),

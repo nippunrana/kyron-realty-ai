@@ -5,6 +5,7 @@ import { ConversationalPanel } from "./ConversationalPanel";
 import { LivePropertyInspector } from "./LivePropertyInspector";
 import { PublishSuccessModal } from "./PublishSuccessModal";
 import { ReviewSpecsModal } from "./ReviewSpecsModal";
+import { ImageUploadModal } from "./ImageUploadModal";
 import { TelemetryHUD, type TelemetryLogEvent } from "./TelemetryHUD";
 import { areCoreSpecsVerified, getCoreSpecStatus } from "./inspector-specs";
 import type { UIAction } from "@/hooks/voice-agent-types";
@@ -122,9 +123,15 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
   const [isPublishing, setIsPublishing] = useState(false);
   const [pipelineError, setPipelineError] = useState<string | null>(null);
   const [isTurnSyncing, setIsTurnSyncing] = useState(false);
-  const [onboardingStage, setOnboardingStage] = useState<"core" | "additional_specs" | "final_review">("core");
+  const [onboardingStage, setOnboardingStage] = useState<"core" | "additional_specs" | "photos" | "final_review">("core");
   const [showCoreModal, setShowCoreModal] = useState(false);
   const [showFinalModal, setShowFinalModal] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [draftId, setDraftId] = useState<number | null>(null);
+  const [uploadToken, setUploadToken] = useState("");
+  const [uploadUrl, setUploadUrl] = useState("");
+  const [qrCodeSvg, setQrCodeSvg] = useState("");
+  const draftIdRef = useRef<number | null>(null);
   const [telemetryLogs, setTelemetryLogs] = useState<TelemetryLogEvent[]>([]);
   const [sessionUsage, setSessionUsage] = useState({
     promptTokens: 0,
@@ -173,7 +180,8 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
   useEffect(() => {
     dataRef.current = data;
     onboardingStageRef.current = onboardingStage;
-  }, [data, onboardingStage]);
+    draftIdRef.current = draftId;
+  }, [data, onboardingStage, draftId]);
 
   const turnSequenceRef = useRef<number>(0);
   const isExtractionBusyRef = useRef<boolean>(false);
@@ -228,6 +236,58 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
     setOnboardingStage("additional_specs");
   }, []);
 
+  // Create or Update Draft Property in DB for photo uplink
+  const createOrUpdateDraft = useCallback(async () => {
+    try {
+      addTelemetryLog("STATE-UPDATE", "Creating draft property record for photo uplink", {
+        draftId: draftIdRef.current,
+      });
+      const res = await fetch(`${BASE_PATH}/api/properties/draft`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          property: dataRef.current.property,
+          draftId: draftIdRef.current,
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setDraftId(json.draftId);
+        draftIdRef.current = json.draftId;
+        setUploadToken(json.uploadToken);
+        setUploadUrl(json.uploadUrl);
+        setQrCodeSvg(json.qrCodeSvg);
+        addTelemetryLog(
+          "STATE-UPDATE",
+          "Draft property established with QR code",
+          { draftId: json.draftId, uploadUrl: json.uploadUrl },
+          undefined,
+          "success"
+        );
+        return json;
+      }
+    } catch (err) {
+      console.error("Draft creation error:", err);
+      addTelemetryLog("STATE-UPDATE", "Failed to create draft property", err, undefined, "error");
+    }
+    return null;
+  }, [addTelemetryLog]);
+
+  // Transition from Additional Specs (Stage 4) to Photo Intake (Stage 5)
+  const handleOpenPhotoUpload = useCallback(async () => {
+    setShowFinalModal(false);
+    setOnboardingStage("photos");
+    await createOrUpdateDraft();
+    setShowUploadModal(true);
+  }, [createOrUpdateDraft]);
+
+  // Transition from Photo Intake (Stage 5) to Final Unified Review & Deploy (Stage 6)
+  const handleProceedToFinalReview = useCallback(() => {
+    setShowUploadModal(false);
+    setOnboardingStage("final_review");
+    setShowFinalModal(true);
+  }, []);
+
   const handleUIAction = useCallback(
     (action: UIAction) => {
       addTelemetryLog("INTENT", `UI Action received: ${action}`, {
@@ -237,29 +297,38 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
 
       if (action === "open_core_modal") {
         if (onboardingStageRef.current === "core") {
-          // If all 6 specs are already verified, open immediately
           if (areCoreSpecsVerified(dataRef.current.property)) {
             addTelemetryLog("MODAL-TRIGGER", "Opening Core Specs Review Card (Verified 6/6)", null, undefined, "success");
             setShowCoreModal(true);
             pendingModalOpenRef.current = false;
           } else {
-            // Latch pending modal open request until specs land from Gemini
             addTelemetryLog("SYNC-GATE", "Core Specs modal latched (turn extraction in-flight)", null, undefined, "warn");
             pendingModalOpenRef.current = true;
           }
         } else {
           addTelemetryLog("INTENT", "Ignored open_core_modal because onboarding has advanced past core specs", null, undefined, "info");
         }
+      } else if (action === "open_upload_modal") {
+        if (onboardingStageRef.current !== "core") {
+          addTelemetryLog("MODAL-TRIGGER", "Opening Photo Upload Modal via intent", null, undefined, "success");
+          handleOpenPhotoUpload();
+        } else {
+          addTelemetryLog("INTENT", "Ignored open_upload_modal because stage is still core", null, undefined, "warn");
+        }
+      } else if (action === "close_upload_modal") {
+        addTelemetryLog("MODAL-TRIGGER", "Closing Photo Upload Modal via intent", null);
+        setShowUploadModal(false);
       } else if (action === "open_final_modal") {
-        // STRICT GUARD: Final Review Card must NEVER open while in Stage 1 ("core")!
         if (onboardingStageRef.current === "core") {
           addTelemetryLog("INTENT", "Ignored open_final_modal because stage is still core", null, undefined, "warn");
           return;
         }
 
+        // Close upload modal if it was open
+        setShowUploadModal(false);
+
         const hasMoveIn = Boolean(dataRef.current.property.availableDate && dataRef.current.property.availableDate.trim().length > 0);
 
-        // Gated Check: If extraction is in flight OR move-in timing has not yet landed in state, latch until it arrives!
         if (isTurnSyncingRef.current || !hasMoveIn) {
           addTelemetryLog(
             "SYNC-GATE",
@@ -274,7 +343,6 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
           );
           setFinalGate(true);
 
-          // Safety timeout: Release gate after 2500ms so user never waits forever
           setTimeout(() => {
             if (pendingFinalModalOpenRef.current) {
               setFinalGate(false);
@@ -297,6 +365,8 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
             addTelemetryLog("SYNC-GATE", "Core Specs modal latched (turn extraction in-flight)", null, undefined, "warn");
             pendingModalOpenRef.current = true;
           }
+        } else if (onboardingStageRef.current === "photos") {
+          setShowUploadModal(true);
         } else {
           const hasMoveIn = Boolean(dataRef.current.property.availableDate && dataRef.current.property.availableDate.trim().length > 0);
           if (isTurnSyncingRef.current || !hasMoveIn) {
@@ -329,6 +399,7 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
         addTelemetryLog("MODAL-TRIGGER", "Closing Review Modal", null);
         setShowCoreModal(false);
         setShowFinalModal(false);
+        setShowUploadModal(false);
         pendingModalOpenRef.current = false;
         setFinalGate(false);
         if (onboardingStageRef.current === "core" && areCoreSpecsVerified(dataRef.current.property)) {
@@ -336,7 +407,7 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
         }
       }
     },
-    [handleConfirmCoreSpecs, addTelemetryLog, setFinalGate]
+    [handleConfirmCoreSpecs, handleOpenPhotoUpload, addTelemetryLog, setFinalGate]
   );
 
   // Trailing Conflating Queue: In-flight Gemini extractions run to completion
@@ -491,7 +562,7 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
       }
 
       // In-Flight Sync Gate: Final Review Card (guarantees newly spoken details have landed with 0 blanks!)
-      if (pendingFinalModalOpenRef.current && (onboardingStageRef.current === "additional_specs" || onboardingStageRef.current === "final_review")) {
+      if (pendingFinalModalOpenRef.current && (onboardingStageRef.current === "additional_specs" || onboardingStageRef.current === "photos" || onboardingStageRef.current === "final_review")) {
         setFinalGate(false);
         setShowFinalModal(true);
       }
@@ -797,11 +868,14 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
           property: data.property,
           knowledgeBase: data.knowledgeBase,
           negotiationMatrix: data.negotiationMatrix,
+          draftId: draftIdRef.current,
         }),
       });
 
       const json = await res.json();
       if (json.success) {
+        setShowFinalModal(false);
+        setShowUploadModal(false);
         setPublishedResult({
           property: json.property,
           qrCodeSvg: json.qrCodeSvg,
@@ -905,6 +979,8 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
             onOpenReviewModal={() => {
               if (onboardingStage === "core") {
                 setShowCoreModal(true);
+              } else if (onboardingStage === "photos") {
+                setShowUploadModal(true);
               } else {
                 setShowFinalModal(true);
               }
@@ -931,8 +1007,46 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
         />
       )}
 
-      {/* 2. Final Unified Review Modal (Stage 5: Final Review & Deploy) */}
-      {showFinalModal && (
+      {/* 2. Additional Specs Review Modal (Stage 4) */}
+      {showFinalModal && onboardingStage === "additional_specs" && (
+        <ReviewSpecsModal
+          mode="additional"
+          onClose={() => setShowFinalModal(false)}
+          property={data.property}
+          knowledgeBase={data.knowledgeBase}
+          contactEmail={data.knowledgeBase.contactEmail || user?.email || ""}
+          ownerName={user?.name || ""}
+          onProceedToUpload={handleOpenPhotoUpload}
+          onPublish={handlePublish}
+          isPublishing={isPublishing}
+        />
+      )}
+
+      {/* 3. Property Photo Uplink Modal (Stage 5) */}
+      <ImageUploadModal
+        isOpen={showUploadModal}
+        onClose={() => setShowUploadModal(false)}
+        draftId={draftId}
+        uploadToken={uploadToken}
+        uploadUrl={uploadUrl}
+        qrCodeSvg={qrCodeSvg}
+        propertyTitle={data.property.title || data.property.address}
+        existingImages={data.property.images || []}
+        onImagesUpdated={(newImages) => {
+          setData((prev) => ({
+            ...prev,
+            property: {
+              ...prev.property,
+              images: newImages,
+              coverImageUrl: prev.property.coverImageUrl || newImages[0] || "",
+            },
+          }));
+        }}
+        onProceedToFinalReview={handleProceedToFinalReview}
+      />
+
+      {/* 4. Final Unified Review Modal (Stage 6: Final Review & Deploy) */}
+      {showFinalModal && (onboardingStage === "final_review" || onboardingStage === "photos") && (
         <ReviewSpecsModal
           mode="final"
           onClose={() => setShowFinalModal(false)}
@@ -940,6 +1054,10 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
           knowledgeBase={data.knowledgeBase}
           contactEmail={data.knowledgeBase.contactEmail || user?.email || ""}
           ownerName={user?.name || ""}
+          onProceedToUpload={() => {
+            setShowFinalModal(false);
+            setShowUploadModal(true);
+          }}
           onPublish={handlePublish}
           isPublishing={isPublishing}
         />
