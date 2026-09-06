@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { slidingWindowMessages, currentPropertyState } = body || {};
+    const { slidingWindowMessages, currentPropertyState, currentKnowledgeBase } = body || {};
 
     if (!slidingWindowMessages || !Array.isArray(slidingWindowMessages) || slidingWindowMessages.length === 0) {
       return NextResponse.json({
@@ -22,6 +22,7 @@ export async function POST(req: NextRequest) {
     const result = await extractTurnSpecs({
       slidingWindowMessages,
       currentPropertyState,
+      currentKnowledgeBase,
     });
 
     return NextResponse.json({

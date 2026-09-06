@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   Building2,
   Sparkles,
@@ -19,6 +19,7 @@ import {
   Mail,
 } from "lucide-react";
 import type { ExtractedPropertyPayload } from "@/lib/kb-extractor";
+import type { PillLabels } from "@/lib/turn-extractor";
 import { VerificationChecklist } from "./VerificationChecklist";
 import { buildAdditionalSpecs, buildChecklistItems } from "./inspector-specs";
 import { ExtraSpecsSuggestionBar } from "./ExtraSpecsSuggestionBar";
@@ -27,6 +28,7 @@ interface LivePropertyInspectorProps {
   data: ExtractedPropertyPayload;
   ownerName?: string;
   onboardingStage?: "core" | "additional_specs" | "final_review";
+  pillLabels?: PillLabels;
   onUpdateProperty: (updates: Partial<ExtractedPropertyPayload["property"]>) => void;
   onUpdateKnowledgeBase: (updates: Partial<ExtractedPropertyPayload["knowledgeBase"]>) => void;
   onPublish: () => void;
@@ -43,6 +45,7 @@ export function LivePropertyInspector({
   data,
   ownerName,
   onboardingStage = "core",
+  pillLabels,
   onUpdateProperty,
   onUpdateKnowledgeBase,
   onPublish,
@@ -53,6 +56,28 @@ export function LivePropertyInspector({
   isTurnSyncing = false,
 }: LivePropertyInspectorProps) {
   const [activeImageIdx, setActiveImageIdx] = useState(0);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const suggestionBarSectionRef = useRef<HTMLDivElement>(null);
+
+  // Smoothly bring Additional Specs into focus when progressing past core specs
+  useEffect(() => {
+    if (onboardingStage === "additional_specs" || onboardingStage === "final_review") {
+      const timer = setTimeout(() => {
+        const container = scrollContainerRef.current;
+        const target = suggestionBarSectionRef.current;
+        if (container && target) {
+          const containerRect = container.getBoundingClientRect();
+          const targetRect = target.getBoundingClientRect();
+          const targetOffset = targetRect.top - containerRect.top + container.scrollTop - 16;
+          container.scrollTo({
+            top: Math.max(0, targetOffset),
+            behavior: "smooth",
+          });
+        }
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [onboardingStage]);
 
   const { property, knowledgeBase, negotiationMatrix } = data;
   const hasImages = Boolean(
@@ -177,7 +202,7 @@ export function LivePropertyInspector({
       </div>
 
       {/* Main Scrollable Inspector Body */}
-      <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5 space-y-4 sm:space-y-5">
+      <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5 space-y-4 sm:space-y-5">
         {/* Photo Gallery Hero OR Architectural Blueprint Waiting Card */}
         {hasImages ? (
           <div className="relative rounded-2xl overflow-hidden bg-slate-900 aspect-16/9 group border border-slate-200/80 shadow-xs">
@@ -300,18 +325,24 @@ export function LivePropertyInspector({
 
         {/* Suggestion Chips Bar for Extra Specs */}
         {(isFullyVerified || onboardingStage === "additional_specs" || onboardingStage === "final_review" || additionalSpecs.length > 0) && (
-          <ExtraSpecsSuggestionBar
-            listingType={property.listingType === "sale" ? "sale" : "rent"}
-            currentValues={{
-              parkingDetail: knowledgeBase.parkingDetail,
-              petPolicyDetail: knowledgeBase.petPolicyDetail,
-              utilitiesDetail: knowledgeBase.utilitiesDetail,
-              hoaFeeMonthly: Number(property.hoaFeeMonthly) || 0,
-              availableDate: property.availableDate,
-              features: property.features,
-            }}
-            onApplyChip={handleApplyChip}
-          />
+          <div
+            ref={suggestionBarSectionRef}
+            className={onboardingStage === "additional_specs" ? "ring-2 ring-indigo-400/40 rounded-2xl transition-all duration-300 shadow-sm" : ""}
+          >
+            <ExtraSpecsSuggestionBar
+              listingType={property.listingType === "sale" ? "sale" : "rent"}
+              currentValues={{
+                parkingDetail: knowledgeBase.parkingDetail,
+                petPolicyDetail: knowledgeBase.petPolicyDetail,
+                utilitiesDetail: knowledgeBase.utilitiesDetail,
+                hoaFeeMonthly: Number(property.hoaFeeMonthly) || 0,
+                availableDate: property.availableDate,
+                features: property.features,
+              }}
+              pillLabels={pillLabels}
+              onApplyChip={handleApplyChip}
+            />
+          </div>
         )}
 
         {/* SECTION 1: ADDITIONAL PROPERTY SPECS (Dynamically revealed) */}

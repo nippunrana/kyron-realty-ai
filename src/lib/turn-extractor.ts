@@ -7,9 +7,18 @@ export interface TurnMessage {
   text: string;
 }
 
+export interface PillLabels {
+  parking?: string;
+  pets?: string;
+  utilities?: string;
+  availableDate?: string;
+  hoa?: string;
+}
+
 export interface ExtractTurnInput {
   slidingWindowMessages: TurnMessage[];
   currentPropertyState?: Partial<ExtractedPropertyPayload["property"]>;
+  currentKnowledgeBase?: Partial<ExtractedPropertyPayload["knowledgeBase"]>;
 }
 
 export interface TurnSpecUpdates {
@@ -33,6 +42,7 @@ export interface TurnSpecUpdates {
   availableDate?: string;
   features?: string[];
   amenities?: string[];
+  pillLabels?: PillLabels;
 }
 
 /**
@@ -46,7 +56,7 @@ export async function extractTurnSpecs(
   updates: TurnSpecUpdates;
   modalAction?: "open_core" | "close_core" | "open_final" | "close_final" | "open" | "close" | "none";
 }> {
-  const { slidingWindowMessages, currentPropertyState } = input;
+  const { slidingWindowMessages, currentPropertyState, currentKnowledgeBase } = input;
 
   if (!slidingWindowMessages || slidingWindowMessages.length === 0) {
     return { updates: {}, modalAction: "none" };
@@ -63,29 +73,32 @@ export async function extractTurnSpecs(
     .map((m) => `[${m.role === "assistant" ? "ELENA VANCE" : "OWNER"}]: ${m.text}`)
     .join("\n");
 
-  const currentVerifiedSummary = currentPropertyState
-    ? `
+  const currentVerifiedSummary = `
 CURRENT VERIFIED STATE:
-- listingType: ${currentPropertyState.listingType || "pending"}
-- address: ${currentPropertyState.address || "pending"}
-- price: ${currentPropertyState.price ? `$${currentPropertyState.price}` : "pending"}
-- bedrooms: ${currentPropertyState.bedrooms !== undefined && currentPropertyState.bedrooms !== null ? currentPropertyState.bedrooms : "pending"}
-- bathrooms: ${currentPropertyState.bathrooms !== undefined && currentPropertyState.bathrooms !== null ? currentPropertyState.bathrooms : "pending"}
-- sqft: ${currentPropertyState.sqft ? `${currentPropertyState.sqft} sqft` : "pending"}
-- hoaFeeMonthly: ${currentPropertyState.hoaFeeMonthly ? `$${currentPropertyState.hoaFeeMonthly}/mo` : "0"}
-- securityDeposit: ${currentPropertyState.securityDeposit ? `$${currentPropertyState.securityDeposit}` : "0"}
-- availableDate: ${currentPropertyState.availableDate || "pending"}
-`.trim()
-    : "";
+- listingType: ${currentPropertyState?.listingType || "pending"}
+- address: ${currentPropertyState?.address || "pending"}
+- price: ${currentPropertyState?.price ? `$${currentPropertyState.price}` : "pending"}
+- bedrooms: ${currentPropertyState?.bedrooms !== undefined && currentPropertyState?.bedrooms !== null ? currentPropertyState.bedrooms : "pending"}
+- bathrooms: ${currentPropertyState?.bathrooms !== undefined && currentPropertyState?.bathrooms !== null ? currentPropertyState.bathrooms : "pending"}
+- sqft: ${currentPropertyState?.sqft ? `${currentPropertyState.sqft} sqft` : "pending"}
+- hoaFeeMonthly: ${currentPropertyState?.hoaFeeMonthly ? `$${currentPropertyState.hoaFeeMonthly}/mo` : "0"}
+- securityDeposit: ${currentPropertyState?.securityDeposit ? `$${currentPropertyState.securityDeposit}` : "0"}
+- availableDate: ${currentPropertyState?.availableDate || "pending"}
+- parkingDetail: ${currentKnowledgeBase?.parkingDetail || "pending"}
+- petPolicyDetail: ${currentKnowledgeBase?.petPolicyDetail || "pending"}
+- utilitiesDetail: ${currentKnowledgeBase?.utilitiesDetail || "pending"}
+- contactEmail: ${currentKnowledgeBase?.contactEmail || "pending"}
+`.trim();
 
   const prompt = `
 You are the Real Estate Turn Extractor for Kyron Realty AI.
 Your job is to analyze the recent conversation turns between Elena Vance (AI Real Estate Specialist) and the property owner, and extract or update all property specifications into structured JSON:
 
 MANDATORY EXTRACTION WORKFLOW:
-1. First, summarize all spoken facts, numbers, and agreed details in 'spokenSummary' (e.g. "rent 25000, 4 bedrooms, 3 bathrooms, 3000 sqft, 41 Sector 64 Noida UP"). This ensures full attention across all clauses.
-2. Next, evaluate EVERY field in 'coreSpecs'. If a value was spoken in the dialogue or already confirmed in CURRENT VERIFIED STATE, output its number or clean string. If an attribute is completely unknown or not yet mentioned, output null.
-   - listingType: "rent" or "sale" (or null)
+1. First, summarize all spoken facts, numbers, and agreed details in 'spokenSummary' (e.g. "rent 25000, 4 bedrooms, 3 bathrooms, 3000 sqft, 41 Sector 64 Noida UP, 3 parking spaces, dogs allowed, water included, move in 15 days"). This ensures full attention across all clauses.
+2. Evaluate 'coreSpecs':
+   - listingType: "rent" or "sale" (or null if unknown).
+     CRITICAL POLICY: If listingType in CURRENT VERIFIED STATE is already "rent" or "sale", it is PERMANENTLY LOCKED and cannot be changed!
    - price: numerical monthly rent or purchase price (e.g. 25000, or null)
    - bedrooms: number of bedrooms (e.g. 4, 0 for studio, or null)
    - bathrooms: number of full/half bathrooms (e.g. 3, 1.5, or null)
@@ -94,11 +107,23 @@ MANDATORY EXTRACTION WORKFLOW:
    - city: city name (e.g. "Noida", or null)
    - state: state name (e.g. "Uttar Pradesh", or null)
    - zipCode: postal code (or null)
-   CRITICAL: If the owner stated multiple specs in one sentence (e.g. "rent of 25,000, 4 bedrooms, 3 bathrooms, 3,000 sqft"), you MUST populate price: 25000, bedrooms: 4, bathrooms: 3, and sqft: 3000. NEVER leave bedrooms or bathrooms as null if the owner stated them!
-3. Populate any mentioned 'additionalSpecs' (parking, pets, utilities, HOA, deposit, lease length, move-in date, features, amenities, email).
-4. Determine 'modalAction':
+   CRITICAL: If the owner stated multiple specs in one sentence (e.g. "rent of 25,000, 4 bedrooms, 3 bathrooms, 3,000 sqft"), you MUST populate price: 25000, bedrooms: 4, bathrooms: 3, and sqft: 3000.
+3. CONTINUOUS VERBAL CORRECTIONS:
+   If the owner updates or corrects ANY earlier spec (e.g. "Actually rent is 45000", "There are 3 parking spots instead of 2", "Only cats allowed", "Change address to Main Mathura Road"), ALWAYS output the owner's latest corrected value so the system updates immediately.
+4. ADDITIONAL SPECS & RELATIVE TIMINGS:
+   - parkingDetail: full details of parking (e.g. "3-car parking with 2 in garage and space outside").
+   - petPolicyDetail: full pet policy stated (e.g. "Dogs are allowed, no issue").
+   - utilitiesDetail: utility inclusions (e.g. "Water is included in maintenance fees").
+   - availableDate: move-in timing or availability. If the owner specifies a relative date or timeline (e.g. "in 15 days", "within two weeks", "ready in 15 days", "available immediately", "1st of next month"), ALWAYS format it cleanly as e.g. "Within 15 days", "In 15 Days", "Available Immediately", or "1st of Next Month". NEVER leave availableDate null if move-in timing was discussed!
+   - PILL BUTTON LABELS: For any additional spec stated, also provide a concise 2–4 word UI button label:
+     - parkingPillText: e.g. "3-Car Parking"
+     - petPolicyPillText: e.g. "Dogs Allowed"
+     - utilitiesPillText: e.g. "Water Included"
+     - availableDatePillText: e.g. "In 15 Days"
+     - hoaPillText: e.g. "$250/mo HOA" or "No HOA"
+5. Determine 'modalAction':
    - "open_core": Elena or owner EXPLICITLY announces, pulls up, or asks to show the Core Specs review card (e.g. "I've pulled up your core specs review card on your screen", "open the review card", "show me the card").
-     CRITICAL: If the owner or Elena is simply asking or answering regular intake questions (such as stating "for rent", giving an address, stating price/beds/baths), modalAction MUST BE "none".
+     CRITICAL: If the owner or Elena is simply asking or answering regular intake questions, modalAction MUST BE "none".
    - "close_core": Owner confirms or approves the core specs (e.g. "looks good", "proceed", "confirmed", "that's right", "continue") or asks to close/minimize the review card.
    - "open_final": Elena or owner announces/opens the Final Complete review card.
    - "close_final": Owner asks to close or minimize the final card.
@@ -147,12 +172,17 @@ ${formattedDialogue}
               properties: {
                 contactEmail: { type: "string" },
                 parkingDetail: { type: "string" },
+                parkingPillText: { type: "string", description: "Concise 2-4 word pill button text (e.g. '3-Car Parking')" },
                 petPolicyDetail: { type: "string" },
+                petPolicyPillText: { type: "string", description: "Concise 2-4 word pill button text (e.g. 'Dogs Allowed')" },
                 utilitiesDetail: { type: "string" },
+                utilitiesPillText: { type: "string", description: "Concise 2-4 word pill button text (e.g. 'Water Included')" },
                 hoaFeeMonthly: { type: "number" },
+                hoaPillText: { type: "string", description: "Concise 2-4 word pill button text (e.g. 'No HOA' or '$250/mo HOA')" },
                 securityDeposit: { type: "number" },
                 minLeaseMonths: { type: "number" },
                 availableDate: { type: "string" },
+                availableDatePillText: { type: "string", description: "Concise 2-4 word pill button text (e.g. 'In 15 Days')" },
                 features: { type: "array", items: { type: "string" } },
                 amenities: { type: "array", items: { type: "string" } },
               },
@@ -191,9 +221,14 @@ ${formattedDialogue}
       return t;
     };
 
-    if (rawCore.listingType === "rent" || rawCore.listingType === "sale") {
+    // ListingType lock policy: cannot change if already locked in current state
+    const lockedListingType = currentPropertyState?.listingType;
+    if (lockedListingType === "rent" || lockedListingType === "sale") {
+      updates.listingType = lockedListingType;
+    } else if (rawCore.listingType === "rent" || rawCore.listingType === "sale") {
       updates.listingType = rawCore.listingType;
     }
+
     if (typeof rawCore.price === "number" && !isNaN(rawCore.price) && rawCore.price > 0) {
       updates.price = rawCore.price;
     }
@@ -240,6 +275,23 @@ ${formattedDialogue}
     }
     if (Array.isArray(rawAdditional.amenities) && rawAdditional.amenities.length > 0) {
       updates.amenities = rawAdditional.amenities.filter((a: any) => typeof a === "string" && a.trim());
+    }
+
+    // Dynamic Pill Labels
+    const pillLabels: PillLabels = {};
+    const cleanParkingPill = cleanString(rawAdditional.parkingPillText);
+    if (cleanParkingPill) pillLabels.parking = cleanParkingPill;
+    const cleanPetPill = cleanString(rawAdditional.petPolicyPillText);
+    if (cleanPetPill) pillLabels.pets = cleanPetPill;
+    const cleanUtilPill = cleanString(rawAdditional.utilitiesPillText);
+    if (cleanUtilPill) pillLabels.utilities = cleanUtilPill;
+    const cleanAvailPill = cleanString(rawAdditional.availableDatePillText);
+    if (cleanAvailPill) pillLabels.availableDate = cleanAvailPill;
+    const cleanHoaPill = cleanString(rawAdditional.hoaPillText);
+    if (cleanHoaPill) pillLabels.hoa = cleanHoaPill;
+
+    if (Object.keys(pillLabels).length > 0) {
+      updates.pillLabels = pillLabels;
     }
 
     return {

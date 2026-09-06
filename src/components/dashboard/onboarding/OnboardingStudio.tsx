@@ -8,7 +8,7 @@ import { ReviewSpecsModal } from "./ReviewSpecsModal";
 import { areCoreSpecsVerified, getCoreSpecStatus } from "./inspector-specs";
 import type { UIAction } from "@/hooks/voice-agent-types";
 import type { ExtractedPropertyPayload } from "@/lib/kb-extractor";
-import type { TurnMessage } from "@/lib/turn-extractor";
+import type { TurnMessage, PillLabels } from "@/lib/turn-extractor";
 import { computeFloorPrice } from "@/lib/listing-helpers";
 import { BASE_PATH } from "@/lib/base-path";
 import { ArrowLeft } from "lucide-react";
@@ -79,6 +79,7 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
       contactEmail: user?.email || "",
     },
   }));
+  const [pillLabels, setPillLabels] = useState<PillLabels>({});
   const [isProcessing, setIsProcessing] = useState(false);
   const [activePipelineStep, setActivePipelineStep] = useState<string | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
@@ -100,6 +101,7 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
   const isExtractionBusyRef = useRef<boolean>(false);
   const pendingExtractionWindowRef = useRef<TurnMessage[] | null>(null);
   const pendingModalOpenRef = useRef<boolean>(false);
+  const pendingFinalModalOpenRef = useRef<boolean>(false);
   const isTurnSyncingRef = useRef<boolean>(false);
 
   // Success Modal State
@@ -125,6 +127,7 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
   // Transition from Stage 1 (Core Specs) to Stage 2 (Additional Specs)
   const handleConfirmCoreSpecs = useCallback(() => {
     setShowCoreModal(false);
+    pendingModalOpenRef.current = false;
     setOnboardingStage("additional_specs");
   }, []);
 
@@ -141,12 +144,19 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
           pendingModalOpenRef.current = true;
         }
       } else {
-        setShowFinalModal(true);
+        // In-Flight Sync Gate for Final Review: if extraction is in flight, latch until it lands!
+        if (isTurnSyncingRef.current) {
+          pendingFinalModalOpenRef.current = true;
+        } else {
+          setShowFinalModal(true);
+          pendingFinalModalOpenRef.current = false;
+        }
       }
     } else if (action === "close_review_modal") {
       setShowCoreModal(false);
       setShowFinalModal(false);
       pendingModalOpenRef.current = false;
+      pendingFinalModalOpenRef.current = false;
       if (onboardingStageRef.current === "core" && areCoreSpecsVerified(dataRef.current.property)) {
         handleConfirmCoreSpecs();
       }
@@ -168,6 +178,7 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
         body: JSON.stringify({
           slidingWindowMessages: slidingWindow,
           currentPropertyState: dataRef.current.property,
+          currentKnowledgeBase: dataRef.current.knowledgeBase,
         }),
       });
 
@@ -183,8 +194,18 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
           utilitiesDetail,
           features: newFeatures,
           amenities: newAmenities,
+          pillLabels: newPillLabels,
           ...propertyUpdates
         } = updates;
+
+        // Strict Listing Type Lock: once set, cannot be mutated
+        if (dataRef.current.property.listingType) {
+          propertyUpdates.listingType = dataRef.current.property.listingType;
+        }
+
+        if (newPillLabels && Object.keys(newPillLabels).length > 0) {
+          setPillLabels((prev) => ({ ...prev, ...newPillLabels }));
+        }
 
         candidateProperty = {
           ...candidateProperty,
@@ -226,11 +247,16 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
       // Check if all 6 core specs are now verified in state
       const isCoreComplete = areCoreSpecsVerified(candidateProperty);
 
-      // In-Flight Sync Gate: If Elena or the user requested the review modal while
-      // extraction was in flight, open it now that all 6 specs have safely landed!
+      // In-Flight Sync Gate: Core Specs
       if (isCoreComplete && pendingModalOpenRef.current && onboardingStageRef.current === "core") {
         pendingModalOpenRef.current = false;
         setShowCoreModal(true);
+      }
+
+      // In-Flight Sync Gate: Final Review Card (guarantees newly spoken details have landed with 0 blanks!)
+      if (pendingFinalModalOpenRef.current && (onboardingStageRef.current === "additional_specs" || onboardingStageRef.current === "final_review")) {
+        pendingFinalModalOpenRef.current = false;
+        setShowFinalModal(true);
       }
 
       // Handle modal action intent returned by turn extractor
@@ -247,9 +273,15 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
         } else if (action === "close_core") {
           handleConfirmCoreSpecs();
         } else if (action === "open_final") {
-          setShowFinalModal(true);
+          if (pendingExtractionWindowRef.current) {
+            pendingFinalModalOpenRef.current = true;
+          } else {
+            setShowFinalModal(true);
+            pendingFinalModalOpenRef.current = false;
+          }
         } else if (action === "close_final") {
           setShowFinalModal(false);
+          pendingFinalModalOpenRef.current = false;
         } else if (action === "open") {
           if (onboardingStageRef.current === "core") {
             if (isCoreComplete) {
@@ -258,13 +290,19 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
               pendingModalOpenRef.current = true;
             }
           } else {
-            setShowFinalModal(true);
+            if (pendingExtractionWindowRef.current) {
+              pendingFinalModalOpenRef.current = true;
+            } else {
+              setShowFinalModal(true);
+              pendingFinalModalOpenRef.current = false;
+            }
           }
         } else if (action === "close") {
           if (onboardingStageRef.current === "core") {
             handleConfirmCoreSpecs();
           } else {
             setShowFinalModal(false);
+            pendingFinalModalOpenRef.current = false;
           }
         }
       }
@@ -379,6 +417,11 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
       if (!json.success || !json.data) {
         throw new Error(json.error || "Knowledge-base synthesis failed.");
       }
+
+      if (json.data.knowledgeBase?.pillLabels && Object.keys(json.data.knowledgeBase.pillLabels).length > 0) {
+        setPillLabels((pl) => ({ ...pl, ...json.data.knowledgeBase.pillLabels }));
+      }
+
       setData((prev) => {
         const newProp = json.data.property || {};
         const newKb = json.data.knowledgeBase || {};
@@ -531,6 +574,7 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
             data={data}
             ownerName={user?.name || ""}
             onboardingStage={onboardingStage}
+            pillLabels={pillLabels}
             onUpdateProperty={handleUpdateProperty}
             onUpdateKnowledgeBase={handleUpdateKnowledgeBase}
             onPublish={handlePublish}
