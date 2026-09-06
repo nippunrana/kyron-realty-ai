@@ -28,7 +28,7 @@ Next-generation real estate intelligence platform powered by Next.js 16, Postgre
    ```
 
 2. **Install dependencies:**
-   ```bash
+   ```bash 
    npm install
    ```
 
