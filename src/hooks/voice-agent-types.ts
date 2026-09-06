@@ -37,10 +37,15 @@ export interface UseAgoraVoiceAgentReturn {
   sendTextMessage: (text: string) => void;
 }
 
-export type UIAction = "open_review_modal" | "close_review_modal";
+export type UIAction =
+  | "open_core_modal"
+  | "open_final_modal"
+  | "close_review_modal"
+  | "open_review_modal";
 
 export interface UseAgoraVoiceAgentOptions {
   onCallEnd?: (transcript: VoiceMessage[]) => void;
   onAgentTurnComplete?: (transcript: VoiceMessage[]) => void;
   onUIAction?: (action: UIAction) => void;
+  onLogEvent?: (category: "AGORA" | "INTENT", title: string, details?: any) => void;
 }

@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { extractTurnSpecs } from "@/lib/turn-extractor";
 
 export async function POST(req: NextRequest) {
+  const startTime = Date.now();
   try {
     const session = await auth();
     if (!session?.user) {
@@ -16,6 +17,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         success: true,
         data: { updates: {}, modalAction: "none" },
+        latencyMs: Date.now() - startTime,
       });
     }
 
@@ -25,16 +27,22 @@ export async function POST(req: NextRequest) {
       currentKnowledgeBase,
     });
 
+    const durationMs = Date.now() - startTime;
+    console.log(`[API extract-turn] 200 OK (${durationMs}ms) - Updated: [${Object.keys(result.updates).join(", ")}]`);
+
     return NextResponse.json({
       success: true,
       data: result,
+      latencyMs: durationMs,
     });
   } catch (error: any) {
-    console.error("Turn extraction route error:", error);
+    const durationMs = Date.now() - startTime;
+    console.error(`[API extract-turn Error] (${durationMs}ms):`, error);
     return NextResponse.json(
       {
         success: false,
         error: error.message || "Failed to extract turn specifications.",
+        latencyMs: durationMs,
       },
       { status: 500 }
     );

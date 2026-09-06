@@ -114,12 +114,13 @@ MANDATORY EXTRACTION WORKFLOW:
    - parkingDetail: full details of parking (e.g. "3-car parking with 2 in garage and space outside").
    - petPolicyDetail: full pet policy stated (e.g. "Dogs are allowed, no issue").
    - utilitiesDetail: utility inclusions (e.g. "Water is included in maintenance fees").
-   - availableDate: move-in timing or availability. If the owner specifies a relative date or timeline (e.g. "in 15 days", "within two weeks", "ready in 15 days", "available immediately", "1st of next month"), ALWAYS format it cleanly as e.g. "Within 15 days", "In 15 Days", "Available Immediately", or "1st of Next Month". NEVER leave availableDate null if move-in timing was discussed!
+   - availableDate: move-in timing or availability. If the owner specifies a relative date or timeline (e.g. "14 days from now", "in 14 days", "within two weeks", "ready in 15 days", "available immediately", "1st of next month"), ALWAYS format it cleanly as e.g. "In 14 Days", "Within 14 Days", "Available Immediately", or "1st of Next Month". NEVER leave availableDate null if move-in timing was discussed!
+   - features: array of concise feature highlight strings (e.g. "1-Car Garage", "Street Parking", "Water Included via Maintenance", "Private Balcony", "Central A/C"). When parking breakdown (garage vs street), utility inclusions, or specific unit perks are discussed, extract 1–3 discrete highlight strings here so they appear as feature cards in the Live Property Inspector immediately!
    - PILL BUTTON LABELS: For any additional spec stated, also provide a concise 2–4 word UI button label:
      - parkingPillText: e.g. "3-Car Parking"
      - petPolicyPillText: e.g. "Dogs Allowed"
      - utilitiesPillText: e.g. "Water Included"
-     - availableDatePillText: e.g. "In 15 Days"
+     - availableDatePillText: e.g. "In 14 Days"
      - hoaPillText: e.g. "$250/mo HOA" or "No HOA"
 5. Determine 'modalAction':
    - "open_core": Elena or owner EXPLICITLY announces, pulls up, or asks to show the Core Specs review card (e.g. "I've pulled up your core specs review card on your screen", "open the review card", "show me the card").
@@ -135,6 +136,7 @@ RECENT DIALOGUE (Sliding Window):
 ${formattedDialogue}
 `.trim();
 
+  const startTime = Date.now();
   try {
     const ai = new GoogleGenAI({ apiKey });
     const modelName = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
@@ -294,12 +296,25 @@ ${formattedDialogue}
       updates.pillLabels = pillLabels;
     }
 
+    const durationMs = Date.now() - startTime;
+    console.log(
+      `[Turn Extractor] Completed in ${durationMs}ms:`,
+      JSON.stringify({
+        updatedFields: Object.keys(updates),
+        availableDate: updates.availableDate,
+        features: updates.features,
+        pillLabels: updates.pillLabels,
+        modalAction: parsed.modalAction || "none",
+      })
+    );
+
     return {
       updates,
       modalAction: parsed.modalAction || "none",
     };
   } catch (err: any) {
-    console.error("[Turn Extraction Error]:", err.message || err);
+    const durationMs = Date.now() - startTime;
+    console.error(`[Turn Extractor Error] Failed after ${durationMs}ms:`, err.message || err);
     return { updates: {}, modalAction: "none" };
   }
 }

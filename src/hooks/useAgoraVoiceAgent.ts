@@ -35,11 +35,13 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
   const onCallEndRef = useRef<((transcript: VoiceMessage[]) => void) | undefined>(options?.onCallEnd);
   const onAgentTurnCompleteRef = useRef<((transcript: VoiceMessage[]) => void) | undefined>(options?.onAgentTurnComplete);
   const onUIActionRef = useRef<((action: UIAction) => void) | undefined>(options?.onUIAction);
+  const onLogEventRef = useRef<((category: "AGORA" | "INTENT", title: string, details?: any) => void) | undefined>(options?.onLogEvent);
   // Keep the latest callbacks reachable from long-lived SDK listeners without re-subscribing
   useEffect(() => {
     onCallEndRef.current = options?.onCallEnd;
     onAgentTurnCompleteRef.current = options?.onAgentTurnComplete;
     onUIActionRef.current = options?.onUIAction;
+    onLogEventRef.current = options?.onLogEvent;
   });
   const transcriptRef = useRef<VoiceMessage[]>([]);
   const prevAgentStateRef = useRef<string | null>(null);
@@ -47,7 +49,8 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
   const voiceAiRef = useRef<any>(null);
   const agentUidRef = useRef<number>(999001);
   const userUidRef = useRef<number>(1001);
-  const processedTurnIdsRef = useRef<Set<number>>(new Set());
+  const processedTurnIdsRef = useRef<Set<string>>(new Set());
+  const processedAssistantTurnIntentsRef = useRef<Set<string>>(new Set());
   const localMessagesRef = useRef<VoiceMessage[]>([]);
   const mappedRemoteRef = useRef<VoiceMessage[]>([]);
   const lastExtractedAssistantTextRef = useRef<string>("");
@@ -94,6 +97,7 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
     localMessagesRef.current = [];
     mappedRemoteRef.current = [];
     processedTurnIdsRef.current.clear();
+    processedAssistantTurnIntentsRef.current.clear();
 
     if (animFrameRef.current) {
       cancelAnimationFrame(animFrameRef.current);
@@ -164,6 +168,11 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
     if (turnKey === lastExtractedAssistantTextRef.current) return;
     lastExtractedAssistantTextRef.current = turnKey;
 
+    onLogEventRef.current?.("AGORA", `Dispatched turn extraction (${fullTranscript.length} messages, last: ${lastMsg.role})`, {
+      lastMessage: lastMsg.text,
+      totalTurns: fullTranscript.length,
+    });
+
     onAgentTurnCompleteRef.current?.(fullTranscript);
   }, []);
 
@@ -188,6 +197,8 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
       const abortController = new AbortController();
       abortControllerRef.current = abortController;
 
+      processedTurnIdsRef.current.clear();
+      processedAssistantTurnIntentsRef.current.clear();
       setErrorMessage(null);
       setCallState("connecting");
 
@@ -320,8 +331,8 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
           // Deduplicated checklist extraction for user turns
           for (const item of transcriptions) {
             const isUser = isUserTranscription(item);
-
             const spokenText = (item.text || "").trim();
+
             if (isUser && spokenText.length > 0) {
               const isFinished =
                 item.final === true ||
@@ -330,9 +341,17 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
               const turnKey = `${item.turn_id ?? "turn"}_${spokenText.toLowerCase()}`;
               if (isFinished && !processedTurnIdsRef.current.has(turnKey as any)) {
                 processedTurnIdsRef.current.add(turnKey as any);
+                onLogEventRef.current?.("AGORA", `User speech finalized (Turn #${item.turn_id ?? "turn"})`, {
+                  text: spokenText,
+                  final: true,
+                });
+
                 // Fast verbal UI modal intent matching
                 const intent = detectUserModalIntent(spokenText);
-                if (intent) onUIActionRef.current?.(intent);
+                if (intent) {
+                  onLogEventRef.current?.("INTENT", `Detected User Intent: ${intent}`, { text: spokenText });
+                  onUIActionRef.current?.(intent);
+                }
 
                 // Immediate parallel extraction: Run Gemini while Elena begins speaking
                 setTimeout(() => {
@@ -340,22 +359,31 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
                 }, 100);
               }
             } else if (!isUser && spokenText.length > 0) {
-              // Assistant speech confirming modal action
+              // Assistant speech confirming modal action (strictly deduplicated per turn)
               const intent = detectAssistantModalIntent(spokenText);
-              if (intent) onUIActionRef.current?.(intent);
+              if (intent) {
+                const turnId = item.turn_id !== undefined ? String(item.turn_id) : spokenText.slice(0, 40).toLowerCase();
+                const intentKey = `assistant_${turnId}_${intent}`;
+                if (!processedAssistantTurnIntentsRef.current.has(intentKey)) {
+                  processedAssistantTurnIntentsRef.current.add(intentKey);
+                  onLogEventRef.current?.("INTENT", `Detected Assistant Intent: ${intent}`, { text: spokenText });
+                  onUIActionRef.current?.(intent);
+                }
+              }
             }
           }
 
-          // Fallback debounce: When an assistant turn settles for 800ms, trigger extraction
+          // Fallback debounce: When an assistant or user turn settles, trigger extraction
           if (transcriptDebounceTimerRef.current) {
             clearTimeout(transcriptDebounceTimerRef.current);
             transcriptDebounceTimerRef.current = null;
           }
           const lastMsg = fullList[fullList.length - 1];
-          if (lastMsg && lastMsg.role === "assistant" && lastMsg.text.trim().length > 0) {
+          if (lastMsg && lastMsg.text.trim().length > 0) {
+            const delay = lastMsg.role === "assistant" ? 800 : 500;
             transcriptDebounceTimerRef.current = setTimeout(() => {
               triggerTurnExtraction();
-            }, 800);
+            }, delay);
           }
         });
 

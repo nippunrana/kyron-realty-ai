@@ -30,6 +30,7 @@ interface ConversationalPanelProps {
   onSendMessage: (text: string) => Promise<void>;
   onTurnExtraction?: (slidingWindow: TurnMessage[]) => void;
   onUIAction?: (action: UIAction) => void;
+  onLogEvent?: (category: "AGORA" | "INTENT", title: string, details?: any) => void;
   isProcessing: boolean;
   activePipelineStep: string | null;
   /** Failure from the crawl or synthesis pipeline, shown beside the transcript; never a silent no-op. */
@@ -41,6 +42,7 @@ export function ConversationalPanel({
   onSendMessage,
   onTurnExtraction,
   onUIAction,
+  onLogEvent,
   isProcessing,
   activePipelineStep,
   pipelineError,
@@ -103,6 +105,7 @@ export function ConversationalPanel({
     onCallEnd: handleCallEnd,
     onAgentTurnComplete: handleAgentTurnComplete,
     onUIAction,
+    onLogEvent,
   });
 
   const isProgrammaticScrollRef = useRef(false);

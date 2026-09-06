@@ -1,17 +1,18 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useSyncExternalStore } from "react";
 import { ConversationalPanel } from "./ConversationalPanel";
 import { LivePropertyInspector } from "./LivePropertyInspector";
 import { PublishSuccessModal } from "./PublishSuccessModal";
 import { ReviewSpecsModal } from "./ReviewSpecsModal";
+import { TelemetryHUD, type TelemetryLogEvent } from "./TelemetryHUD";
 import { areCoreSpecsVerified, getCoreSpecStatus } from "./inspector-specs";
 import type { UIAction } from "@/hooks/voice-agent-types";
 import type { ExtractedPropertyPayload } from "@/lib/kb-extractor";
 import type { TurnMessage, PillLabels } from "@/lib/turn-extractor";
 import { computeFloorPrice } from "@/lib/listing-helpers";
 import { BASE_PATH } from "@/lib/base-path";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Activity } from "lucide-react";
 import Link from "next/link";
 
 const emptyInitialDraftState: ExtractedPropertyPayload = {
@@ -71,6 +72,42 @@ interface OnboardingStudioProps {
   };
 }
 
+const HUD_STORAGE_KEY = "kyron_telemetry_hud_open";
+let hudListeners: Array<() => void> = [];
+
+function subscribeHud(callback: () => void) {
+  hudListeners.push(callback);
+  if (typeof window !== "undefined") {
+    window.addEventListener("storage", callback);
+  }
+  return () => {
+    hudListeners = hudListeners.filter((l) => l !== callback);
+    if (typeof window !== "undefined") {
+      window.removeEventListener("storage", callback);
+    }
+  };
+}
+
+function getHudSnapshot(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return localStorage.getItem(HUD_STORAGE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function getHudServerSnapshot(): boolean {
+  return false;
+}
+
+function setHudStore(open: boolean): void {
+  try {
+    localStorage.setItem(HUD_STORAGE_KEY, String(open));
+  } catch {}
+  hudListeners.forEach((l) => l());
+}
+
 export function OnboardingStudio({ user }: OnboardingStudioProps) {
   const [data, setData] = useState<ExtractedPropertyPayload>(() => ({
     ...emptyInitialDraftState,
@@ -88,6 +125,41 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
   const [onboardingStage, setOnboardingStage] = useState<"core" | "additional_specs" | "final_review">("core");
   const [showCoreModal, setShowCoreModal] = useState(false);
   const [showFinalModal, setShowFinalModal] = useState(false);
+  const [telemetryLogs, setTelemetryLogs] = useState<TelemetryLogEvent[]>([]);
+  const isHudOpen = useSyncExternalStore(subscribeHud, getHudSnapshot, getHudServerSnapshot);
+
+  const toggleHud = () => {
+    setHudStore(!getHudSnapshot());
+  };
+
+  const addTelemetryLog = useCallback(
+    (
+      category: TelemetryLogEvent["category"],
+      title: string,
+      details?: any,
+      latencyMs?: number,
+      level: TelemetryLogEvent["level"] = "info"
+    ) => {
+      const newEvent: TelemetryLogEvent = {
+        id: `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        timestamp: new Date().toLocaleTimeString("en-US", {
+          hour12: false,
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          fractionalSecondDigits: 3,
+        }),
+        category,
+        title,
+        details,
+        latencyMs,
+        level,
+      };
+
+      setTelemetryLogs((prev) => [newEvent, ...prev].slice(0, 150));
+    },
+    []
+  );
 
   // Latest state for async turn-extraction and voice callbacks; synced after each commit
   const dataRef = useRef(data);
@@ -100,9 +172,28 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
   const turnSequenceRef = useRef<number>(0);
   const isExtractionBusyRef = useRef<boolean>(false);
   const pendingExtractionWindowRef = useRef<TurnMessage[] | null>(null);
+  const failedTurnBufferRef = useRef<TurnMessage[]>([]);
   const pendingModalOpenRef = useRef<boolean>(false);
   const pendingFinalModalOpenRef = useRef<boolean>(false);
+  const [isFinalGateLatched, setIsFinalGateLatched] = useState(false);
+  const setFinalGate = useCallback((latched: boolean) => {
+    pendingFinalModalOpenRef.current = latched;
+    setIsFinalGateLatched(latched);
+  }, []);
   const isTurnSyncingRef = useRef<boolean>(false);
+
+  // Helper to merge failed/retry turns with incoming turns into a rich sliding window (up to 12 turns)
+  const mergeTurnWindows = (prev: TurnMessage[], incoming: TurnMessage[]): TurnMessage[] => {
+    const combined = [...prev, ...incoming];
+    const deduped: TurnMessage[] = [];
+    for (const msg of combined) {
+      const last = deduped[deduped.length - 1];
+      if (!last || last.role !== msg.role || last.text.trim() !== msg.text.trim()) {
+        deduped.push(msg);
+      }
+    }
+    return deduped.slice(-12);
+  };
 
   // Success Modal State
   const [publishedResult, setPublishedResult] = useState<{
@@ -131,37 +222,116 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
     setOnboardingStage("additional_specs");
   }, []);
 
-  const handleUIAction = useCallback((action: UIAction) => {
-    if (action === "open_review_modal") {
-      if (onboardingStageRef.current === "core") {
-        // If all 6 specs are already verified, open immediately
-        if (areCoreSpecsVerified(dataRef.current.property)) {
-          setShowCoreModal(true);
-          pendingModalOpenRef.current = false;
-        } else if (isTurnSyncingRef.current) {
-          // If turn extraction is currently in flight, latch the modal open request
-          // so it pops the instant the 6/6 specs arrive from Gemini with zero blanks
-          pendingModalOpenRef.current = true;
-        }
-      } else {
-        // In-Flight Sync Gate for Final Review: if extraction is in flight, latch until it lands!
-        if (isTurnSyncingRef.current) {
-          pendingFinalModalOpenRef.current = true;
+  const handleUIAction = useCallback(
+    (action: UIAction) => {
+      addTelemetryLog("INTENT", `UI Action received: ${action}`, {
+        stage: onboardingStageRef.current,
+        isTurnSyncing: isTurnSyncingRef.current,
+      });
+
+      if (action === "open_core_modal") {
+        if (onboardingStageRef.current === "core") {
+          // If all 6 specs are already verified, open immediately
+          if (areCoreSpecsVerified(dataRef.current.property)) {
+            addTelemetryLog("MODAL-TRIGGER", "Opening Core Specs Review Card (Verified 6/6)", null, undefined, "success");
+            setShowCoreModal(true);
+            pendingModalOpenRef.current = false;
+          } else {
+            // Latch pending modal open request until specs land from Gemini
+            addTelemetryLog("SYNC-GATE", "Core Specs modal latched (turn extraction in-flight)", null, undefined, "warn");
+            pendingModalOpenRef.current = true;
+          }
         } else {
+          addTelemetryLog("INTENT", "Ignored open_core_modal because onboarding has advanced past core specs", null, undefined, "info");
+        }
+      } else if (action === "open_final_modal") {
+        // STRICT GUARD: Final Review Card must NEVER open while in Stage 1 ("core")!
+        if (onboardingStageRef.current === "core") {
+          addTelemetryLog("INTENT", "Ignored open_final_modal because stage is still core", null, undefined, "warn");
+          return;
+        }
+
+        const hasMoveIn = Boolean(dataRef.current.property.availableDate && dataRef.current.property.availableDate.trim().length > 0);
+
+        // Gated Check: If extraction is in flight OR move-in timing has not yet landed in state, latch until it arrives!
+        if (isTurnSyncingRef.current || !hasMoveIn) {
+          addTelemetryLog(
+            "SYNC-GATE",
+            "Final Review modal latched (waiting for in-flight turn extraction / move-in timing, max 2500ms)",
+            {
+              stage: onboardingStageRef.current,
+              isTurnSyncing: isTurnSyncingRef.current,
+              hasMoveIn,
+            },
+            undefined,
+            "warn"
+          );
+          setFinalGate(true);
+
+          // Safety timeout: Release gate after 2500ms so user never waits forever
+          setTimeout(() => {
+            if (pendingFinalModalOpenRef.current) {
+              setFinalGate(false);
+              setShowFinalModal(true);
+              addTelemetryLog("SYNC-GATE", "Released Final Review sync gate via 2500ms fallback timeout", null, undefined, "info");
+            }
+          }, 2500);
+        } else {
+          addTelemetryLog("MODAL-TRIGGER", "Opening Final Review Modal immediately", null, undefined, "success");
           setShowFinalModal(true);
-          pendingFinalModalOpenRef.current = false;
+          setFinalGate(false);
+        }
+      } else if (action === "open_review_modal") {
+        if (onboardingStageRef.current === "core") {
+          if (areCoreSpecsVerified(dataRef.current.property)) {
+            addTelemetryLog("MODAL-TRIGGER", "Opening Core Specs Review Card (Verified 6/6)", null, undefined, "success");
+            setShowCoreModal(true);
+            pendingModalOpenRef.current = false;
+          } else {
+            addTelemetryLog("SYNC-GATE", "Core Specs modal latched (turn extraction in-flight)", null, undefined, "warn");
+            pendingModalOpenRef.current = true;
+          }
+        } else {
+          const hasMoveIn = Boolean(dataRef.current.property.availableDate && dataRef.current.property.availableDate.trim().length > 0);
+          if (isTurnSyncingRef.current || !hasMoveIn) {
+            addTelemetryLog(
+              "SYNC-GATE",
+              "Final Review modal latched (waiting for in-flight turn extraction, max 2500ms)",
+              {
+                stage: onboardingStageRef.current,
+                isTurnSyncing: isTurnSyncingRef.current,
+                hasMoveIn,
+              },
+              undefined,
+              "warn"
+            );
+            setFinalGate(true);
+            setTimeout(() => {
+              if (pendingFinalModalOpenRef.current) {
+                setFinalGate(false);
+                setShowFinalModal(true);
+                addTelemetryLog("SYNC-GATE", "Released Final Review sync gate via 2500ms fallback timeout", null, undefined, "info");
+              }
+            }, 2500);
+          } else {
+            addTelemetryLog("MODAL-TRIGGER", "Opening Final Review Modal immediately", null, undefined, "success");
+            setShowFinalModal(true);
+            setFinalGate(false);
+          }
+        }
+      } else if (action === "close_review_modal") {
+        addTelemetryLog("MODAL-TRIGGER", "Closing Review Modal", null);
+        setShowCoreModal(false);
+        setShowFinalModal(false);
+        pendingModalOpenRef.current = false;
+        setFinalGate(false);
+        if (onboardingStageRef.current === "core" && areCoreSpecsVerified(dataRef.current.property)) {
+          handleConfirmCoreSpecs();
         }
       }
-    } else if (action === "close_review_modal") {
-      setShowCoreModal(false);
-      setShowFinalModal(false);
-      pendingModalOpenRef.current = false;
-      pendingFinalModalOpenRef.current = false;
-      if (onboardingStageRef.current === "core" && areCoreSpecsVerified(dataRef.current.property)) {
-        handleConfirmCoreSpecs();
-      }
-    }
-  }, [handleConfirmCoreSpecs]);
+    },
+    [handleConfirmCoreSpecs, addTelemetryLog, setFinalGate]
+  );
 
   // Trailing Conflating Queue: In-flight Gemini extractions run to completion
   // without being cancelled. Consecutive or fast turns coalesce into a single follow-up call.
@@ -170,11 +340,30 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
     setIsTurnSyncing(true);
     isTurnSyncingRef.current = true;
     const sequenceId = ++turnSequenceRef.current;
+    const startTime = Date.now();
+
+    addTelemetryLog(
+      "EXTRACT-REQ",
+      `Turn extraction #${sequenceId} (${slidingWindow.length} turns)`,
+      {
+        turns: slidingWindow.map((t) => `[${t.role}]: ${t.text}`),
+        currentVerifiedState: {
+          listingType: dataRef.current.property.listingType,
+          price: dataRef.current.property.price,
+          address: dataRef.current.property.address,
+          availableDate: dataRef.current.property.availableDate,
+        },
+      }
+    );
+
+    const abortController = new AbortController();
+    const timeoutId = setTimeout(() => abortController.abort(), 15000);
 
     try {
       const res = await fetch(`${BASE_PATH}/api/onboarding/extract-turn`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: abortController.signal,
         body: JSON.stringify({
           slidingWindowMessages: slidingWindow,
           currentPropertyState: dataRef.current.property,
@@ -182,10 +371,15 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
         }),
       });
 
+      clearTimeout(timeoutId);
       const json = await res.json();
+      const elapsedMs = Date.now() - startTime;
       let candidateProperty = { ...dataRef.current.property };
 
       if (json.success && json.data?.updates && Object.keys(json.data.updates).length > 0) {
+        // Clear failed retry buffer on successful extraction
+        failedTurnBufferRef.current = [];
+
         const updates = json.data.updates;
         const {
           contactEmail,
@@ -242,6 +436,27 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
               : prev.negotiationMatrix,
           };
         });
+        addTelemetryLog(
+          "EXTRACT-RES",
+          `Turn extraction #${sequenceId} succeeded (${elapsedMs}ms)`,
+          {
+            updatedFields: Object.keys(updates),
+            availableDate: updates.availableDate,
+            features: updates.features,
+            pillLabels: updates.pillLabels,
+            modalAction: json.data?.modalAction,
+          },
+          elapsedMs,
+          "success"
+        );
+      } else {
+        addTelemetryLog(
+          "EXTRACT-RES",
+          `Turn extraction #${sequenceId} returned no updates (${elapsedMs}ms)`,
+          json,
+          elapsedMs,
+          "info"
+        );
       }
 
       // Check if all 6 core specs are now verified in state
@@ -255,7 +470,7 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
 
       // In-Flight Sync Gate: Final Review Card (guarantees newly spoken details have landed with 0 blanks!)
       if (pendingFinalModalOpenRef.current && (onboardingStageRef.current === "additional_specs" || onboardingStageRef.current === "final_review")) {
-        pendingFinalModalOpenRef.current = false;
+        setFinalGate(false);
         setShowFinalModal(true);
       }
 
@@ -273,15 +488,15 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
         } else if (action === "close_core") {
           handleConfirmCoreSpecs();
         } else if (action === "open_final") {
-          if (pendingExtractionWindowRef.current) {
-            pendingFinalModalOpenRef.current = true;
+          if (pendingExtractionWindowRef.current || !candidateProperty.availableDate) {
+            setFinalGate(true);
           } else {
             setShowFinalModal(true);
-            pendingFinalModalOpenRef.current = false;
+            setFinalGate(false);
           }
         } else if (action === "close_final") {
           setShowFinalModal(false);
-          pendingFinalModalOpenRef.current = false;
+          setFinalGate(false);
         } else if (action === "open") {
           if (onboardingStageRef.current === "core") {
             if (isCoreComplete) {
@@ -290,11 +505,11 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
               pendingModalOpenRef.current = true;
             }
           } else {
-            if (pendingExtractionWindowRef.current) {
-              pendingFinalModalOpenRef.current = true;
+            if (pendingExtractionWindowRef.current || !candidateProperty.availableDate) {
+              setFinalGate(true);
             } else {
               setShowFinalModal(true);
-              pendingFinalModalOpenRef.current = false;
+              setFinalGate(false);
             }
           }
         } else if (action === "close") {
@@ -302,19 +517,40 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
             handleConfirmCoreSpecs();
           } else {
             setShowFinalModal(false);
-            pendingFinalModalOpenRef.current = false;
+            setFinalGate(false);
           }
         }
       }
     } catch (err: any) {
-      console.error("[Turn Extraction Client Error]:", err);
+      clearTimeout(timeoutId);
+      const elapsedMs = Date.now() - startTime;
+      const isAborted = err.name === "AbortError";
+
+      // Coalesce failed window into retry buffer so no turns or facts are missed
+      failedTurnBufferRef.current = mergeTurnWindows(failedTurnBufferRef.current, slidingWindow);
+
+      addTelemetryLog(
+        isAborted ? "SYNC-GATE" : "ERROR",
+        `Turn extraction #${sequenceId} ${isAborted ? "timed out (15s limit) - buffered for retry" : "failed - buffered for retry"} (${elapsedMs}ms)`,
+        err.message || String(err),
+        elapsedMs,
+        isAborted ? "warn" : "error"
+      );
+
+      // Never invoke console.error on AbortError to prevent Next.js Turbopack dev error overlay
+      if (!isAborted) {
+        console.error("[Turn Extraction Client Error]:", err);
+      }
     } finally {
       // If new turns arrived while this extraction was in flight, execute the latest coalesced snapshot
       const pendingSnapshot = pendingExtractionWindowRef.current;
       pendingExtractionWindowRef.current = null;
 
       if (pendingSnapshot && pendingSnapshot.length > 0) {
-        executeTurnExtraction(pendingSnapshot);
+        const nextWindow = failedTurnBufferRef.current.length > 0
+          ? mergeTurnWindows(failedTurnBufferRef.current, pendingSnapshot)
+          : pendingSnapshot;
+        executeTurnExtraction(nextWindow);
       } else {
         isExtractionBusyRef.current = false;
         if (sequenceId === turnSequenceRef.current) {
@@ -328,13 +564,17 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
   const handleTurnExtraction = (slidingWindow: TurnMessage[]) => {
     if (!slidingWindow || slidingWindow.length === 0) return;
 
+    const windowToRun = failedTurnBufferRef.current.length > 0
+      ? mergeTurnWindows(failedTurnBufferRef.current, slidingWindow)
+      : slidingWindow;
+
     if (isExtractionBusyRef.current) {
       // Coalesce into pending snapshot: latest conversational state always wins
-      pendingExtractionWindowRef.current = slidingWindow;
+      pendingExtractionWindowRef.current = windowToRun;
       return;
     }
 
-    executeTurnExtraction(slidingWindow);
+    executeTurnExtraction(windowToRun);
   };
 
   const handleUpdateKnowledgeBase = (
@@ -397,6 +637,11 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
   const handleSendMessage = async (text: string) => {
     if (!text || !text.trim()) return;
 
+    const startTime = Date.now();
+    addTelemetryLog("DISCONNECT-SYNTHESIS", "Initiated end-of-call full transcript synthesis", {
+      transcriptLength: text.length,
+    });
+
     setIsProcessing(true);
     setPipelineError(null);
     setActivePipelineStep("Synthesizing voice intelligence & knowledge base...");
@@ -414,9 +659,24 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
       });
 
       const json = await res.json();
+      const elapsedMs = Date.now() - startTime;
+
       if (!json.success || !json.data) {
         throw new Error(json.error || "Knowledge-base synthesis failed.");
       }
+
+      addTelemetryLog(
+        "DISCONNECT-SYNTHESIS",
+        `Full transcript synthesis completed (${elapsedMs}ms)`,
+        {
+          availableDate: json.data.property?.availableDate,
+          features: json.data.property?.features,
+          pillLabels: json.data.knowledgeBase?.pillLabels,
+          detectedDiscrepancies: json.data.detectedDiscrepancies,
+        },
+        elapsedMs,
+        "success"
+      );
 
       if (json.data.knowledgeBase?.pillLabels && Object.keys(json.data.knowledgeBase.pillLabels).length > 0) {
         setPillLabels((pl) => ({ ...pl, ...json.data.knowledgeBase.pillLabels }));
@@ -551,6 +811,34 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
             Converse naturally with Elena Vance or import a listing URL to dynamically extract property specs and deploy a 24/7 Voice Sales Agent.
           </p>
         </div>
+
+        {/* Right Header Action: Telemetry HUD Toggle */}
+        <div className="flex items-center gap-2 self-start sm:self-center">
+          <button
+            type="button"
+            onClick={toggleHud}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer shadow-2xs ${
+              isHudOpen
+                ? "bg-indigo-600 text-white border-indigo-700 shadow-sm"
+                : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200"
+            }`}
+            title="Toggle Live Telemetry & Pipeline Inspector"
+          >
+            <Activity className={`w-3.5 h-3.5 ${isHudOpen ? "text-white" : "text-indigo-600"}`} />
+            <span>Telemetry HUD</span>
+            {telemetryLogs.length > 0 && (
+              <span
+                className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
+                  isHudOpen
+                    ? "bg-white/20 text-white"
+                    : "bg-indigo-50 text-indigo-700 border border-indigo-200"
+                }`}
+              >
+                {telemetryLogs.length}
+              </span>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Split-Screen 2-Column Grid */}
@@ -562,6 +850,7 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
             onSendMessage={handleSendMessage}
             onTurnExtraction={handleTurnExtraction}
             onUIAction={handleUIAction}
+            onLogEvent={addTelemetryLog}
             isProcessing={isProcessing}
             activePipelineStep={activePipelineStep}
             pipelineError={pipelineError}
@@ -631,6 +920,20 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
           shareUrl={publishedResult.shareUrl}
         />
       )}
+
+      {/* Real-time Telemetry & Pipeline Inspector HUD */}
+      <TelemetryHUD
+        isOpen={isHudOpen}
+        onClose={() => setHudStore(false)}
+        logs={telemetryLogs}
+        onClearLogs={() => setTelemetryLogs([])}
+        syncStatus={{
+          isTurnSyncing,
+          pendingFinalModalOpen: isFinalGateLatched,
+          onboardingStage,
+          availableDate: data.property.availableDate,
+        }}
+      />
     </div>
   );
 }
