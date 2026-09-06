@@ -126,6 +126,7 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
   const [showCoreModal, setShowCoreModal] = useState(false);
   const [showFinalModal, setShowFinalModal] = useState(false);
   const [telemetryLogs, setTelemetryLogs] = useState<TelemetryLogEvent[]>([]);
+  const [sessionUsage, setSessionUsage] = useState({ totalTokens: 0, totalCostUsd: 0 });
   const isHudOpen = useSyncExternalStore(subscribeHud, getHudSnapshot, getHudServerSnapshot);
 
   const toggleHud = () => {
@@ -436,15 +437,25 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
               : prev.negotiationMatrix,
           };
         });
+        const usage = json.data?.usage || json.usage;
+        if (usage) {
+          setSessionUsage((prev) => ({
+            totalTokens: prev.totalTokens + (usage.totalTokens || 0),
+            totalCostUsd: Number((prev.totalCostUsd + (usage.costUsd || 0)).toFixed(6)),
+          }));
+        }
+        const tokenInfo = usage ? ` - ${usage.totalTokens} tok (${usage.costFormatted})` : "";
+
         addTelemetryLog(
           "EXTRACT-RES",
-          `Turn extraction #${sequenceId} succeeded (${elapsedMs}ms)`,
+          `Turn extraction #${sequenceId} succeeded (${elapsedMs}ms)${tokenInfo}`,
           {
             updatedFields: Object.keys(updates),
             availableDate: updates.availableDate,
             features: updates.features,
             pillLabels: updates.pillLabels,
             modalAction: json.data?.modalAction,
+            usage,
           },
           elapsedMs,
           "success"
@@ -665,14 +676,24 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
         throw new Error(json.error || "Knowledge-base synthesis failed.");
       }
 
+      const synthUsage = json.data?.usage || json.usage;
+      if (synthUsage) {
+        setSessionUsage((prev) => ({
+          totalTokens: prev.totalTokens + (synthUsage.totalTokens || 0),
+          totalCostUsd: Number((prev.totalCostUsd + (synthUsage.costUsd || 0)).toFixed(6)),
+        }));
+      }
+      const tokenInfo = synthUsage ? ` - ${synthUsage.totalTokens} tok (${synthUsage.costFormatted})` : "";
+
       addTelemetryLog(
         "DISCONNECT-SYNTHESIS",
-        `Full transcript synthesis completed (${elapsedMs}ms)`,
+        `Full transcript synthesis completed (${elapsedMs}ms)${tokenInfo}`,
         {
           availableDate: json.data.property?.availableDate,
           features: json.data.property?.features,
           pillLabels: json.data.knowledgeBase?.pillLabels,
           detectedDiscrepancies: json.data.detectedDiscrepancies,
+          usage: synthUsage,
         },
         elapsedMs,
         "success"
@@ -932,6 +953,7 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
           pendingFinalModalOpen: isFinalGateLatched,
           onboardingStage,
           availableDate: data.property.availableDate,
+          sessionUsage,
         }}
       />
     </div>

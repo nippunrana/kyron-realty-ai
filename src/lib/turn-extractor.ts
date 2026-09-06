@@ -1,6 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import type { ExtractedPropertyPayload } from "./kb-extractor";
-import { getGeminiApiKey } from "./gemini";
+import { getGeminiApiKey, computeGeminiCost, type GeminiUsage } from "./gemini";
 
 export interface TurnMessage {
   role: "assistant" | "user";
@@ -55,6 +55,7 @@ export async function extractTurnSpecs(
 ): Promise<{
   updates: TurnSpecUpdates;
   modalAction?: "open_core" | "close_core" | "open_final" | "close_final" | "open" | "close" | "none";
+  usage?: GeminiUsage;
 }> {
   const { slidingWindowMessages, currentPropertyState, currentKnowledgeBase } = input;
 
@@ -116,12 +117,13 @@ MANDATORY EXTRACTION WORKFLOW:
    - utilitiesDetail: utility inclusions (e.g. "Water is included in maintenance fees").
    - availableDate: move-in timing or availability. If the owner specifies a relative date or timeline (e.g. "14 days from now", "in 14 days", "within two weeks", "ready in 15 days", "available immediately", "1st of next month"), ALWAYS format it cleanly as e.g. "In 14 Days", "Within 14 Days", "Available Immediately", or "1st of Next Month". NEVER leave availableDate null if move-in timing was discussed!
    - features: array of concise feature highlight strings (e.g. "1-Car Garage", "Street Parking", "Water Included via Maintenance", "Private Balcony", "Central A/C"). When parking breakdown (garage vs street), utility inclusions, or specific unit perks are discussed, extract 1–3 discrete highlight strings here so they appear as feature cards in the Live Property Inspector immediately!
-   - PILL BUTTON LABELS: For any additional spec stated, also provide a concise 2–4 word UI button label:
-     - parkingPillText: e.g. "3-Car Parking"
-     - petPolicyPillText: e.g. "Dogs Allowed"
-     - utilitiesPillText: e.g. "Water Included"
-     - availableDatePillText: e.g. "In 14 Days"
-     - hoaPillText: e.g. "$250/mo HOA" or "No HOA"
+    - PILL BUTTON LABELS: For any additional spec stated, provide a strictly concise 2–4 word UI button label (maximum 30 characters).
+      NEVER output repetitive text, translations, loops, or commentary.
+      - parkingPillText: e.g. "3-Car Parking"
+      - petPolicyPillText: e.g. "Dogs Allowed"
+      - utilitiesPillText: e.g. "Water Included"
+      - availableDatePillText: e.g. "In 14 Days"
+      - hoaPillText: e.g. "$250/mo HOA" or "No HOA"
 5. Determine 'modalAction':
    - "open_core": Elena or owner EXPLICITLY announces, pulls up, or asks to show the Core Specs review card (e.g. "I've pulled up your core specs review card on your screen", "open the review card", "show me the card").
      CRITICAL: If the owner or Elena is simply asking or answering regular intake questions, modalAction MUST BE "none".
@@ -145,6 +147,7 @@ ${formattedDialogue}
       model: modelName,
       contents: prompt,
       config: {
+        maxOutputTokens: 800,
         responseMimeType: "application/json",
         responseSchema: {
           type: "object",
@@ -279,17 +282,23 @@ ${formattedDialogue}
       updates.amenities = rawAdditional.amenities.filter((a: any) => typeof a === "string" && a.trim());
     }
 
-    // Dynamic Pill Labels
+    // Dynamic Pill Labels with strict character length guard (prevents loop glitches)
+    const cleanPillString = (val: any) => {
+      const s = cleanString(val);
+      if (!s) return undefined;
+      return s.length > 35 ? s.slice(0, 32) + "..." : s;
+    };
+
     const pillLabels: PillLabels = {};
-    const cleanParkingPill = cleanString(rawAdditional.parkingPillText);
+    const cleanParkingPill = cleanPillString(rawAdditional.parkingPillText);
     if (cleanParkingPill) pillLabels.parking = cleanParkingPill;
-    const cleanPetPill = cleanString(rawAdditional.petPolicyPillText);
+    const cleanPetPill = cleanPillString(rawAdditional.petPolicyPillText);
     if (cleanPetPill) pillLabels.pets = cleanPetPill;
-    const cleanUtilPill = cleanString(rawAdditional.utilitiesPillText);
+    const cleanUtilPill = cleanPillString(rawAdditional.utilitiesPillText);
     if (cleanUtilPill) pillLabels.utilities = cleanUtilPill;
-    const cleanAvailPill = cleanString(rawAdditional.availableDatePillText);
+    const cleanAvailPill = cleanPillString(rawAdditional.availableDatePillText);
     if (cleanAvailPill) pillLabels.availableDate = cleanAvailPill;
-    const cleanHoaPill = cleanString(rawAdditional.hoaPillText);
+    const cleanHoaPill = cleanPillString(rawAdditional.hoaPillText);
     if (cleanHoaPill) pillLabels.hoa = cleanHoaPill;
 
     if (Object.keys(pillLabels).length > 0) {
@@ -297,20 +306,26 @@ ${formattedDialogue}
     }
 
     const durationMs = Date.now() - startTime;
+    const promptTokens = response.usageMetadata?.promptTokenCount || 0;
+    const candidateTokens = response.usageMetadata?.candidatesTokenCount || 0;
+    const usage = computeGeminiCost(modelName, promptTokens, candidateTokens);
+
     console.log(
-      `[Turn Extractor] Completed in ${durationMs}ms:`,
+      `[Turn Extractor] Completed in ${durationMs}ms (${usage.totalTokens} tokens, ${usage.costFormatted}):`,
       JSON.stringify({
         updatedFields: Object.keys(updates),
         availableDate: updates.availableDate,
         features: updates.features,
         pillLabels: updates.pillLabels,
         modalAction: parsed.modalAction || "none",
+        usage,
       })
     );
 
     return {
       updates,
       modalAction: parsed.modalAction || "none",
+      usage,
     };
   } catch (err: any) {
     const durationMs = Date.now() - startTime;

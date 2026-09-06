@@ -30,6 +30,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       data: extraction,
+      usage: extraction.usage,
     });
   } catch (error: any) {
     console.error("Knowledge extraction route error:", error);

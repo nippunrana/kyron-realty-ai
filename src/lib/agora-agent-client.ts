@@ -294,7 +294,7 @@ ${contactEmail ? `5. If asked for direct owner or leasing office contact, provid
 
   let llmConfig: any = null;
   if (geminiApiKey) {
-    const geminiModel = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+    const geminiModel = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
     llmConfig = {
       url: `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:streamGenerateContent?alt=sse&key=${geminiApiKey}`,
       system_messages: [

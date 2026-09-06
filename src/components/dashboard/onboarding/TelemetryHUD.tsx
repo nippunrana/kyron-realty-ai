@@ -41,6 +41,10 @@ interface TelemetryHUDProps {
     pendingFinalModalOpen: boolean;
     onboardingStage: string;
     availableDate?: string;
+    sessionUsage?: {
+      totalTokens: number;
+      totalCostUsd: number;
+    };
   };
 }
 
@@ -137,7 +141,7 @@ export function TelemetryHUD({
       </div>
 
       {/* Live State & Sync Gate Status Bar */}
-      <div className="p-3 bg-slate-900/60 border-b border-slate-800/80 grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] shrink-0 font-sans">
+      <div className="p-3 bg-slate-900/60 border-b border-slate-800/80 grid grid-cols-2 sm:grid-cols-5 gap-2 text-[11px] shrink-0 font-sans">
         <div className="p-2 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-between">
           <span className="text-slate-400">Syncing:</span>
           <span
@@ -173,8 +177,23 @@ export function TelemetryHUD({
 
         <div className="p-2 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-between">
           <span className="text-slate-400">Move-In:</span>
-          <span className="font-bold text-emerald-400 text-[10px] truncate max-w-[80px]">
-            {syncStatus.availableDate || "None"}
+          <span
+            className={`font-bold px-1.5 py-0.2 rounded text-[10px] truncate max-w-[75px] ${
+              syncStatus.availableDate
+                ? "bg-emerald-950 text-emerald-300 border border-emerald-700/50"
+                : "bg-slate-800 text-slate-400"
+            }`}
+          >
+            {syncStatus.availableDate || "PENDING"}
+          </span>
+        </div>
+
+        <div className="p-2 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-between col-span-2 sm:col-span-1">
+          <span className="text-slate-400">AI Cost:</span>
+          <span className="font-bold text-emerald-400 text-[10px] truncate">
+            {syncStatus.sessionUsage && syncStatus.sessionUsage.totalTokens > 0
+              ? `${syncStatus.sessionUsage.totalTokens.toLocaleString()} tok ($${syncStatus.sessionUsage.totalCostUsd < 0.01 ? syncStatus.sessionUsage.totalCostUsd.toFixed(5) : syncStatus.sessionUsage.totalCostUsd.toFixed(4)})`
+              : "$0.00"}
           </span>
         </div>
       </div>
@@ -255,6 +274,11 @@ export function TelemetryHUD({
                   </div>
 
                   <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                    {log.details?.usage?.costFormatted && (
+                      <span className="text-[10px] text-emerald-400 font-bold bg-emerald-950/60 border border-emerald-800/50 px-1.5 py-0.2 rounded">
+                        {log.details.usage.costFormatted}
+                      </span>
+                    )}
                     {typeof log.latencyMs === "number" && (
                       <span className="text-[10px] text-indigo-400 font-bold bg-indigo-950/60 border border-indigo-800/50 px-1.5 py-0.2 rounded">
                         {log.latencyMs}ms

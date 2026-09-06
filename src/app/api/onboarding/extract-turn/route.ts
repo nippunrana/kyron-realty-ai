@@ -28,11 +28,14 @@ export async function POST(req: NextRequest) {
     });
 
     const durationMs = Date.now() - startTime;
-    console.log(`[API extract-turn] 200 OK (${durationMs}ms) - Updated: [${Object.keys(result.updates).join(", ")}]`);
+    console.log(
+      `[API extract-turn] 200 OK (${durationMs}ms) - Updated: [${Object.keys(result.updates).join(", ")}] - ${result.usage?.totalTokens || 0} tokens (${result.usage?.costFormatted || "$0"})`
+    );
 
     return NextResponse.json({
       success: true,
       data: result,
+      usage: result.usage,
       latencyMs: durationMs,
     });
   } catch (error: any) {

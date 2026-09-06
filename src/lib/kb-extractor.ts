@@ -6,7 +6,7 @@ import {
   randomSlugSuffix,
   slugify,
 } from "./listing-helpers";
-import { getGeminiApiKey } from "./gemini";
+import { getGeminiApiKey, computeGeminiCost, type GeminiUsage } from "./gemini";
 
 export interface ExtractedPropertyPayload {
   property: {
@@ -70,6 +70,7 @@ export interface ExtractedPropertyPayload {
     }>;
     notesForAgent: string;
   };
+  usage?: GeminiUsage;
 }
 
 export interface ExtractInput {
@@ -245,7 +246,7 @@ Return a strictly valid JSON object matching this schema:
   `.trim();
 
   try {
-    const modelName = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+    const modelName = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
     const response = await ai.models.generateContent({
       model: modelName,
       contents: systemPrompt,
@@ -253,6 +254,10 @@ Return a strictly valid JSON object matching this schema:
         responseMimeType: "application/json",
       },
     });
+
+    const promptTokens = response.usageMetadata?.promptTokenCount || 0;
+    const candidateTokens = response.usageMetadata?.candidatesTokenCount || 0;
+    const usage = computeGeminiCost(modelName, promptTokens, candidateTokens);
 
     const text = response.text || "";
     if (!text.trim()) {
@@ -409,6 +414,7 @@ Return valid JSON:
         targetPrice,
         minFloorPrice,
       },
+      usage,
     };
   } catch (err: any) {
     console.error(`[Gemini Extraction Error]:`, err.message || err);
