@@ -4,8 +4,9 @@ import { Metadata } from "next";
 import { auth } from "@/auth";
 import { db } from "@/db";
 import { properties } from "@/db/schema";
-import { desc, eq, isNull, or, and, ne } from "drizzle-orm";
+import { desc, eq, isNull, or } from "drizzle-orm";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
+import { PropertyListingsSection, type ListingCardItem } from "@/components/dashboard/PropertyListingsSection";
 import {
   BrainCircuit,
   TrendingUp,
@@ -14,13 +15,6 @@ import {
   Building2,
   ShieldCheck,
   Plus,
-  PhoneCall,
-  MapPin,
-  Bed,
-  Bath,
-  Maximize,
-  Radio,
-  ExternalLink,
 } from "lucide-react";
 
 export const metadata: Metadata = {
@@ -43,8 +37,8 @@ const listingCardColumns = {
   sqft: properties.sqft,
   coverImageUrl: properties.coverImageUrl,
   images: properties.images,
+  status: properties.status,
 };
-type ListingCard = Pick<typeof properties.$inferSelect, keyof typeof listingCardColumns>;
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -58,17 +52,12 @@ export default async function DashboardPage() {
 
   // Own listings only. Rows with a null owner_id predate authentication and stay
   // visible to every user until they are assigned (see docs/built-systems/database.md).
-  let userProperties: ListingCard[] = [];
+  let userProperties: ListingCardItem[] = [];
   try {
     userProperties = await db
       .select(listingCardColumns)
       .from(properties)
-      .where(
-        and(
-          or(eq(properties.ownerId, user.id ?? ""), isNull(properties.ownerId)),
-          ne(properties.status, "draft")
-        )
-      )
+      .where(or(eq(properties.ownerId, user.id ?? ""), isNull(properties.ownerId)))
       .orderBy(desc(properties.createdAt));
   } catch (err) {
     console.error("Error fetching properties for dashboard:", err);
@@ -113,163 +102,8 @@ export default async function DashboardPage() {
           </div>
         </section>
 
-        {/* Active Property Inventory Section */}
-        <section className="mb-10">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <span>Active Listings & Voice Agents</span>
-                <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold border border-slate-200">
-                  {userProperties.length}
-                </span>
-              </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Every listing is deployed with real-time Agora speech intelligence and dynamic price guardrails.
-              </p>
-            </div>
-
-            {userProperties.length > 0 && (
-              <Link
-                href="/dashboard/properties/new"
-                className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
-              >
-                <span>+ Add another listing</span>
-              </Link>
-            )}
-          </div>
-
-          {userProperties.length === 0 ? (
-            /* Zero State Card */
-            <div className="bg-white rounded-3xl p-8 sm:p-12 border border-slate-200/90 shadow-sm text-center flex flex-col items-center justify-center">
-              <div className="w-16 h-16 rounded-3xl bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center mb-4 shadow-sm">
-                <Building2 className="w-8 h-8" />
-              </div>
-              <h3 className="text-base sm:text-lg font-extrabold text-slate-900 mb-1">
-                No Properties Listed Yet
-              </h3>
-              <p className="text-xs sm:text-sm text-slate-600 max-w-md mb-6 leading-relaxed">
-                Launch your first property in under 60 seconds. Paste an existing URL to scrape specs, or talk with our voice wizard to synthesize a verified knowledge base.
-              </p>
-              <Link
-                href="/dashboard/properties/new"
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm shadow-md shadow-blue-600/20 transition-all"
-              >
-                <Sparkles className="w-4 h-4" />
-                <span>Launch Onboarding Studio</span>
-              </Link>
-            </div>
-          ) : (
-            /* Property Grid */
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {userProperties.map((prop) => {
-                const coverImage =
-                  prop.coverImageUrl ||
-                  (Array.isArray(prop.images) && prop.images[0]) ||
-                  "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80";
-
-                return (
-                  <div
-                    key={prop.id}
-                    className="bg-white rounded-3xl border border-slate-200/90 shadow-sm hover:shadow-md transition-all overflow-hidden flex flex-col justify-between group"
-                  >
-                    <div>
-                      {/* Photo Thumbnail */}
-                      <div className="relative aspect-16/10 bg-slate-900 overflow-hidden">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={coverImage}
-                          alt={prop.title}
-                          className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-300"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-black/20" />
-
-                        {/* Top Badges */}
-                        <div className="absolute top-3 left-3 flex items-center gap-1.5">
-                          <span className="px-2.5 py-0.5 rounded-lg bg-slate-950/80 backdrop-blur-md text-white text-[10px] font-bold uppercase tracking-wider border border-white/20">
-                            {prop.listingType === "rent" ? "For Rent" : "For Sale"}
-                          </span>
-                          <span className="px-2.5 py-0.5 rounded-lg bg-emerald-500/90 text-white text-[10px] font-bold uppercase">
-                            {prop.propertyType}
-                          </span>
-                        </div>
-
-                        {/* Agora Voice Active Pill */}
-                        <div className="absolute top-3 right-3">
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-600/90 backdrop-blur-md text-white text-[10px] font-bold">
-                            <Radio className="w-3 h-3 animate-pulse text-emerald-300" />
-                            <span>Voice AI Live</span>
-                          </span>
-                        </div>
-
-                        {/* Price Overlay */}
-                        <div className="absolute bottom-3 left-3 text-white">
-                          <div className="text-lg font-extrabold tracking-tight">
-                            ${Number(prop.price).toLocaleString()}
-                            {prop.listingType === "rent" && (
-                              <span className="text-xs font-normal text-slate-200">/mo</span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Content Body */}
-                      <div className="p-5">
-                        <div className="flex items-center gap-1 text-xs text-slate-500 mb-1">
-                          <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                          <span className="truncate">
-                            {prop.address}, {prop.city}
-                          </span>
-                        </div>
-
-                        <h3 className="text-sm font-bold text-slate-900 leading-snug line-clamp-1 mb-3">
-                          {prop.title}
-                        </h3>
-
-                        {/* Specs Pill Row */}
-                        <div className="flex items-center gap-3 text-xs text-slate-600 pb-3 border-b border-slate-100 font-medium">
-                          <span className="flex items-center gap-1">
-                            <Bed className="w-3.5 h-3.5 text-slate-400" />
-                            <span>{prop.bedrooms ?? "—"} Beds</span>
-                          </span>
-                          <span>•</span>
-                          <span className="flex items-center gap-1">
-                            <Bath className="w-3.5 h-3.5 text-slate-400" />
-                            <span>{prop.bathrooms ?? "—"} Baths</span>
-                          </span>
-                          <span>•</span>
-                          <span className="flex items-center gap-1">
-                            <Maximize className="w-3.5 h-3.5 text-slate-400" />
-                            <span>{prop.sqft ?? "—"} sf</span>
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Action Footer */}
-                    <div className="px-5 py-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2">
-                      <Link
-                        href={`/listings/${prop.slug}`}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold transition-colors"
-                      >
-                        <PhoneCall className="w-3.5 h-3.5" />
-                        <span>Test Voice Agent</span>
-                      </Link>
-
-                      <Link
-                        href={`/listings/${prop.slug}`}
-                        target="_blank"
-                        className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors"
-                        title="Open Public Listing in new tab"
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                      </Link>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </section>
+        {/* Property Inventory Section (Published vs Drafts Tabs + Deletion) */}
+        <PropertyListingsSection initialProperties={userProperties} />
 
         {/* Intelligence Platform Modules */}
         <section className="grid grid-cols-1 md:grid-cols-3 gap-6">

@@ -9,12 +9,19 @@ export const metadata: Metadata = {
   description: "AI-powered property listing creation, website scraping, and Agora Voice Agent deployment.",
 };
 
-export default async function NewPropertyPage() {
+export default async function NewPropertyPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ draftId?: string }>;
+}) {
   const session = await auth();
 
   if (!session?.user) {
     redirect("/login");
   }
+
+  const resolvedParams = await searchParams;
+  const initialDraftId = resolvedParams.draftId ? Number(resolvedParams.draftId) : undefined;
 
   return (
     <div className="fixed inset-0 flex flex-col bg-slate-50 text-slate-900 selection:bg-blue-100 selection:text-blue-900 overflow-hidden">
@@ -26,7 +33,7 @@ export default async function NewPropertyPage() {
 
       {/* Main Studio Workspace */}
       <main className="flex-1 min-h-0 flex flex-col overflow-hidden">
-        <OnboardingStudio user={session.user} />
+        <OnboardingStudio user={session.user} initialDraftId={initialDraftId} />
       </main>
     </div>
   );

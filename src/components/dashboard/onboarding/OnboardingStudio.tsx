@@ -71,6 +71,7 @@ interface OnboardingStudioProps {
     name?: string | null;
     email?: string | null;
   };
+  initialDraftId?: number;
 }
 
 const HUD_STORAGE_KEY = "kyron_telemetry_hud_open";
@@ -109,7 +110,7 @@ function setHudStore(open: boolean): void {
   hudListeners.forEach((l) => l());
 }
 
-export function OnboardingStudio({ user }: OnboardingStudioProps) {
+export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps) {
   const [data, setData] = useState<ExtractedPropertyPayload>(() => ({
     ...emptyInitialDraftState,
     knowledgeBase: {
@@ -127,11 +128,11 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
   const [showCoreModal, setShowCoreModal] = useState(false);
   const [showFinalModal, setShowFinalModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [draftId, setDraftId] = useState<number | null>(null);
+  const [draftId, setDraftId] = useState<number | null>(initialDraftId || null);
   const [uploadToken, setUploadToken] = useState("");
   const [uploadUrl, setUploadUrl] = useState("");
   const [qrCodeSvg, setQrCodeSvg] = useState("");
-  const draftIdRef = useRef<number | null>(null);
+  const draftIdRef = useRef<number | null>(initialDraftId || null);
   const [voiceControl, setVoiceControl] = useState<VoiceControlState | null>(null);
 
   const handleVoiceStateSync = useCallback((state: VoiceControlState) => {
@@ -179,6 +180,116 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
     },
     []
   );
+
+  // Resume / populate existing draft listing if initialDraftId is provided
+  useEffect(() => {
+    if (!initialDraftId) return;
+
+    let isMounted = true;
+    async function loadDraftListing() {
+      try {
+        addTelemetryLog("STATE-UPDATE", `Loading existing draft listing #${initialDraftId}...`);
+        const res = await fetch(`${BASE_PATH}/api/properties/${initialDraftId}`);
+        const result = await res.json();
+
+        if (!res.ok || !result.success || !result.property) {
+          throw new Error(result.error || "Failed to load draft listing.");
+        }
+
+        if (!isMounted) return;
+        const prop = result.property;
+        const kb = result.knowledgeBase;
+        const matrix = result.negotiationMatrix;
+
+        setDraftId(prop.id);
+        draftIdRef.current = prop.id;
+
+        if (prop.uploadToken) {
+          setUploadToken(prop.uploadToken);
+          const host = window.location.host;
+          const protocol = window.location.protocol;
+          const url = `${protocol}//${host}${BASE_PATH}/properties/upload/${prop.id}?token=${prop.uploadToken}`;
+          setUploadUrl(url);
+        }
+
+        if (prop.qrCodeSvg) {
+          setQrCodeSvg(prop.qrCodeSvg);
+        }
+
+        setData((prev) => ({
+          property: {
+            ...prev.property,
+            title: prop.title || prev.property.title,
+            slug: prop.slug || prev.property.slug,
+            description: prop.description || prev.property.description,
+            listingType: prop.listingType || prev.property.listingType,
+            propertyType: prop.propertyType || prev.property.propertyType,
+            price: Number(prop.price) || 0,
+            securityDeposit: Number(prop.securityDeposit) || 0,
+            minLeaseMonths: prop.minLeaseMonths ?? 12,
+            hoaFeeMonthly: Number(prop.hoaFeeMonthly) || 0,
+            address: prop.address || prev.property.address,
+            unitNumber: prop.unitNumber || "",
+            city: prop.city || "",
+            state: prop.state || "",
+            zipCode: prop.zipCode || "",
+            country: prop.country || "USA",
+            bedrooms: prop.bedrooms ?? 0,
+            bathrooms: Number(prop.bathrooms) || 0,
+            sqft: prop.sqft ?? 0,
+            yearBuilt: prop.yearBuilt ?? 0,
+            amenities: Array.isArray(prop.amenities) ? prop.amenities : prev.property.amenities,
+            features: Array.isArray(prop.features) ? prop.features : prev.property.features,
+            coverImageUrl: prop.coverImageUrl || "",
+            images: Array.isArray(prop.images) ? prop.images : [],
+          },
+          knowledgeBase: kb
+            ? {
+                ...prev.knowledgeBase,
+                ...kb,
+              }
+            : prev.knowledgeBase,
+          negotiationMatrix: matrix
+            ? {
+                ...prev.negotiationMatrix,
+                ...matrix,
+              }
+            : prev.negotiationMatrix,
+        }));
+
+        if (Array.isArray(prop.images) && prop.images.length > 0) {
+          setOnboardingStage("final_review");
+        } else if (prop.address && prop.price && Number(prop.price) > 0) {
+          setOnboardingStage("photos");
+        } else if (prop.address) {
+          setOnboardingStage("additional_specs");
+        }
+
+        addTelemetryLog(
+          "STATE-UPDATE",
+          `Draft listing #${initialDraftId} loaded into studio workspace`,
+          { title: prop.title, address: prop.address },
+          undefined,
+          "info"
+        );
+      } catch (err) {
+        console.error("Failed to load initial draft listing:", err);
+        addTelemetryLog(
+          "STATE-UPDATE",
+          `Failed to load draft listing #${initialDraftId}`,
+          err,
+          undefined,
+          "error"
+        );
+      }
+    }
+
+    loadDraftListing();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [initialDraftId, addTelemetryLog]);
 
   // Latest state for async turn-extraction and voice callbacks; synced after each commit
   const dataRef = useRef(data);
