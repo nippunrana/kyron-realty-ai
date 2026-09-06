@@ -10,6 +10,10 @@ import {
   ChevronRight,
   ChevronDown,
   Check,
+  Coins,
+  Cpu,
+  ArrowDownLeft,
+  ArrowUpRight,
 } from "lucide-react";
 
 export interface TelemetryLogEvent {
@@ -42,10 +46,27 @@ interface TelemetryHUDProps {
     onboardingStage: string;
     availableDate?: string;
     sessionUsage?: {
+      promptTokens?: number;
+      candidateTokens?: number;
       totalTokens: number;
       totalCostUsd: number;
     };
   };
+}
+
+function formatStageName(stage: string): string {
+  switch (stage) {
+    case "core":
+      return "Core Specs";
+    case "additional_specs":
+      return "Extra Specs";
+    case "final_review":
+      return "Final Review";
+    case "complete":
+      return "Complete";
+    default:
+      return stage ? stage.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) : "Core Specs";
+  }
 }
 
 export function TelemetryHUD({
@@ -58,6 +79,17 @@ export function TelemetryHUD({
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+
+  const promptTokens = syncStatus.sessionUsage?.promptTokens ?? 0;
+  const candidateTokens = syncStatus.sessionUsage?.candidateTokens ?? 0;
+  const totalTokens = syncStatus.sessionUsage?.totalTokens ?? 0;
+  const totalCostUsd = syncStatus.sessionUsage?.totalCostUsd ?? 0;
+  const formattedCost =
+    totalCostUsd > 0
+      ? totalCostUsd < 0.01
+        ? `$${totalCostUsd.toFixed(5)}`
+        : `$${totalCostUsd.toFixed(4)}`
+      : "$0.0000";
 
   const filteredLogs = useMemo(() => {
     if (selectedCategory === "ALL") return logs;
@@ -80,12 +112,12 @@ export function TelemetryHUD({
   return (
     <div
       id="telemetry-hud-drawer"
-      className="fixed inset-y-0 right-0 z-50 w-full sm:w-[480px] md:w-[540px] bg-slate-950 text-slate-100 shadow-2xl border-l border-slate-800 flex flex-col font-mono text-xs animate-in slide-in-from-right duration-200"
+      className="fixed inset-y-0 right-0 z-50 w-full sm:w-[540px] md:w-[600px] lg:w-[640px] bg-slate-950 text-slate-100 shadow-2xl border-l border-slate-800 flex flex-col font-mono text-xs animate-in slide-in-from-right duration-200"
     >
       {/* HUD Header */}
       <div className="p-4 border-b border-slate-800 bg-slate-900/90 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-indigo-500/20 text-indigo-400 border border-indigo-500/40 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-400 border border-indigo-500/40 flex items-center justify-center">
             <Terminal className="w-4 h-4" />
           </div>
           <div>
@@ -93,7 +125,7 @@ export function TelemetryHUD({
               <span className="font-bold text-slate-100 text-sm tracking-tight font-sans">
                 Pipeline Telemetry HUD
               </span>
-              <span className="px-1.5 py-0.2 rounded bg-indigo-950 text-indigo-300 border border-indigo-700/50 text-[10px] font-bold">
+              <span className="px-1.5 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-700/50 text-[10px] font-bold">
                 DEV MODE
               </span>
             </div>
@@ -107,7 +139,7 @@ export function TelemetryHUD({
           <button
             type="button"
             onClick={handleCopyLogs}
-            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors cursor-pointer flex items-center gap-1 text-[11px]"
+            className="p-1.5 px-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors cursor-pointer flex items-center gap-1.5 text-[11px] font-sans"
             title="Copy structured JSON logs"
           >
             {copied ? (
@@ -140,61 +172,117 @@ export function TelemetryHUD({
         </div>
       </div>
 
-      {/* Live State & Sync Gate Status Bar */}
-      <div className="p-3 bg-slate-900/60 border-b border-slate-800/80 grid grid-cols-2 sm:grid-cols-5 gap-2 text-[11px] shrink-0 font-sans">
-        <div className="p-2 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-between">
-          <span className="text-slate-400">Syncing:</span>
-          <span
-            className={`font-bold px-1.5 py-0.2 rounded text-[10px] ${
-              syncStatus.isTurnSyncing
-                ? "bg-blue-500/20 text-blue-300 border border-blue-500/40 animate-pulse"
-                : "bg-slate-800 text-slate-400"
-            }`}
-          >
-            {syncStatus.isTurnSyncing ? "IN-FLIGHT" : "IDLE"}
-          </span>
+      {/* Top Metrics & Status Section */}
+      <div className="p-3 bg-slate-900/80 border-b border-slate-800 flex flex-col gap-2.5 shrink-0 font-sans">
+        {/* Tier 1: Total AI Spend & Processed Tokens Breakdown */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {/* Card 1: Total AI Cost */}
+          <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-950/40 via-slate-900 to-slate-900/90 border border-emerald-500/30 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center justify-center shrink-0">
+                <Coins className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">
+                  Total AI Cost
+                </span>
+                <span className="text-lg font-extrabold text-emerald-400 font-mono tracking-tight leading-tight block">
+                  {formattedCost}
+                </span>
+              </div>
+            </div>
+            <div className="text-right">
+              <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-700/50 text-[10px] font-semibold block">
+                3.5 Flash-Lite
+              </span>
+              <span className="text-[9px] text-slate-500 font-mono mt-0.5 block">
+                $0.30 in / $2.50 out
+              </span>
+            </div>
+          </div>
+
+          {/* Card 2: Processed Tokens with In/Out Breakdown */}
+          <div className="p-3 rounded-xl bg-gradient-to-br from-indigo-950/40 via-slate-900 to-slate-900/90 border border-indigo-500/30 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-lg bg-indigo-500/20 text-indigo-400 border border-indigo-500/40 flex items-center justify-center shrink-0">
+                <Cpu className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">
+                  Tokens Processed
+                </span>
+                <span className="text-lg font-extrabold text-indigo-200 font-mono tracking-tight leading-tight block">
+                  {totalTokens.toLocaleString()}
+                </span>
+              </div>
+            </div>
+            <div className="flex flex-col items-end gap-1">
+              <span className="inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800/90 text-sky-300 border border-sky-500/25">
+                <ArrowDownLeft className="w-3 h-3 text-sky-400 shrink-0" />
+                <span>{promptTokens.toLocaleString()} in</span>
+              </span>
+              <span className="inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800/90 text-purple-300 border border-purple-500/25">
+                <ArrowUpRight className="w-3 h-3 text-purple-400 shrink-0" />
+                <span>{candidateTokens.toLocaleString()} out</span>
+              </span>
+            </div>
+          </div>
         </div>
 
-        <div className="p-2 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-between">
-          <span className="text-slate-400">Final Gate:</span>
-          <span
-            className={`font-bold px-1.5 py-0.2 rounded text-[10px] ${
-              syncStatus.pendingFinalModalOpen
-                ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse"
-                : "bg-slate-800 text-slate-400"
-            }`}
-          >
-            {syncStatus.pendingFinalModalOpen ? "LATCHED" : "OPEN"}
-          </span>
-        </div>
+        {/* Tier 2: Pipeline State & Sync Gate Control Bar */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-[11px]">
+          {/* Turn Sync */}
+          <div className="p-2 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-between">
+            <span className="text-slate-400 text-[10px]">Sync:</span>
+            <span
+              className={`font-bold px-1.5 py-0.5 rounded text-[10px] flex items-center gap-1 ${
+                syncStatus.isTurnSyncing
+                  ? "bg-blue-500/20 text-blue-300 border border-blue-500/40 animate-pulse"
+                  : "bg-slate-800 text-slate-400"
+              }`}
+            >
+              {syncStatus.isTurnSyncing && (
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-ping" />
+              )}
+              {syncStatus.isTurnSyncing ? "IN-FLIGHT" : "IDLE"}
+            </span>
+          </div>
 
-        <div className="p-2 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-between">
-          <span className="text-slate-400">Stage:</span>
-          <span className="font-bold text-indigo-300 text-[10px] truncate max-w-[80px]">
-            {syncStatus.onboardingStage}
-          </span>
-        </div>
+          {/* Final Gate */}
+          <div className="p-2 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-between">
+            <span className="text-slate-400 text-[10px]">Gate:</span>
+            <span
+              className={`font-bold px-1.5 py-0.5 rounded text-[10px] ${
+                syncStatus.pendingFinalModalOpen
+                  ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse"
+                  : "bg-emerald-950/60 text-emerald-300 border border-emerald-700/40"
+              }`}
+            >
+              {syncStatus.pendingFinalModalOpen ? "LATCHED" : "OPEN"}
+            </span>
+          </div>
 
-        <div className="p-2 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-between">
-          <span className="text-slate-400">Move-In:</span>
-          <span
-            className={`font-bold px-1.5 py-0.2 rounded text-[10px] truncate max-w-[75px] ${
-              syncStatus.availableDate
-                ? "bg-emerald-950 text-emerald-300 border border-emerald-700/50"
-                : "bg-slate-800 text-slate-400"
-            }`}
-          >
-            {syncStatus.availableDate || "PENDING"}
-          </span>
-        </div>
+          {/* Stage */}
+          <div className="p-2 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-between">
+            <span className="text-slate-400 text-[10px]">Stage:</span>
+            <span className="font-bold text-indigo-300 text-[10px] px-1.5 py-0.5 rounded bg-indigo-950/50 border border-indigo-800/40">
+              {formatStageName(syncStatus.onboardingStage)}
+            </span>
+          </div>
 
-        <div className="p-2 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-between col-span-2 sm:col-span-1">
-          <span className="text-slate-400">AI Cost:</span>
-          <span className="font-bold text-emerald-400 text-[10px] truncate">
-            {syncStatus.sessionUsage && syncStatus.sessionUsage.totalTokens > 0
-              ? `${syncStatus.sessionUsage.totalTokens.toLocaleString()} tok ($${syncStatus.sessionUsage.totalCostUsd < 0.01 ? syncStatus.sessionUsage.totalCostUsd.toFixed(5) : syncStatus.sessionUsage.totalCostUsd.toFixed(4)})`
-              : "$0.00"}
-          </span>
+          {/* Move-In */}
+          <div className="p-2 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-between">
+            <span className="text-slate-400 text-[10px]">Move-In:</span>
+            <span
+              className={`font-bold px-1.5 py-0.5 rounded text-[10px] ${
+                syncStatus.availableDate
+                  ? "bg-emerald-950 text-emerald-300 border border-emerald-700/50"
+                  : "bg-slate-800 text-slate-400"
+              }`}
+            >
+              {syncStatus.availableDate || "PENDING"}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -266,8 +354,8 @@ export function TelemetryHUD({
                     >
                       {log.category}
                     </span>
-                    <div className="truncate min-w-0">
-                      <span className="text-xs font-medium text-slate-100 line-clamp-1">
+                    <div className="min-w-0 flex-1">
+                      <span className="text-xs font-medium text-slate-100 line-clamp-2 break-words">
                         {log.title}
                       </span>
                     </div>

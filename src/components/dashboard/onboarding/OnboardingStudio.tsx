@@ -126,7 +126,12 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
   const [showCoreModal, setShowCoreModal] = useState(false);
   const [showFinalModal, setShowFinalModal] = useState(false);
   const [telemetryLogs, setTelemetryLogs] = useState<TelemetryLogEvent[]>([]);
-  const [sessionUsage, setSessionUsage] = useState({ totalTokens: 0, totalCostUsd: 0 });
+  const [sessionUsage, setSessionUsage] = useState({
+    promptTokens: 0,
+    candidateTokens: 0,
+    totalTokens: 0,
+    totalCostUsd: 0,
+  });
   const isHudOpen = useSyncExternalStore(subscribeHud, getHudSnapshot, getHudServerSnapshot);
 
   const toggleHud = () => {
@@ -377,6 +382,17 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
       const elapsedMs = Date.now() - startTime;
       let candidateProperty = { ...dataRef.current.property };
 
+      const usage = json.data?.usage || json.usage;
+      if (usage) {
+        setSessionUsage((prev) => ({
+          promptTokens: prev.promptTokens + (usage.promptTokens || 0),
+          candidateTokens: prev.candidateTokens + (usage.candidateTokens || 0),
+          totalTokens: prev.totalTokens + (usage.totalTokens || 0),
+          totalCostUsd: Number((prev.totalCostUsd + (usage.costUsd || 0)).toFixed(6)),
+        }));
+      }
+      const tokenInfo = usage ? ` - ${usage.totalTokens} tok (${usage.costFormatted})` : "";
+
       if (json.success && json.data?.updates && Object.keys(json.data.updates).length > 0) {
         // Clear failed retry buffer on successful extraction
         failedTurnBufferRef.current = [];
@@ -437,14 +453,6 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
               : prev.negotiationMatrix,
           };
         });
-        const usage = json.data?.usage || json.usage;
-        if (usage) {
-          setSessionUsage((prev) => ({
-            totalTokens: prev.totalTokens + (usage.totalTokens || 0),
-            totalCostUsd: Number((prev.totalCostUsd + (usage.costUsd || 0)).toFixed(6)),
-          }));
-        }
-        const tokenInfo = usage ? ` - ${usage.totalTokens} tok (${usage.costFormatted})` : "";
 
         addTelemetryLog(
           "EXTRACT-RES",
@@ -463,8 +471,11 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
       } else {
         addTelemetryLog(
           "EXTRACT-RES",
-          `Turn extraction #${sequenceId} returned no updates (${elapsedMs}ms)`,
-          json,
+          `Turn extraction #${sequenceId} returned no updates (${elapsedMs}ms)${tokenInfo}`,
+          {
+            ...json,
+            usage,
+          },
           elapsedMs,
           "info"
         );
@@ -679,6 +690,8 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
       const synthUsage = json.data?.usage || json.usage;
       if (synthUsage) {
         setSessionUsage((prev) => ({
+          promptTokens: prev.promptTokens + (synthUsage.promptTokens || 0),
+          candidateTokens: prev.candidateTokens + (synthUsage.candidateTokens || 0),
           totalTokens: prev.totalTokens + (synthUsage.totalTokens || 0),
           totalCostUsd: Number((prev.totalCostUsd + (synthUsage.costUsd || 0)).toFixed(6)),
         }));
@@ -947,7 +960,15 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
         isOpen={isHudOpen}
         onClose={() => setHudStore(false)}
         logs={telemetryLogs}
-        onClearLogs={() => setTelemetryLogs([])}
+        onClearLogs={() => {
+          setTelemetryLogs([]);
+          setSessionUsage({
+            promptTokens: 0,
+            candidateTokens: 0,
+            totalTokens: 0,
+            totalCostUsd: 0,
+          });
+        }}
         syncStatus={{
           isTurnSyncing,
           pendingFinalModalOpen: isFinalGateLatched,
