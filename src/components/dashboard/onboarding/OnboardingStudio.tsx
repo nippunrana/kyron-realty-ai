@@ -521,6 +521,8 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
         setFinalGate(false);
         if (onboardingStageRef.current === "core" && areCoreSpecsVerified(dataRef.current.property)) {
           handleConfirmCoreSpecs();
+        } else if (onboardingStageRef.current === "additional_specs") {
+          handleOpenPhotoUpload();
         }
       }
     },
@@ -707,6 +709,9 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
         } else if (action === "close_final") {
           setShowFinalModal(false);
           setFinalGate(false);
+          if (onboardingStageRef.current === "additional_specs") {
+            handleOpenPhotoUpload();
+          }
         } else if (action === "open") {
           if (onboardingStageRef.current === "core") {
             if (isCoreComplete) {
@@ -725,6 +730,8 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
         } else if (action === "close") {
           if (onboardingStageRef.current === "core") {
             handleConfirmCoreSpecs();
+          } else if (onboardingStageRef.current === "additional_specs") {
+            handleOpenPhotoUpload();
           } else {
             setShowFinalModal(false);
             setFinalGate(false);

@@ -12,16 +12,16 @@ const USER_OPEN =
   /(pull|bring|open|show|display|pop|bring back|pull back|pull it back|bring it back).*(card|modal|pop[- ]?up|review|summary|details|specs)/i;
 const USER_CLOSE = /(close|hide|dismiss|minimize|shut).*(card|modal|pop[- ]?up|review|summary)/i;
 const USER_APPROVE =
-  /(looks good|all looks good|look good|we can proceed|proceed further|let's proceed|let's move on|that's right|confirmed|continue)/i;
+  /(all is done|all done|everything is done|all set|looks good|all looks good|look good|we can proceed|proceed further|let's proceed|let's move on|that's right|confirmed|continue|ready for photos|move on to photos)/i;
 
 const ASSISTANT_OPEN_CORE =
   /(pull|bring|open|show|display).*(core specs|core details|6 core).*(screen|for you|back up|take a look|right now)/i;
 const ASSISTANT_OPEN_PHOTOS =
   /(pull|bring|open|show|display).*(photo|photos|image|images|upload window|upload modal).*(screen|for you|right now)/i;
 const ASSISTANT_OPEN_FINAL =
-  /(pull|bring|open|show|display).*(final|complete property card|hit deploy|ready to deploy).*(screen|for you|back up|take a look|right now)/i;
+  /(pull|bring|open|show|display).*(final|complete property card|full property review|hit deploy|ready to deploy).*(screen|for you|back up|take a look|right now)/i;
 const ASSISTANT_OPEN_GENERIC =
-  /(pull|bring|open|show|display).*(card|modal|pop[- ]?up|review).*(screen|for you|back up|take a look|right now)/i;
+  /(pull|bring|open|show|display).*(card|modal|pop[- ]?up|review|specs).*(screen|for you|back up|take a look|right now)/i;
 const ASSISTANT_CLOSE = /(close|closed|hide|dismiss|minimiz).*(card|modal|pop[- ]?up|review)/i;
 
 /** Verbal review-card commands from the owner: open wins over close/approve. */

@@ -128,8 +128,9 @@ MANDATORY EXTRACTION WORKFLOW:
    - "open_core": Elena or owner EXPLICITLY announces, pulls up, or asks to show the Core Specs review card (e.g. "I've pulled up your core specs review card on your screen", "open the review card", "show me the card").
      CRITICAL: If the owner or Elena is simply asking or answering regular intake questions, modalAction MUST BE "none".
    - "close_core": Owner confirms or approves the core specs (e.g. "looks good", "proceed", "confirmed", "that's right", "continue") or asks to close/minimize the review card.
-   - "open_final": Elena or owner announces/opens the Final Complete review card.
-   - "close_final": Owner asks to close or minimize the final card.
+   - "open_final": Elena or owner announces/opens the full specs review card or final review card (e.g. "I've pulled up your full property review card", "open review card").
+   - "close_final": Owner confirms or approves the full review card, or says "All is done", "all done", "everything is done", "all set", "looks good", "proceed", or asks to close/minimize the card to move to photo upload.
+   - CRITICAL SAFEGUARD: If the owner is adjusting, changing, or correcting any detail (e.g. "Actually change price to 3500", "make it 2 parking spots"), modalAction MUST BE "none" so the review card remains open on screen while values update live.
    - Otherwise: "none".
 
 ${currentVerifiedSummary}

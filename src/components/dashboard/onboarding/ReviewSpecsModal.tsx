@@ -124,7 +124,7 @@ export function ReviewSpecsModal({
               {isFinalMode
                 ? "Complete Property Intelligence Ready"
                 : isAdditionalMode
-                ? "Stage 2: Additional Specifications Verified"
+                ? "Stage 2: Full Specifications Review"
                 : `Stage 1: Core Specs Verified (${verifiedCoreCount}/6)`}
             </span>
           </div>
@@ -132,20 +132,33 @@ export function ReviewSpecsModal({
             {isFinalMode
               ? "Final Listing Review & Deploy"
               : isAdditionalMode
-              ? "Review Additional Details"
+              ? "Review Full Property Specifications"
               : "Review Core Specifications"}
           </h2>
           <p className="text-xs sm:text-sm text-slate-600 mt-1 max-w-lg mx-auto">
             {isFinalMode
               ? "Elena Vance has assembled your complete profile with verified specs and photos. Review below before deploying."
               : isAdditionalMode
-              ? "Elena Vance has captured your property terms and policies. Confirm below to proceed to photo upload."
+              ? "Elena Vance has captured your complete specifications. Review below or speak any adjustments before photo upload."
               : "Elena Vance has locked in your 6 core parameters. Confirm them below to move to extra property specs."}
           </p>
         </div>
 
         {/* Scrollable specs body */}
         <div className="overflow-y-auto flex-1 pr-1 space-y-3 mb-4">
+          {/* Group 1 Header: Core Specifications (when in additional or final mode) */}
+          {(isAdditionalMode || isFinalMode) && (
+            <div className="flex items-center justify-between pt-0.5 pb-0.5 px-1">
+              <span className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Core Specifications ({verifiedCoreCount}/6 Verified)</span>
+              </span>
+              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                Locked & Verified
+              </span>
+            </div>
+          )}
+
           {/* 1. HERO LOCATION SPOTLIGHT CARD */}
           <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-50/80 via-slate-50 to-white border border-emerald-200/90 shadow-xs relative overflow-hidden">
             <div className="flex items-center justify-between gap-3 mb-1.5">
@@ -276,16 +289,16 @@ export function ReviewSpecsModal({
             </div>
           </div>
 
-          {/* 4. FINAL MODE: ADDITIONAL SPECS & POLICIES SUMMARY */}
-          {isFinalMode && (
+          {/* 4. ADDITIONAL SPECS & POLICIES SUMMARY */}
+          {(isAdditionalMode || isFinalMode) && (
             <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-50/60 via-slate-50 to-white border border-indigo-200/80 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-extrabold text-indigo-950 uppercase tracking-wider flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                  <span>Enriched Property Knowledge Base</span>
+                  <span>Additional Specifications & Policies</span>
                 </span>
                 <span className="text-[10px] font-bold text-indigo-700 bg-indigo-100/70 px-2 py-0.5 rounded-full">
-                  AI Sales Ready
+                  {isFinalMode ? "AI Sales Ready" : "Stage 2 Verified"}
                 </span>
               </div>
 
@@ -428,7 +441,7 @@ export function ReviewSpecsModal({
               <Mic className="w-3 h-3 animate-pulse" />
             </div>
             <div className="flex-1 leading-relaxed text-[11px]">
-              <span className="font-bold">Live voice corrections active:</span> Speak naturally to Elena to modify details (e.g. <span className="font-semibold italic">“Actually change the price to $4,000”</span>) and this card updates live.
+              <span className="font-bold">Live voice corrections active:</span> Speak naturally to Elena to modify any detail (e.g. <span className="font-semibold italic">“Actually change the price to $4,000”</span> or <span className="font-semibold italic">“Parking is 2 cars”</span>) and this card updates live.
             </div>
           </div>
         </div>
@@ -461,7 +474,7 @@ export function ReviewSpecsModal({
                 onClick={onClose}
                 className="py-2.5 px-4 rounded-xl border border-slate-200 hover:bg-slate-100 active:bg-slate-200 text-xs font-bold text-slate-700 transition-all text-center cursor-pointer"
               >
-                Back to Inspector
+                Adjust with Elena
               </button>
 
               <button
@@ -469,7 +482,7 @@ export function ReviewSpecsModal({
                 onClick={onProceedToUpload}
                 className="flex-1 py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer hover:scale-[1.01]"
               >
-                <span>Confirm & Attach Photos</span>
+                <span>All Done — Continue to Photos</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>

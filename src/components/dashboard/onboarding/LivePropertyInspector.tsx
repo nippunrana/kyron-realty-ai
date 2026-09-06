@@ -180,7 +180,9 @@ export function LivePropertyInspector({
               >
                 <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
                 <span>
-                  {onboardingStage === "additional_specs" || onboardingStage === "photos" || onboardingStage === "final_review"
+                  {onboardingStage === "additional_specs"
+                    ? "Review Specs"
+                    : onboardingStage === "photos" || onboardingStage === "final_review"
                     ? "Review & Deploy"
                     : "Review Card"}
                 </span>
