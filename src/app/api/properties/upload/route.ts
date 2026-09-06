@@ -5,6 +5,7 @@ import { properties, propertyMedia } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { writeFile, mkdir } from "node:fs/promises";
 import path from "node:path";
+import sharp from "sharp";
 import { BASE_PATH } from "@/lib/base-path";
 
 const ALLOWED_MIME_TYPES = new Set([
@@ -16,6 +17,8 @@ const ALLOWED_MIME_TYPES = new Set([
 ]);
 
 const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15MB per file
+const MAX_IMAGE_DIMENSION = 1200; // Max width/height bounding box
+const WEBP_QUALITY = 85; // Optimized compression quality
 
 export async function POST(req: NextRequest) {
   try {
@@ -107,14 +110,38 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const ext = path.extname(file.name) || (file.type === "image/png" ? ".png" : ".jpg");
+      const arrayBuffer = await file.arrayBuffer();
+      const inputBuffer = Buffer.from(arrayBuffer);
+
+      // Process image:
+      // 1. Auto-orient based on EXIF (.rotate())
+      // 2. Proportional resize inside 1200x1200 without enlargement if already smaller
+      // 3. Convert to WebP at 85% quality and strip private camera/GPS metadata
+      let processedBuffer: Buffer;
+      try {
+        processedBuffer = await sharp(inputBuffer)
+          .rotate()
+          .resize({
+            width: MAX_IMAGE_DIMENSION,
+            height: MAX_IMAGE_DIMENSION,
+            fit: "inside",
+            withoutEnlargement: true,
+          })
+          .webp({ quality: WEBP_QUALITY })
+          .toBuffer();
+      } catch (imgErr) {
+        console.error(`Failed to process image '${file.name}':`, imgErr);
+        return NextResponse.json(
+          { error: `Failed to process image '${file.name}'. The file may be corrupt or an invalid image.` },
+          { status: 400 }
+        );
+      }
+
       const safeRandom = crypto.randomUUID().slice(0, 8);
-      const filename = `${Date.now()}-${safeRandom}${ext}`;
+      const filename = `${Date.now()}-${safeRandom}.webp`;
       const filePath = path.join(uploadDir, filename);
 
-      const arrayBuffer = await file.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-      await writeFile(filePath, buffer);
+      await writeFile(filePath, processedBuffer);
 
       const publicUrl = `${BASE_PATH}/uploads/properties/${draftId}/${filename}`;
       newImageUrls.push(publicUrl);
