@@ -40,3 +40,68 @@ export function defaultTourDateTime(hour = 14): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}T${pad(hour)}:00`;
 }
+
+/**
+ * Safely parses an available date from an ISO string, timestamp, or natural language relative phrase
+ * (e.g., "In 7 Days", "Within 14 Days", "Immediately"). Returns a valid Date or null, never throwing
+ * "RangeError: Invalid time value".
+ */
+export function parseAvailableDate(value: unknown): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) {
+    return isNaN(value.getTime()) ? null : value;
+  }
+  if (typeof value !== "string") return null;
+
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  // Try direct standard parse
+  const directDate = new Date(trimmed);
+  if (!isNaN(directDate.getTime())) {
+    return directDate;
+  }
+
+  // Parse natural language relative timelines extracted by AI or entered by user
+  const lower = trimmed.toLowerCase();
+  if (lower.includes("immediately") || lower.includes("now") || lower.includes("today")) {
+    return new Date();
+  }
+
+  // e.g. "in 7 days", "within 14 days", "ready in 15 days", "7 days"
+  const daysMatch = lower.match(/(?:in|within|ready in)?\s*(\d+)\s*days?/);
+  if (daysMatch) {
+    const days = parseInt(daysMatch[1], 10);
+    if (!isNaN(days)) {
+      const d = new Date();
+      d.setDate(d.getDate() + days);
+      return d;
+    }
+  }
+
+  // e.g. "in 2 weeks", "within 2 weeks"
+  const weeksMatch = lower.match(/(?:in|within|ready in)?\s*(\d+)\s*weeks?/);
+  if (weeksMatch) {
+    const weeks = parseInt(weeksMatch[1], 10);
+    if (!isNaN(weeks)) {
+      const d = new Date();
+      d.setDate(d.getDate() + weeks * 7);
+      return d;
+    }
+  }
+
+  // e.g. "in 1 month", "in 2 months"
+  const monthsMatch = lower.match(/(?:in|within|ready in)?\s*(\d+)\s*months?/);
+  if (monthsMatch) {
+    const months = parseInt(monthsMatch[1], 10);
+    if (!isNaN(months)) {
+      const d = new Date();
+      d.setMonth(d.getMonth() + months);
+      return d;
+    }
+  }
+
+  // Fallback: If it cannot be parsed into a calendar date, return null so DB insert never crashes
+  return null;
+}
+

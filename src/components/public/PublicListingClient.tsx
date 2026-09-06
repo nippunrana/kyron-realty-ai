@@ -69,7 +69,12 @@ export function PublicListingClient({
   const spec = (value: unknown, unit: string) =>
     value === null || value === undefined || value === "" ? "Not listed" : `${value} ${unit}`;
   const availability = property.availableDate
-    ? new Date(property.availableDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })
+    ? (() => {
+        const d = new Date(property.availableDate);
+        return !isNaN(d.getTime())
+          ? d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })
+          : String(property.availableDate);
+      })()
     : "Not listed";
 
   const handleDirectTourBooking = async (e: React.FormEvent) => {

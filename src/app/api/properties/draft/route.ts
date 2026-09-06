@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { properties } from "@/db/schema";
 import QRCode from "qrcode";
 import { eq, and } from "drizzle-orm";
-import { buildDefaultTitle, randomSlugSuffix, slugify } from "@/lib/listing-helpers";
+import { buildDefaultTitle, parseAvailableDate, randomSlugSuffix, slugify } from "@/lib/listing-helpers";
 import { BASE_PATH } from "@/lib/base-path";
 
 export async function POST(req: NextRequest) {
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
           bedrooms: property.bedrooms ? Number(property.bedrooms) : existingDraft.bedrooms,
           bathrooms: property.bathrooms ? String(property.bathrooms) : existingDraft.bathrooms,
           sqft: property.sqft ? Number(property.sqft) : existingDraft.sqft,
-          availableDate: property.availableDate ? new Date(property.availableDate) : existingDraft.availableDate,
+          availableDate: parseAvailableDate(property.availableDate) ?? existingDraft.availableDate,
           images: Array.isArray(property.images) ? property.images : existingDraft.images,
           coverImageUrl: property.coverImageUrl || existingDraft.coverImageUrl,
           uploadToken,
@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
           bathrooms: property.bathrooms ? String(property.bathrooms) : null,
           sqft: property.sqft ? Number(property.sqft) : null,
           yearBuilt: property.yearBuilt ? Number(property.yearBuilt) : null,
-          availableDate: property.availableDate ? new Date(property.availableDate) : null,
+          availableDate: parseAvailableDate(property.availableDate),
           coverImageUrl: property.coverImageUrl || (Array.isArray(property.images) && property.images[0]) || null,
           images: Array.isArray(property.images) ? property.images : [],
           amenities: property.amenities || [],

@@ -9,7 +9,7 @@ import {
 } from "@/db/schema";
 import QRCode from "qrcode";
 import { eq } from "drizzle-orm";
-import { buildDefaultTitle, computeFloorPrice, randomSlugSuffix, slugify } from "@/lib/listing-helpers";
+import { buildDefaultTitle, computeFloorPrice, parseAvailableDate, randomSlugSuffix, slugify } from "@/lib/listing-helpers";
 import { BASE_PATH } from "@/lib/base-path";
 
 export async function POST(req: NextRequest) {
@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
           bathrooms: property.bathrooms ? String(property.bathrooms) : null,
           sqft: property.sqft ? Number(property.sqft) : null,
           yearBuilt: property.yearBuilt ? Number(property.yearBuilt) : null,
-          availableDate: property.availableDate ? new Date(property.availableDate) : null,
+          availableDate: parseAvailableDate(property.availableDate),
           coverImageUrl: property.coverImageUrl || (property.images && property.images[0]) || null,
           images: property.images || [],
           amenities: property.amenities || [],
@@ -140,7 +140,7 @@ export async function POST(req: NextRequest) {
           bathrooms: property.bathrooms ? String(property.bathrooms) : null,
           sqft: property.sqft ? Number(property.sqft) : null,
           yearBuilt: property.yearBuilt ? Number(property.yearBuilt) : null,
-          availableDate: property.availableDate ? new Date(property.availableDate) : null,
+          availableDate: parseAvailableDate(property.availableDate),
           coverImageUrl: property.coverImageUrl || (property.images && property.images[0]) || null,
           images: property.images || [],
           amenities: property.amenities || [],
