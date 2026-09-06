@@ -44,7 +44,6 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
     onLogEventRef.current = options?.onLogEvent;
   });
   const transcriptRef = useRef<VoiceMessage[]>([]);
-  const prevAgentStateRef = useRef<string | null>(null);
   const rtmClientRef = useRef<any>(null);
   const voiceAiRef = useRef<any>(null);
   const agentUidRef = useRef<number>(999001);
@@ -54,8 +53,6 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
   const localMessagesRef = useRef<VoiceMessage[]>([]);
   const mappedRemoteRef = useRef<VoiceMessage[]>([]);
   const lastExtractedAssistantTextRef = useRef<string>("");
-  const hasAgentSpokenInTurnRef = useRef<boolean>(false);
-  const transcriptDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Centralized Resource Teardown
   const teardownResources = useCallback(async () => {
@@ -87,12 +84,7 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
       rtmClientRef.current = null;
     }
 
-    if (transcriptDebounceTimerRef.current) {
-      clearTimeout(transcriptDebounceTimerRef.current);
-      transcriptDebounceTimerRef.current = null;
-    }
     lastExtractedAssistantTextRef.current = "";
-    hasAgentSpokenInTurnRef.current = false;
 
     localMessagesRef.current = [];
     mappedRemoteRef.current = [];
@@ -338,7 +330,8 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
                 item.final === true ||
                 item.metadata?.final === true;
 
-              const turnKey = `${item.turn_id ?? "turn"}_${spokenText.toLowerCase()}`;
+              const turnId = item.turn_id !== undefined ? String(item.turn_id) : spokenText.toLowerCase();
+              const turnKey = `user_turn_${turnId}`;
               if (isFinished && !processedTurnIdsRef.current.has(turnKey as any)) {
                 processedTurnIdsRef.current.add(turnKey as any);
                 onLogEventRef.current?.("AGORA", `User speech finalized (Turn #${item.turn_id ?? "turn"})`, {
@@ -356,7 +349,7 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
                 // Immediate parallel extraction: Run Gemini while Elena begins speaking
                 setTimeout(() => {
                   triggerTurnExtraction();
-                }, 100);
+                }, 50);
               }
             } else if (!isUser && spokenText.length > 0) {
               // Assistant speech confirming modal action (strictly deduplicated per turn)
@@ -372,19 +365,6 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
               }
             }
           }
-
-          // Fallback debounce: When an assistant or user turn settles, trigger extraction
-          if (transcriptDebounceTimerRef.current) {
-            clearTimeout(transcriptDebounceTimerRef.current);
-            transcriptDebounceTimerRef.current = null;
-          }
-          const lastMsg = fullList[fullList.length - 1];
-          if (lastMsg && lastMsg.text.trim().length > 0) {
-            const delay = lastMsg.role === "assistant" ? 800 : 500;
-            transcriptDebounceTimerRef.current = setTimeout(() => {
-              triggerTurnExtraction();
-            }, delay);
-          }
         });
 
         // Dual-Signal 1: Agent speaking state changed (Cloud Gateway activity stream)
@@ -392,39 +372,26 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
           setIsAgentSpeaking(isSpeaking);
           if (isSpeaking) {
             setCallState("agent_speaking");
-            hasAgentSpokenInTurnRef.current = true;
           } else {
             setCallState("connected");
-            if (hasAgentSpokenInTurnRef.current) {
-              hasAgentSpokenInTurnRef.current = false;
-              // Elena finished speaking. Give 200ms for final ASR transcript to settle, then extract
-              setTimeout(() => {
-                triggerTurnExtraction();
-              }, 200);
-            }
           }
         });
 
         // Dual-Signal 2: Agent listening state changed
         ai.on(AgoraVoiceAIEvents.AGENT_LISTENING_CHANGED, (_agentUserId: string, isListening: boolean) => {
-          if (isListening && hasAgentSpokenInTurnRef.current) {
-            hasAgentSpokenInTurnRef.current = false;
-            setTimeout(() => {
-              triggerTurnExtraction();
-            }, 200);
+          if (isListening) {
+            setIsAgentSpeaking(false);
+            setCallState("connected");
           }
         });
 
         // Auxiliary Fallback: Legacy/Alternate Agent state change
         ai.on(AgoraVoiceAIEvents.AGENT_STATE_CHANGED, (_agentUserId: string, event: any) => {
           const newState = event?.state;
-          const prevState = prevAgentStateRef.current;
-          prevAgentStateRef.current = newState;
 
           if (newState === "speaking") {
             setIsAgentSpeaking(true);
             setCallState("agent_speaking");
-            hasAgentSpokenInTurnRef.current = true;
           } else if (
             newState === "listening" ||
             newState === "thinking" ||
@@ -432,10 +399,6 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
           ) {
             setIsAgentSpeaking(false);
             setCallState("connected");
-
-            if (prevState === "speaking" && (newState === "listening" || newState === "idle")) {
-              triggerTurnExtraction();
-            }
           }
         });
 
