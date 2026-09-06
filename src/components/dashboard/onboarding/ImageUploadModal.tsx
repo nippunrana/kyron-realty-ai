@@ -17,6 +17,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { BASE_PATH } from "@/lib/base-path";
+import { ModalMuteButton } from "./ModalMuteButton";
 
 interface ImageUploadModalProps {
   isOpen: boolean;
@@ -29,6 +30,9 @@ interface ImageUploadModalProps {
   existingImages: string[];
   onImagesUpdated: (newImages: string[]) => void;
   onProceedToFinalReview: () => void;
+  isCallActive?: boolean;
+  isMuted?: boolean;
+  onToggleMute?: () => void;
 }
 
 export function ImageUploadModal({
@@ -42,6 +46,9 @@ export function ImageUploadModal({
   existingImages,
   onImagesUpdated,
   onProceedToFinalReview,
+  isCallActive,
+  isMuted = false,
+  onToggleMute,
 }: ImageUploadModalProps) {
   const [activeTab, setActiveTab] = useState<"computer" | "mobile">("computer");
   const [copied, setCopied] = useState(false);
@@ -174,15 +181,20 @@ export function ImageUploadModal({
         <div className="absolute -top-20 -right-20 w-48 h-48 bg-blue-500/10 rounded-full blur-2xl pointer-events-none" />
         <div className="absolute -bottom-20 -left-20 w-48 h-48 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none" />
 
-        {/* Close / Minimize Button */}
-        <button
-          type="button"
-          onClick={onClose}
-          className="absolute top-5 right-5 p-2 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
-          aria-label="Close modal"
-        >
-          <X className="w-5 h-5" />
-        </button>
+        {/* Top Right Actions: Mute Toggle (if call is active) & Close / Minimize Button */}
+        <div className="absolute top-5 right-5 flex items-center gap-2 z-20">
+          {isCallActive && onToggleMute && (
+            <ModalMuteButton isMuted={isMuted} onToggleMute={onToggleMute} />
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-2 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+            aria-label="Close modal"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
 
         {/* Modal Header */}
         <div className="text-center mb-5 shrink-0">

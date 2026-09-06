@@ -38,13 +38,14 @@ export async function POST(req: NextRequest) {
       usage: result.usage,
       latencyMs: durationMs,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     const durationMs = Date.now() - startTime;
+    const message = error instanceof Error ? error.message : "Failed to extract turn specifications.";
     console.error(`[API extract-turn Error] (${durationMs}ms):`, error);
     return NextResponse.json(
       {
         success: false,
-        error: error.message || "Failed to extract turn specifications.",
+        error: message,
         latencyMs: durationMs,
       },
       { status: 500 }

@@ -21,10 +21,11 @@ export async function POST(req: NextRequest) {
       );
     }
     return NextResponse.json(result);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Failed to stop Agora agent session.";
     console.error("Agora stop session error:", error);
     return NextResponse.json(
-      { success: false, error: error.message || "Failed to stop Agora agent session." },
+      { success: false, error: message },
       { status: 500 }
     );
   }

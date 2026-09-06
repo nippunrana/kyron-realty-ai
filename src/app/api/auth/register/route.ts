@@ -7,7 +7,7 @@ import { eq } from "drizzle-orm";
 
 export async function POST(request: Request) {
   try {
-    let body: any;
+    let body: { email?: unknown; password?: unknown; name?: unknown } | null = null;
     try {
       body = await request.json();
     } catch {

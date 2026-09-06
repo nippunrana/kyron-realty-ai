@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    let insertedProperty: any;
+    let insertedProperty: typeof properties.$inferSelect | undefined;
 
     if (draftId) {
       const [updated] = await db
@@ -160,7 +160,7 @@ export async function POST(req: NextRequest) {
       if (
         knowledgeBase.contactEmail &&
         !faqs.some(
-          (f: any) =>
+          (f: { category?: string; question?: string }) =>
             f.category === "Contact" ||
             (f.question && f.question.toLowerCase().includes("contact email"))
         )
@@ -230,10 +230,11 @@ export async function POST(req: NextRequest) {
       qrCodeSvg,
       shareUrl,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Failed to create property listing.";
     console.error("Failed to create property listing:", error);
     return NextResponse.json(
-      { success: false, error: error.message || "Failed to create property listing." },
+      { success: false, error: message },
       { status: 500 }
     );
   }

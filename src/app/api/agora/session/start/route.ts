@@ -41,10 +41,11 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json(sessionResult);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Failed to start Agora agent session.";
     console.error("Agora start session error:", error);
     return NextResponse.json(
-      { success: false, error: error.message || "Failed to start Agora agent session." },
+      { success: false, error: message },
       { status: 500 }
     );
   }

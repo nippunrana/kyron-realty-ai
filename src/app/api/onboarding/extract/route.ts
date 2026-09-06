@@ -32,12 +32,13 @@ export async function POST(req: NextRequest) {
       data: extraction,
       usage: extraction.usage,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Failed to extract property knowledge base.";
     console.error("Knowledge extraction route error:", error);
     return NextResponse.json(
       {
         success: false,
-        error: error.message || "Failed to extract property knowledge base.",
+        error: message,
       },
       { status: 500 }
     );

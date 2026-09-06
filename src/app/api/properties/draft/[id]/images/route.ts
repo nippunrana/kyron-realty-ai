@@ -57,10 +57,11 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
       title: property.title,
       address: property.address,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Failed to fetch images.";
     console.error("Failed to fetch draft images:", error);
     return NextResponse.json(
-      { success: false, error: error.message || "Failed to fetch images." },
+      { success: false, error: message },
       { status: 500 }
     );
   }
@@ -138,10 +139,11 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
       images: updatedImages,
       coverImageUrl: newCover,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Failed to delete image.";
     console.error("Failed to delete image:", error);
     return NextResponse.json(
-      { success: false, error: error.message || "Failed to delete image." },
+      { success: false, error: message },
       { status: 500 }
     );
   }

@@ -25,12 +25,13 @@ export async function POST(req: NextRequest) {
       success: true,
       data: scraped,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Failed to scrape property URL.";
     console.error("Scraping route error:", error);
     return NextResponse.json(
       {
         success: false,
-        error: error.message || "Failed to scrape property URL.",
+        error: message,
       },
       { status: 500 }
     );

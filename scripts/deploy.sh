@@ -7,8 +7,9 @@ echo "🚀 Starting deployment for Kyron Realty AI..."
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_DIR"
 
-echo "📥 Pulling latest changes from git..."
-git pull origin main
+echo "📥 Syncing latest changes from git..."
+git fetch origin main
+git reset --hard origin/main
 
 echo "📦 Installing production dependencies..."
 npm ci --legacy-peer-deps || npm install

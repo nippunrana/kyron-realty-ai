@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
+import { ModalMuteButton } from "./ModalMuteButton";
 
 interface PublishSuccessModalProps {
   onClose: () => void;
@@ -26,6 +27,9 @@ interface PublishSuccessModalProps {
   };
   qrCodeSvg: string;
   shareUrl: string;
+  isCallActive?: boolean;
+  isMuted?: boolean;
+  onToggleMute?: () => void;
 }
 
 export function PublishSuccessModal({
@@ -33,6 +37,9 @@ export function PublishSuccessModal({
   property,
   qrCodeSvg,
   shareUrl,
+  isCallActive,
+  isMuted = false,
+  onToggleMute,
 }: PublishSuccessModalProps) {
   const { copied, copy } = useCopyToClipboard(2500);
 
@@ -62,14 +69,19 @@ export function PublishSuccessModal({
         <div className="absolute -top-24 -right-24 w-48 h-48 bg-blue-500/10 rounded-full blur-2xl pointer-events-none" />
         <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
 
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          className="absolute top-5 right-5 p-2 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
-          aria-label="Close modal"
-        >
-          <X className="w-5 h-5" />
-        </button>
+        {/* Top Right Actions: Mute Toggle (if call is active) & Close Button */}
+        <div className="absolute top-5 right-5 flex items-center gap-2 z-20">
+          {isCallActive && onToggleMute && (
+            <ModalMuteButton isMuted={isMuted} onToggleMute={onToggleMute} />
+          )}
+          <button
+            onClick={onClose}
+            className="p-2 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+            aria-label="Close modal"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
 
         {/* Success Header */}
         <div className="text-center mb-6">

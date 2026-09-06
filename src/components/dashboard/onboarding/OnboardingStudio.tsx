@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect, useSyncExternalStore } from "react";
-import { ConversationalPanel } from "./ConversationalPanel";
+import { ConversationalPanel, type VoiceControlState } from "./ConversationalPanel";
 import { LivePropertyInspector } from "./LivePropertyInspector";
 import { PublishSuccessModal } from "./PublishSuccessModal";
 import { ReviewSpecsModal } from "./ReviewSpecsModal";
@@ -132,6 +132,12 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
   const [uploadUrl, setUploadUrl] = useState("");
   const [qrCodeSvg, setQrCodeSvg] = useState("");
   const draftIdRef = useRef<number | null>(null);
+  const [voiceControl, setVoiceControl] = useState<VoiceControlState | null>(null);
+
+  const handleVoiceStateSync = useCallback((state: VoiceControlState) => {
+    setVoiceControl(state);
+  }, []);
+
   const [telemetryLogs, setTelemetryLogs] = useState<TelemetryLogEvent[]>([]);
   const [sessionUsage, setSessionUsage] = useState({
     promptTokens: 0,
@@ -959,6 +965,7 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
             onTurnExtraction={handleTurnExtraction}
             onUIAction={handleUIAction}
             onLogEvent={addTelemetryLog}
+            onVoiceStateSync={handleVoiceStateSync}
             isProcessing={isProcessing}
             activePipelineStep={activePipelineStep}
             pipelineError={pipelineError}
@@ -1004,6 +1011,9 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
           onConfirmCore={handleConfirmCoreSpecs}
           onPublish={handlePublish}
           isPublishing={isPublishing}
+          isCallActive={voiceControl?.isCallActive ?? false}
+          isMuted={voiceControl?.isMuted ?? false}
+          onToggleMute={voiceControl?.toggleMute}
         />
       )}
 
@@ -1019,6 +1029,9 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
           onProceedToUpload={handleOpenPhotoUpload}
           onPublish={handlePublish}
           isPublishing={isPublishing}
+          isCallActive={voiceControl?.isCallActive ?? false}
+          isMuted={voiceControl?.isMuted ?? false}
+          onToggleMute={voiceControl?.toggleMute}
         />
       )}
 
@@ -1043,6 +1056,9 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
           }));
         }}
         onProceedToFinalReview={handleProceedToFinalReview}
+        isCallActive={voiceControl?.isCallActive ?? false}
+        isMuted={voiceControl?.isMuted ?? false}
+        onToggleMute={voiceControl?.toggleMute}
       />
 
       {/* 4. Final Unified Review Modal (Stage 6: Final Review & Deploy) */}
@@ -1060,6 +1076,9 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
           }}
           onPublish={handlePublish}
           isPublishing={isPublishing}
+          isCallActive={voiceControl?.isCallActive ?? false}
+          isMuted={voiceControl?.isMuted ?? false}
+          onToggleMute={voiceControl?.toggleMute}
         />
       )}
 
@@ -1070,6 +1089,9 @@ export function OnboardingStudio({ user }: OnboardingStudioProps) {
           property={publishedResult.property}
           qrCodeSvg={publishedResult.qrCodeSvg}
           shareUrl={publishedResult.shareUrl}
+          isCallActive={voiceControl?.isCallActive ?? false}
+          isMuted={voiceControl?.isMuted ?? false}
+          onToggleMute={voiceControl?.toggleMute}
         />
       )}
 

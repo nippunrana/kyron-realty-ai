@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # Enforces the Agora-only voice policy in docs/built-systems/voice-agent-and-agora.md.
       # Documentation is advisory; this step is not.
@@ -25,7 +25,7 @@ jobs:
           echo "OK: no browser speech APIs in src/"
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: 'npm'
@@ -60,5 +60,7 @@ jobs:
           script: |
             set -e
             cd /var/www/egnitech.com/html/wp-content/projects/kyron-realty-ai
+            git fetch origin main
+            git reset --hard origin/main
             chmod +x scripts/deploy.sh
             ./scripts/deploy.sh

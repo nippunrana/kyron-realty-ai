@@ -25,6 +25,12 @@ import type { UIAction, VoiceMessage } from "@/hooks/voice-agent-types";
 import type { TurnMessage } from "@/lib/turn-extractor";
 import { BASE_PATH } from "@/lib/base-path";
 
+export interface VoiceControlState {
+  isCallActive: boolean;
+  isMuted: boolean;
+  toggleMute: () => void;
+}
+
 interface ConversationalPanelProps {
   onIngestUrl: (url: string) => Promise<void>;
   onSendMessage: (text: string) => Promise<void>;
@@ -35,6 +41,7 @@ interface ConversationalPanelProps {
   activePipelineStep: string | null;
   /** Failure from the crawl or synthesis pipeline, shown beside the transcript; never a silent no-op. */
   pipelineError: string | null;
+  onVoiceStateSync?: (state: VoiceControlState) => void;
 }
 
 export function ConversationalPanel({
@@ -46,6 +53,7 @@ export function ConversationalPanel({
   isProcessing,
   activePipelineStep,
   pipelineError,
+  onVoiceStateSync,
 }: ConversationalPanelProps) {
   const [urlInput, setUrlInput] = useState("");
   const [autoScroll, setAutoScroll] = useState(true);
@@ -107,6 +115,15 @@ export function ConversationalPanel({
     onUIAction,
     onLogEvent,
   });
+
+  // Synchronize active call and mute state to parent for modal controls
+  useEffect(() => {
+    onVoiceStateSync?.({
+      isCallActive,
+      isMuted,
+      toggleMute,
+    });
+  }, [isCallActive, isMuted, toggleMute, onVoiceStateSync]);
 
   const isProgrammaticScrollRef = useRef(false);
 

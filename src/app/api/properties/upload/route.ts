@@ -149,10 +149,11 @@ export async function POST(req: NextRequest) {
       images: updatedImages,
       uploaded: newImageUrls,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Failed to upload image.";
     console.error("Upload error:", error);
     return NextResponse.json(
-      { success: false, error: error.message || "Failed to upload image." },
+      { success: false, error: message },
       { status: 500 }
     );
   }

@@ -101,10 +101,11 @@ export async function POST(req: NextRequest) {
         ? "Viewing appointment confirmed successfully!"
         : "Lead inquiry submitted successfully!",
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Failed to capture lead.";
     console.error("Lead capture route error:", error);
     return NextResponse.json(
-      { success: false, error: error.message || "Failed to capture lead." },
+      { success: false, error: message },
       { status: 500 }
     );
   }

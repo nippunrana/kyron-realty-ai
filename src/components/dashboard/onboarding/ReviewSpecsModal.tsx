@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import type { ExtractedPropertyPayload } from "@/lib/kb-extractor";
 import { getCoreSpecStatus, isStudioListing } from "./inspector-specs";
+import { ModalMuteButton } from "./ModalMuteButton";
 
 /** A missing term says so. Never substitute a plausible default the owner did not state. */
 const NOT_SPECIFIED = "Not specified";
@@ -32,6 +33,9 @@ interface ReviewSpecsModalProps {
   onProceedToUpload?: () => void;
   onPublish: () => Promise<void>;
   isPublishing: boolean;
+  isCallActive?: boolean;
+  isMuted?: boolean;
+  onToggleMute?: () => void;
 }
 
 export function ReviewSpecsModal({
@@ -45,6 +49,9 @@ export function ReviewSpecsModal({
   onProceedToUpload,
   onPublish,
   isPublishing,
+  isCallActive,
+  isMuted = false,
+  onToggleMute,
 }: ReviewSpecsModalProps) {
   const isRent = property.listingType === "rent";
   const formattedPrice = Number(property.price) > 0
@@ -92,14 +99,19 @@ export function ReviewSpecsModal({
         <div className="absolute -top-24 -right-24 w-48 h-48 bg-blue-500/10 rounded-full blur-2xl pointer-events-none" />
         <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
 
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          className="absolute top-5 right-5 p-2 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
-          aria-label="Close modal"
-        >
-          <X className="w-5 h-5" />
-        </button>
+        {/* Top Right Actions: Mute Toggle (if call is active) & Close Button */}
+        <div className="absolute top-5 right-5 flex items-center gap-2 z-20">
+          {isCallActive && onToggleMute && (
+            <ModalMuteButton isMuted={isMuted} onToggleMute={onToggleMute} />
+          )}
+          <button
+            onClick={onClose}
+            className="p-2 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+            aria-label="Close modal"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
 
         {/* Modal Header */}
         <div className="text-center mb-5 shrink-0">

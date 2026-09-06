@@ -143,10 +143,11 @@ export async function POST(req: NextRequest) {
       uploadUrl,
       qrCodeSvg,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Failed to create draft property.";
     console.error("Failed to create or update draft property:", error);
     return NextResponse.json(
-      { success: false, error: error.message || "Failed to create draft property." },
+      { success: false, error: message },
       { status: 500 }
     );
   }
