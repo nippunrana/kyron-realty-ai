@@ -13,8 +13,17 @@ import {
   Building2,
   MapPin,
   Sparkles,
+  QrCode,
+  Copy,
+  Check,
+  X,
 } from "lucide-react";
 import { BASE_PATH } from "@/lib/base-path";
+
+import {
+  WhatsAppIcon,
+  buildPhotoUploadShareMessage,
+} from "@/components/dashboard/onboarding/share-utils";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -25,12 +34,16 @@ export default function MobilePropertyUploadPage({ params }: PageProps) {
   const draftId = resolvedParams.id;
   const searchParams = useSearchParams();
   const token = searchParams.get("token") || "";
+  const viewParam = searchParams.get("view");
 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [propertyTitle, setPropertyTitle] = useState("");
   const [propertyAddress, setPropertyAddress] = useState("");
   const [images, setImages] = useState<string[]>([]);
+  const [qrCodeSvg, setQrCodeSvg] = useState<string | null>(null);
+  const [showQrModal, setShowQrModal] = useState(viewParam === "qr");
+  const [copiedLink, setCopiedLink] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadMessage, setUploadMessage] = useState<string | null>(null);
 
@@ -57,6 +70,9 @@ export default function MobilePropertyUploadPage({ params }: PageProps) {
           setPropertyTitle(json.title || "Draft Property");
           setPropertyAddress(json.address || "");
           setImages(json.images || []);
+          if (json.qrCodeSvg) {
+            setQrCodeSvg(json.qrCodeSvg);
+          }
         } else {
           setError(json.error || "Invalid or expired upload session.");
         }
@@ -136,6 +152,29 @@ export default function MobilePropertyUploadPage({ params }: PageProps) {
     }
   };
 
+  const getCleanUploadUrl = () => {
+    if (typeof window === "undefined") return "";
+    return `${window.location.origin}${window.location.pathname}?token=${encodeURIComponent(token)}`;
+  };
+
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(getCleanUploadUrl());
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2500);
+    } catch {
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2500);
+    }
+  };
+
+  const handleShareToWhatsApp = () => {
+    const cleanUrl = getCleanUploadUrl();
+    const message = buildPhotoUploadShareMessage(cleanUrl, propertyTitle);
+    const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6 text-center">
@@ -180,10 +219,23 @@ export default function MobilePropertyUploadPage({ params }: PageProps) {
           </div>
         </div>
 
-        {/* Live Studio Sync Indicator */}
-        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-950/60 border border-emerald-500/30 text-emerald-400 text-[11px] font-bold">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span>Live Synced</span>
+        {/* Actions: Show QR + Live Synced */}
+        <div className="flex items-center gap-2">
+          {qrCodeSvg && (
+            <button
+              type="button"
+              onClick={() => setShowQrModal(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/80 text-[11px] font-semibold transition-all cursor-pointer shadow-xs"
+              title="View QR Code to scan on another device"
+            >
+              <QrCode className="w-3.5 h-3.5 text-blue-400" />
+              <span className="hidden xs:inline sm:inline">QR Code</span>
+            </button>
+          )}
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-950/60 border border-emerald-500/30 text-emerald-400 text-[11px] font-bold">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span>Live Synced</span>
+          </div>
         </div>
       </header>
 
@@ -336,6 +388,66 @@ export default function MobilePropertyUploadPage({ params }: PageProps) {
           <span>Syncing directly with your desktop browser session</span>
         </div>
       </footer>
+
+      {/* QR Code Inspection & Sharing Modal */}
+      {showQrModal && qrCodeSvg && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-slate-900 rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-800 relative text-center text-slate-100">
+            <button
+              type="button"
+              onClick={() => setShowQrModal(false)}
+              className="absolute top-4 right-4 p-2 rounded-full text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer"
+              aria-label="Close QR dialog"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="w-12 h-12 mx-auto mb-2 rounded-2xl bg-blue-500/10 border border-blue-500/30 text-blue-400 flex items-center justify-center">
+              <QrCode className="w-6 h-6" />
+            </div>
+
+            <h3 className="text-base font-extrabold text-white mb-1">Scan to Upload Photos</h3>
+            <p className="text-xs text-slate-400 mb-4">
+              Point another phone camera at this code to upload photos directly to {propertyTitle || "this property"}.
+            </p>
+
+            <div className="p-3 bg-white rounded-2xl border border-slate-200 shadow-inner mb-4 flex items-center justify-center">
+              <div
+                className="w-44 h-44 flex items-center justify-center [&>svg]:w-full [&>svg]:h-full [&>svg]:max-w-full [&>svg]:max-h-full"
+                dangerouslySetInnerHTML={{ __html: qrCodeSvg }}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={handleShareToWhatsApp}
+                className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-emerald-600/20"
+              >
+                <WhatsAppIcon className="w-4 h-4" />
+                <span>Share via WhatsApp</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleCopyLink}
+                className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center gap-2 border border-slate-700 transition-colors cursor-pointer"
+              >
+                {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{copiedLink ? "Link Copied!" : "Copy Upload Link"}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowQrModal(false)}
+                className="w-full py-2 rounded-xl text-slate-400 hover:text-slate-200 text-xs font-semibold transition-colors cursor-pointer"
+              >
+                Back to Uploader
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

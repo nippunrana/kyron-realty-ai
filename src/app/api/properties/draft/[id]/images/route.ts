@@ -7,6 +7,8 @@ import { unlink } from "node:fs/promises";
 import path from "node:path";
 import { BASE_PATH } from "@/lib/base-path";
 
+import QRCode from "qrcode";
+
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
@@ -32,6 +34,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
         coverImageUrl: properties.coverImageUrl,
         title: properties.title,
         address: properties.address,
+        qrCodeSvg: properties.qrCodeSvg,
       })
       .from(properties)
       .where(eq(properties.id, draftId))
@@ -50,12 +53,33 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
 
     const images = Array.isArray(property.images) ? property.images : [];
 
+    let qrCodeSvg = property.qrCodeSvg;
+    if (!qrCodeSvg && property.uploadToken) {
+      const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || "localhost:3000";
+      const protocol = req.headers.get("x-forwarded-proto") || "http";
+      const uploadUrl = `${protocol}://${host}${BASE_PATH}/properties/upload/${property.id}?token=${property.uploadToken}`;
+      try {
+        qrCodeSvg = await QRCode.toString(uploadUrl, {
+          type: "svg",
+          width: 256,
+          margin: 2,
+          color: {
+            dark: "#0f172a",
+            light: "#ffffff",
+          },
+        });
+      } catch (qrErr) {
+        console.warn("Failed to generate fallback QR code in draft images route:", qrErr);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       images,
       coverImageUrl: property.coverImageUrl,
       title: property.title,
       address: property.address,
+      qrCodeSvg,
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to fetch images.";
