@@ -129,6 +129,7 @@ export async function POST(req: NextRequest) {
 
     const qrCodeSvg = await QRCode.toString(uploadUrl, {
       type: "svg",
+      width: 256,
       margin: 2,
       color: {
         dark: "#0f172a",

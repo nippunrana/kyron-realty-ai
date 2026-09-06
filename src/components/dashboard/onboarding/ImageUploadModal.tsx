@@ -313,7 +313,7 @@ export function ImageUploadModal({
               <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm shrink-0 flex flex-col items-center">
                 {qrCodeSvg ? (
                   <div
-                    className="w-40 h-40 flex items-center justify-center"
+                    className="w-40 h-40 flex items-center justify-center [&>svg]:w-full [&>svg]:h-full [&>svg]:max-w-full [&>svg]:max-h-full"
                     dangerouslySetInnerHTML={{ __html: qrCodeSvg }}
                   />
                 ) : (

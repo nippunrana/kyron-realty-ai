@@ -28,7 +28,10 @@ export function ShareListingModal({ qrCodeSvg, whatsAppUrl, copied, onCopy, onCl
         {qrCodeSvg && (
           <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 mb-4 flex items-center justify-center">
             {/* Server-generated SVG from the qrcode library, never user input */}
-            <div className="w-40 h-40 flex items-center justify-center" dangerouslySetInnerHTML={{ __html: qrCodeSvg }} />
+            <div
+              className="w-40 h-40 flex items-center justify-center [&>svg]:w-full [&>svg]:h-full [&>svg]:max-w-full [&>svg]:max-h-full"
+              dangerouslySetInnerHTML={{ __html: qrCodeSvg }}
+            />
           </div>
         )}
 

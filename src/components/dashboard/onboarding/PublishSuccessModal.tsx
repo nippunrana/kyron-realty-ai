@@ -1,6 +1,8 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import QRCode from "qrcode";
 import {
   CheckCircle2,
   Copy,
@@ -11,6 +13,7 @@ import {
   Sparkles,
   ShieldCheck,
   X,
+  Loader2,
 } from "lucide-react";
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
 import { ModalMuteButton } from "./ModalMuteButton";
@@ -25,7 +28,7 @@ interface PublishSuccessModalProps {
     listingType: string;
     city: string;
   };
-  qrCodeSvg: string;
+  qrCodeSvg?: string | null;
   shareUrl: string;
   isCallActive?: boolean;
   isMuted?: boolean;
@@ -42,9 +45,45 @@ export function PublishSuccessModal({
   onToggleMute,
 }: PublishSuccessModalProps) {
   const { copied, copy } = useCopyToClipboard(2500);
+  const [dynamicQrSvg, setDynamicQrSvg] = useState<string>("");
+
+  // Dual-layer QR generation: if server SVG was absent, generate client-side dynamically from shareUrl
+  useEffect(() => {
+    let isMounted = true;
+    if (qrCodeSvg && qrCodeSvg.trim().length > 0) {
+      return;
+    }
+
+    if (shareUrl) {
+      QRCode.toString(shareUrl, {
+        type: "svg",
+        width: 256,
+        margin: 2,
+        color: {
+          dark: "#0f172a",
+          light: "#ffffff",
+        },
+      })
+        .then((svg) => {
+          if (isMounted) {
+            setDynamicQrSvg(svg);
+          }
+        })
+        .catch((err) => {
+          console.error("Client-side QR code generation error:", err);
+        });
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [qrCodeSvg, shareUrl]);
+
+  const activeQrSvg = (qrCodeSvg && qrCodeSvg.trim().length > 0) ? qrCodeSvg : dynamicQrSvg;
 
   const handleDownloadQrSvg = () => {
-    const blob = new Blob([qrCodeSvg], { type: "image/svg+xml" });
+    if (!activeQrSvg) return;
+    const blob = new Blob([activeQrSvg], { type: "image/svg+xml" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -103,10 +142,17 @@ export function PublishSuccessModal({
         {/* QR Code Card */}
         <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200/80 mb-6 flex flex-col items-center">
           <div className="p-3 bg-white rounded-2xl shadow-sm border border-slate-200 mb-3 flex items-center justify-center">
-            <div
-              className="w-40 h-40 flex items-center justify-center"
-              dangerouslySetInnerHTML={{ __html: qrCodeSvg }}
-            />
+            {activeQrSvg ? (
+              <div
+                className="w-40 h-40 flex items-center justify-center [&>svg]:w-full [&>svg]:h-full [&>svg]:max-w-full [&>svg]:max-h-full"
+                dangerouslySetInnerHTML={{ __html: activeQrSvg }}
+              />
+            ) : (
+              <div className="w-40 h-40 bg-slate-50 rounded-xl flex flex-col items-center justify-center text-slate-400 gap-2">
+                <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                <span className="text-[10px] font-medium text-slate-500">Generating QR...</span>
+              </div>
+            )}
           </div>
           <div className="text-center">
             <div className="text-xs font-bold text-slate-900 flex items-center justify-center gap-1.5">

@@ -53,9 +53,10 @@ export async function POST(req: NextRequest) {
 
     const shareUrl = `${protocol}://${host}${BASE_PATH}/listings/${slug}`;
 
-    // Generate high-res vector QR code
+    // Generate high-res vector QR code with explicit dimensions
     const qrCodeSvg = await QRCode.toString(shareUrl, {
       type: "svg",
+      width: 256,
       margin: 2,
       color: {
         dark: "#0f172a",
