@@ -4,7 +4,7 @@ import {
   CheckCircle2,
   Sparkles,
   MapPin,
-  DollarSign,
+  Banknote,
   Bed,
   Bath,
   Maximize2,
@@ -220,7 +220,7 @@ export function ReviewSpecsModal({
             <div className="p-3.5 rounded-2xl bg-slate-50/90 border border-slate-200/80 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-xl flex items-center justify-center border text-indigo-600 bg-indigo-50 border-indigo-200 shrink-0">
-                  <DollarSign className="w-4 h-4" />
+                  <Banknote className="w-4 h-4" />
                 </div>
                 <div>
                   <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
