@@ -78,12 +78,12 @@ export async function extractTurnSpecs(
 CURRENT VERIFIED STATE:
 - listingType: ${currentPropertyState?.listingType || "pending"}
 - address: ${currentPropertyState?.address || "pending"}
-- price: ${currentPropertyState?.price ? `$${currentPropertyState.price}` : "pending"}
+- price: ${currentPropertyState?.price ? `₹${currentPropertyState.price}` : "pending"}
 - bedrooms: ${currentPropertyState?.bedrooms !== undefined && currentPropertyState?.bedrooms !== null ? currentPropertyState.bedrooms : "pending"}
 - bathrooms: ${currentPropertyState?.bathrooms !== undefined && currentPropertyState?.bathrooms !== null ? currentPropertyState.bathrooms : "pending"}
 - sqft: ${currentPropertyState?.sqft ? `${currentPropertyState.sqft} sqft` : "pending"}
-- hoaFeeMonthly: ${currentPropertyState?.hoaFeeMonthly ? `$${currentPropertyState.hoaFeeMonthly}/mo` : "0"}
-- securityDeposit: ${currentPropertyState?.securityDeposit ? `$${currentPropertyState.securityDeposit}` : "0"}
+- hoaFeeMonthly: ${currentPropertyState?.hoaFeeMonthly ? `₹${currentPropertyState.hoaFeeMonthly}/mo` : "0"}
+- securityDeposit: ${currentPropertyState?.securityDeposit ? `₹${currentPropertyState.securityDeposit}` : "0"}
 - availableDate: ${currentPropertyState?.availableDate || "pending"}
 - parkingDetail: ${currentKnowledgeBase?.parkingDetail || "pending"}
 - petPolicyDetail: ${currentKnowledgeBase?.petPolicyDetail || "pending"}
@@ -123,7 +123,7 @@ MANDATORY EXTRACTION WORKFLOW:
       - petPolicyPillText: e.g. "Dogs Allowed"
       - utilitiesPillText: e.g. "Water Included"
       - availableDatePillText: e.g. "In 14 Days"
-      - hoaPillText: e.g. "$250/mo HOA" or "No HOA"
+      - hoaPillText: e.g. "₹3,500/mo Society Dues" or "No Society Dues"
 5. Determine 'modalAction':
    - "open_core": Elena or owner EXPLICITLY announces, pulls up, or asks to show the Core Specs review card (e.g. "I've pulled up your core specs review card on your screen", "open the review card", "show me the card").
      CRITICAL: If the owner or Elena is simply asking or answering regular intake questions, modalAction MUST BE "none".
@@ -184,7 +184,7 @@ ${formattedDialogue}
                 utilitiesDetail: { type: "string" },
                 utilitiesPillText: { type: "string", description: "Concise 2-4 word pill button text (e.g. 'Water Included')" },
                 hoaFeeMonthly: { type: "number" },
-                hoaPillText: { type: "string", description: "Concise 2-4 word pill button text (e.g. 'No HOA' or '$250/mo HOA')" },
+                hoaPillText: { type: "string", description: "Concise 2-4 word pill button text (e.g. 'No Society Dues' or '₹3,500/mo Society Dues')" },
                 securityDeposit: { type: "number" },
                 minLeaseMonths: { type: "number" },
                 availableDate: { type: "string" },

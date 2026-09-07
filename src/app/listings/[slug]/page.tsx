@@ -29,7 +29,7 @@ export async function generateMetadata({ params }: ListingPageProps): Promise<Me
       };
     }
 
-    const priceLabel = `$${Number(property.price).toLocaleString()}${
+    const priceLabel = `₹${Number(property.price).toLocaleString("en-IN")}${
       property.listingType === "rent" ? "/month" : ""
     }`;
 

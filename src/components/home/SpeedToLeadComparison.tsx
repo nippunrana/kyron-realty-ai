@@ -8,7 +8,7 @@ export function SpeedToLeadComparison() {
       {/* Section Header */}
       <div className="text-center max-w-3xl mx-auto mb-14">
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 border border-rose-200/80 text-rose-700 text-xs font-semibold mb-3">
-          <span>The $200B Speed-to-Lead Breakdown</span>
+          <span>The ₹15 Lakh Crore Speed-to-Lead Opportunity</span>
         </div>
         <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900">
           Why 78% of Inbound Property Leads Are Lost in the First 5 Minutes

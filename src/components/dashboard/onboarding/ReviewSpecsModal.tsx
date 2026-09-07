@@ -55,7 +55,7 @@ export function ReviewSpecsModal({
 }: ReviewSpecsModalProps) {
   const isRent = property.listingType === "rent";
   const formattedPrice = Number(property.price) > 0
-    ? `$${Number(property.price).toLocaleString()}${isRent ? "/mo" : ""}`
+    ? `₹${Number(property.price).toLocaleString("en-IN")}${isRent ? "/mo" : ""}`
     : "Pending";
 
   const {
@@ -284,7 +284,7 @@ export function ReviewSpecsModal({
                 </span>
               </div>
               <p className="text-xs sm:text-sm font-extrabold text-slate-900">
-                {hasValidSqft ? `${Number(property.sqft).toLocaleString()} sqft` : "Pending"}
+                {hasValidSqft ? `${Number(property.sqft).toLocaleString("en-IN")} sqft` : "Pending"}
               </p>
             </div>
           </div>
@@ -321,12 +321,12 @@ export function ReviewSpecsModal({
                   </div>
                 )}
 
-                {/* HOA (Only for sales or if specified) */}
+                {/* Society Maintenance (Only for sales or if specified) */}
                 {!isRent && (
                   <div className="p-2.5 rounded-xl bg-white border border-slate-200/80">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Monthly HOA</span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Maintenance Dues</span>
                     <p className="font-semibold text-slate-800 mt-0.5 truncate">
-                      {hasHoa ? `$${Number(property.hoaFeeMonthly).toLocaleString()}/mo` : NOT_SPECIFIED}
+                      {hasHoa ? `₹${Number(property.hoaFeeMonthly).toLocaleString("en-IN")}/mo` : NOT_SPECIFIED}
                     </p>
                   </div>
                 )}
@@ -441,7 +441,7 @@ export function ReviewSpecsModal({
               <Mic className="w-3 h-3 animate-pulse" />
             </div>
             <div className="flex-1 leading-relaxed text-[11px]">
-              <span className="font-bold">Live voice corrections active:</span> Speak naturally to Elena to modify any detail (e.g. <span className="font-semibold italic">“Actually change the price to $4,000”</span> or <span className="font-semibold italic">“Parking is 2 cars”</span>) and this card updates live.
+              <span className="font-bold">Live voice corrections active:</span> Speak naturally to Elena to modify any detail (e.g. <span className="font-semibold italic">“Actually change the price to ₹95,000”</span> or <span className="font-semibold italic">“Parking is 2 cars”</span>) and this card updates live.
             </div>
           </div>
         </div>

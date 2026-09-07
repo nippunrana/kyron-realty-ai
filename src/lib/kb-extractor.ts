@@ -108,7 +108,7 @@ export async function extractPropertyKnowledgeBase(
       ? `Existing Verified State from Live Session:
 - Address: ${current.address}, ${current.city || ""} ${current.state || ""} ${current.zipCode || ""}
 - Listing Type: ${current.listingType}
-- Price: $${current.price}
+- Price: ₹${current.price}
 - Beds: ${current.bedrooms}, Baths: ${current.bathrooms}, Sqft: ${current.sqft}
 - Available Date: ${current.availableDate || "not specified"}
 - Parking Setup: ${currentKb?.parkingDetail || "not specified"}
@@ -148,7 +148,7 @@ CORE ZERO-HALLUCINATION & FACT-VS-COPY PRINCIPLES:
 2. AUDIT & RECONCILIATION TASK:
    - Compare the full dialogue transcript against the Existing Verified State.
    - If a spec was agreed upon in the live session and never contradicted, KEEP IT as confirmed truth.
-   - If the owner corrected or clarified any spec in the transcript (e.g. rent changed to $45,000, or pet policy allowed dogs), ensure the final agreed value is set.
+   - If the owner corrected or clarified any spec in the transcript (e.g. rent changed to ₹45,000, or pet policy allowed dogs), ensure the final agreed value is set.
    - If there is an outright conflict or contradiction between the live screen state and what the owner actually agreed in the transcript, report it in 'detectedDiscrepancies':
      [ { "field": string, "liveValue": string, "transcriptValue": string, "reason": string } ].
    - If everything is consistent with the transcript, return 'detectedDiscrepancies': [].
@@ -186,7 +186,7 @@ Return a strictly valid JSON object matching this schema:
     "city": string,
     "state": string,
     "zipCode": string,
-    "country": "USA",
+    "country": "India",
     "bedrooms": number,
     "bathrooms": number,
     "sqft": number,

@@ -66,7 +66,7 @@ export function TourBookingForm({
         <input
           type="tel"
           required
-          placeholder="(415) 555-0199"
+          placeholder="+91 98765 43210"
           value={phone}
           onChange={(e) => onPhoneChange(e.target.value)}
           className={inputClass}

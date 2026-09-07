@@ -91,7 +91,7 @@ export function buildChecklistItems(property: Property): ChecklistItemData[] {
       sublabel: "Asking price or monthly rent",
       isComplete: hasPrice,
       valueDisplay: hasPrice
-        ? `$${Number(property.price).toLocaleString()}${
+        ? `₹${Number(property.price).toLocaleString("en-IN")}${
             property.listingType === "rent" ? "/mo" : ""
           }`
         : null,
@@ -115,7 +115,7 @@ export function buildChecklistItems(property: Property): ChecklistItemData[] {
       label: "Square footage / Size",
       sublabel: "Interior floor area (sf)",
       isComplete: hasSqft,
-      valueDisplay: hasSqft ? `${Number(property.sqft).toLocaleString()} sqft` : null,
+      valueDisplay: hasSqft ? `${Number(property.sqft).toLocaleString("en-IN")} sqft` : null,
     },
   ];
 
@@ -173,12 +173,12 @@ export function buildAdditionalSpecs(property: Property, knowledgeBase: Knowledg
     });
   }
 
-  // 4. Monthly HOA Fee
+  // 4. Society Maintenance / Dues
   if (property.hoaFeeMonthly && Number(property.hoaFeeMonthly) > 0) {
     additionalSpecs.push({
       id: "hoa_fee",
-      label: "Monthly HOA Fee",
-      value: `$${Number(property.hoaFeeMonthly).toLocaleString()}/mo`,
+      label: "Society Maintenance",
+      value: `₹${Number(property.hoaFeeMonthly).toLocaleString("en-IN")}/mo`,
       icon: Tag,
       color: "amber",
     });
@@ -189,7 +189,7 @@ export function buildAdditionalSpecs(property: Property, knowledgeBase: Knowledg
     additionalSpecs.push({
       id: "security_deposit",
       label: "Security Deposit",
-      value: `$${Number(property.securityDeposit).toLocaleString()}`,
+      value: `₹${Number(property.securityDeposit).toLocaleString("en-IN")}`,
       icon: ShieldCheck,
       color: "emerald",
     });

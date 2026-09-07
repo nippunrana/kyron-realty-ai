@@ -96,7 +96,7 @@ export function PublishSuccessModal({
 
   const whatsAppText = encodeURIComponent(
     `🏡 Just Listed: ${property.title} in ${property.city}!\n` +
-    `Price: $${Number(property.price).toLocaleString()}/${property.listingType === "rent" ? "mo" : ""}\n\n` +
+    `Price: ₹${Number(property.price).toLocaleString("en-IN")}/${property.listingType === "rent" ? "mo" : ""}\n\n` +
     `Scan the QR code or tap this link to talk 24/7 with our AI Voice Sales Agent for instant answers & viewing bookings:\n${shareUrl}`
   );
   const whatsAppUrl = `https://api.whatsapp.com/send?text=${whatsAppText}`;

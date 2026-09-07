@@ -258,17 +258,17 @@ export function ConversationalPanel({
             <span className="text-slate-400 font-medium shrink-0">Sample:</span>
             <button
               type="button"
-              onClick={() => setUrlInput("https://www.zillow.com/homedetails/250-Marina-Blvd-San-Francisco-CA-94123/20938472_zpid/")}
-              className="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-600 transition-colors truncate max-w-[160px] cursor-pointer"
+              onClick={() => setUrlInput("https://www.99acres.com/3-bhk-apartment-in-golf-course-road-gurugram-spid-Y82918234")}
+              className="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-600 transition-colors truncate max-w-[175px] cursor-pointer"
             >
-              🏡 Marina Loft ($3,450)
+              🏡 Golf Course Condo (₹95,000)
             </button>
             <button
               type="button"
-              onClick={() => setUrlInput("https://www.realtor.com/realestateandhomes-detail/1850-Sunset-Blvd-Los-Angeles-CA-90026")}
-              className="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-600 transition-colors truncate max-w-[160px] cursor-pointer"
+              onClick={() => setUrlInput("https://www.magicbricks.com/propertyDetails/3-bhk-luxury-flat-cyber-city-gurugram-pid-48201948")}
+              className="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-600 transition-colors truncate max-w-[175px] cursor-pointer"
             >
-              🌆 Sunset Condo ($895k)
+              🌆 Cyber City Suite (₹2.4 Cr)
             </button>
           </div>
         </div>
@@ -518,7 +518,7 @@ export function ConversationalPanel({
                 Conversation will appear here
               </p>
               <p className="text-[11px] text-slate-400 mt-0.5 max-w-[240px]">
-                Speak to Elena naturally (e.g. &ldquo;It&apos;s a 2-bedroom rental on Marina Blvd for $3,450/month&rdquo;).
+                Speak to Elena naturally (e.g. &ldquo;It&apos;s a 3-bedroom rental on Golf Course Road for ₹95,000/month&rdquo;).
               </p>
             </div>
           ) : (

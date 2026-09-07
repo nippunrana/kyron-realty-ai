@@ -17,7 +17,7 @@ export function ThreeStepEngine() {
       title: "60-Sec Onboarding Studio",
       subtitle: "Paste any URL or talk to the ingest bot",
       description:
-        "Paste a listing URL from Zillow, Redfin, or your broker portal. Apify web crawlers extract photos, specs, and policies, while our AI synthesizes a deep Knowledge Base and Landlord Guardrail Matrix in under a minute.",
+        "Paste a listing URL from 99acres, MagicBricks, Housing.com, or your broker portal. Apify web crawlers extract photos, specs, and policies, while our AI synthesizes a deep Knowledge Base and Landlord Guardrail Matrix in under a minute.",
       badge: "Apify Crawler + AI Synthesis",
       icon: Globe,
       features: [

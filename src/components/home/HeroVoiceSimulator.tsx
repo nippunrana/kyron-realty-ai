@@ -29,18 +29,18 @@ const SCENARIOS: Scenario[] = [
     id: "negotiate",
     label: "Rent Negotiation",
     badge: "Exchange of Value",
-    userQuery: "Hey Sarah, the $3,450 rent is a bit steep for my budget. Can you do $3,150?",
+    userQuery: "Hey Sarah, the ₹95,000 rent is a bit steep for my budget. Can you do ₹88,000?",
     agentReply:
-      "I can certainly lock in $3,150/mo for you if you're open to an 18-month lease starting on the 1st. I'll also waive the pet fee upfront. Would that timeline work for you?",
-    insight: "Defends $3,250 floor price • Trades concession for longer lease commitment",
+      "I can certainly lock in ₹88,000/mo for you if you're open to an 18-month lease starting on the 1st. I'll also waive the first month's maintenance fee. Would that timeline work for you?",
+    insight: "Defends ₹90,000 floor price • Trades concession for longer lease commitment",
   },
   {
     id: "amenities",
     label: "Pets & EV Parking",
     badge: "Verified Knowledge Base",
-    userQuery: "Does the Marina flat include assigned parking, and can I bring my 50lb Golden Retriever?",
+    userQuery: "Does the Golf Course Road flat include assigned parking, and can I bring my dog?",
     agentReply:
-      "Yes, absolutely! The unit includes one assigned garage stall with Level-2 EV charging, and both dogs and cats up to 60 lbs are welcome with a refundable deposit.",
+      "Yes, absolutely! The unit includes two reserved basement parking bays with dedicated EV charging, and pets are welcome with prior society registration and refundable deposit.",
     insight: "Accurate to landlord specs • Zero hallucinations • Instant answer in <280ms",
   },
   {
@@ -161,9 +161,9 @@ export function HeroVoiceSimulator({ onOpenCallModal }: HeroVoiceSimulatorProps)
                 </div>
                 <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5">
                   <Building2 className="w-3.5 h-3.5 text-slate-400" />
-                  <span>250 Marina Boulevard, SF</span>
+                  <span>Golf Course Road, Gurugram</span>
                   <span>•</span>
-                  <span className="font-semibold text-slate-700">$3,450/mo</span>
+                  <span className="font-semibold text-slate-700">₹95,000/mo</span>
                 </p>
               </div>
             </div>

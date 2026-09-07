@@ -188,7 +188,7 @@ IF PROPERTY IS FOR SALE:
 STAGE 4 REVIEW: FULL PROPERTY SPECS REVIEW WINDOW
 - Once the owner answers both question bundles for additional specs, summarize the extra details concisely in 1 sentence, and state that you have pulled up the full property review window on their screen showing both their core and additional specs:
   "Wonderful, that covers all our additional specifications! I've pulled up your full property review card on your screen right now with all of your core and additional details. Take a look and let me know if you'd like to adjust anything, or if all is done."
-- CONTINUOUS VERBAL ADJUSTMENTS: If the owner asks to change or adjust ANY detail (core spec like price, address, bedrooms, or additional spec like parking, pets, utilities, move-in timing), acknowledge and confirm the change warmly (e.g. "Got it, I've updated the rent to $4,000 for you"). Keep the review card open on screen while they make changes.
+- CONTINUOUS VERBAL ADJUSTMENTS: If the owner asks to change or adjust ANY detail (core spec like price, address, bedrooms, or additional spec like parking, pets, utilities, move-in timing), acknowledge and confirm the change warmly (e.g. "Got it, I've updated the rent to ₹95,000 for you"). Keep the review card open on screen while they make changes.
 - VERBAL CLOSURE TO PHOTO INTAKE: When the owner confirms the review card, or says "All is done", "all done", "looks good", "everything is done", "proceed", "continue", or "ready for photos", enthusiastically close the specs review card and open the photo upload window:
   "Awesome! Everything is locked in. I've opened up your photo upload window on your screen right now. Please select the photos from your computer that you want to attach to this property, or scan the QR code to upload them straight from your phone."
 
@@ -231,7 +231,7 @@ VOICE DELIVERY GUIDELINES:
     const fullAddress = [listing?.address, listing?.city, listing?.state].filter(Boolean).join(", ");
     const isRental = listing?.listingType === "rent";
     const priceLine =
-      targetPrice > 0 ? `$${targetPrice.toLocaleString()}${isRental ? "/month" : ""}` : `${NOT_SPECIFIED} - never quote a price`;
+      targetPrice > 0 ? `₹${targetPrice.toLocaleString("en-IN")}${isRental ? "/month" : ""}` : `${NOT_SPECIFIED} - never quote a price`;
 
     systemPrompt = `
 You are 'Sarah', a senior leasing advisor and sales specialist representing: ${propertyTitle}.
@@ -257,8 +257,8 @@ ${faqsText || "No additional custom FAQs."}
 NEGOTIATION CONCESSION GUARDRAILS:
 ${
   targetPrice > 0
-    ? `- Target Price: $${targetPrice.toLocaleString()}
-- Minimum Floor Price: $${Number(floorPrice).toLocaleString()} (ABSOLUTE BOTTOM - NEVER GO BELOW)
+    ? `- Target Price: ₹${targetPrice.toLocaleString("en-IN")}
+- Minimum Floor Price: ₹${Number(floorPrice).toLocaleString("en-IN")} (ABSOLUTE BOTTOM - NEVER GO BELOW)
 - Allowed Concessions:
 ${concessionRulesText || "- None authorized. Do not offer any discount; refer pricing questions to the licensed broker."}`
     : "- Pricing is not verified. Do not quote or negotiate a price; refer pricing questions to the licensed broker."

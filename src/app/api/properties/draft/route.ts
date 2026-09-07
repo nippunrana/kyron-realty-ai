@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
           city: property.city || null,
           state: property.state || null,
           zipCode: property.zipCode || null,
-          country: property.country || "USA",
+          country: property.country || "India",
           bedrooms: property.bedrooms ? Number(property.bedrooms) : null,
           bathrooms: property.bathrooms ? String(property.bathrooms) : null,
           sqft: property.sqft ? Number(property.sqft) : null,

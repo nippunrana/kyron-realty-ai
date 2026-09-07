@@ -75,16 +75,16 @@ export function DemoListingCard({ onOpenCallModal }: DemoListingCardProps) {
                 <div className="absolute bottom-4 left-4 right-4 flex items-end justify-between text-white">
                   <div>
                     <h3 className="text-xl sm:text-2xl font-black drop-shadow-sm">
-                      250 Marina Boulevard
+                      The Aralias, Golf Course Road
                     </h3>
                     <p className="text-xs text-slate-200 flex items-center gap-1 mt-0.5">
                       <MapPin className="w-3.5 h-3.5 text-blue-400" />
-                      <span>Marina District, San Francisco, CA 94123</span>
+                      <span>Golf Course Road, Sector 54, Gurugram, HR 122002</span>
                     </p>
                   </div>
                   <div className="text-right">
                     <span className="text-2xl sm:text-3xl font-black drop-shadow-sm">
-                      ${Number(DEMO_LISTING.price).toLocaleString()}
+                      ₹{Number(DEMO_LISTING.price).toLocaleString("en-IN")}
                     </span>
                     <span className="text-xs text-slate-200 block">/ month</span>
                   </div>
@@ -112,23 +112,23 @@ export function DemoListingCard({ onOpenCallModal }: DemoListingCardProps) {
                     <Maximize className="w-4 h-4 text-blue-600" />
                     <span>Living Area</span>
                   </div>
-                  <span className="text-sm font-bold text-slate-900 mt-1 block">{DEMO_LISTING.sqft.toLocaleString()} sqft</span>
+                  <span className="text-sm font-bold text-slate-900 mt-1 block">{DEMO_LISTING.sqft.toLocaleString("en-IN")} sqft</span>
                 </div>
               </div>
 
               {/* Amenities Pills */}
               <div className="flex flex-wrap gap-2 mt-4 text-xs">
                 <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 font-medium flex items-center gap-1">
-                  <Dog className="w-3.5 h-3.5 text-slate-500" /> Pet Friendly (&lt;60 lbs)
+                  <Dog className="w-3.5 h-3.5 text-slate-500" /> Pet Friendly (Registered)
                 </span>
                 <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 font-medium flex items-center gap-1">
-                  <Car className="w-3.5 h-3.5 text-slate-500" /> Reserved Garage Stall
+                  <Car className="w-3.5 h-3.5 text-slate-500" /> 2 Reserved Basement Bays
                 </span>
                 <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 font-medium flex items-center gap-1">
-                  <Zap className="w-3.5 h-3.5 text-slate-500" /> Level-2 EV Charger
+                  <Zap className="w-3.5 h-3.5 text-slate-500" /> Dedicated EV Charger
                 </span>
                 <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 font-medium">
-                  In-unit Washer/Dryer
+                  Modular Kitchen &amp; Balcony
                 </span>
               </div>
             </div>
@@ -201,7 +201,7 @@ export function DemoListingCard({ onOpenCallModal }: DemoListingCardProps) {
                   </button>
                 </div>
                 <div className="p-2.5 rounded-lg bg-emerald-50/60 border border-emerald-100 text-[11px] text-slate-700 leading-relaxed">
-                  &quot;🏡 Just Listed: 250 Marina Boulevard, SF! 2 Bed | 2 Bath | $3,450/mo. Tap here to view photos & speak directly with our 24/7 Voice AI Agent for instant tour booking: <span className="text-blue-600 underline">egnitech.com/marina-loft</span>&quot;
+                  &quot;🏡 Just Listed: Golf Course Road, Gurugram! 3 Bed | 3 Bath | ₹95,000/mo. Tap here to view photos &amp; speak directly with our 24/7 Voice AI Agent for instant tour booking: <span className="text-blue-600 underline">egnitech.com/marina-loft</span>&quot;
                 </div>
               </div>
             </div>

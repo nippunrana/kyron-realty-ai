@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import {
   Building2,
   PhoneCall,
@@ -18,6 +19,7 @@ import { DEMO_LISTING } from "@/lib/demo-listing";
 
 export default function Home() {
   const [isCallModalOpen, setIsCallModalOpen] = useState<boolean>(false);
+  const { status } = useSession();
 
   return (
     <div className="min-h-screen flex flex-col justify-between bg-slate-50 text-slate-900 selection:bg-blue-100 selection:text-blue-900 relative overflow-x-hidden">
@@ -69,19 +71,26 @@ export default function Home() {
               <span>Test Call</span>
             </button>
 
-            <Link
-              href="/login"
-              className="px-3.5 py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all"
-            >
-              Sign In
-            </Link>
-
-            <Link
-              href="/dashboard/properties/new"
-              className="px-4 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 active:bg-black rounded-xl shadow-xs transition-all"
-            >
-              Launch Studio
-            </Link>
+            {status === "loading" ? (
+              <div
+                aria-hidden="true"
+                className="h-8 w-24 rounded-xl bg-slate-200/60 animate-pulse"
+              />
+            ) : status === "authenticated" ? (
+              <Link
+                href="/dashboard"
+                className="px-4 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 active:bg-black rounded-xl shadow-xs transition-all"
+              >
+                Dashboard
+              </Link>
+            ) : (
+              <Link
+                href="/login"
+                className="px-4 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 active:bg-black rounded-xl shadow-xs transition-all"
+              >
+                Sign In
+              </Link>
+            )}
           </div>
         </div>
       </header>

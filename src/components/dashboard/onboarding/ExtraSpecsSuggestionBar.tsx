@@ -225,14 +225,14 @@ export function ExtraSpecsSuggestionBar({
     () => [
       {
         id: "hoa",
-        label: "HOA / Condo Dues",
+        label: "Society Maintenance / Dues",
         icon: Building2,
         field: "hoaFeeMonthly",
         chips: [
-          { label: "No HOA", value: "0", field: "hoaFeeMonthly" },
-          { label: "$250/mo HOA", value: "250", field: "hoaFeeMonthly" },
-          { label: "$450/mo HOA (Water/Trash)", value: "450", field: "hoaFeeMonthly" },
-          { label: "$650/mo Luxury Amenities", value: "650", field: "hoaFeeMonthly" },
+          { label: "No Society Dues", value: "0", field: "hoaFeeMonthly" },
+          { label: "₹3,500/mo Society Dues", value: "3500", field: "hoaFeeMonthly" },
+          { label: "₹7,500/mo Maintenance", value: "7500", field: "hoaFeeMonthly" },
+          { label: "₹15,000/mo Luxury Society", value: "15000", field: "hoaFeeMonthly" },
         ],
       },
       {

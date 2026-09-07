@@ -250,7 +250,7 @@ export function PropertyListingsSection({ initialProperties }: PropertyListingsS
                       <div className="text-lg font-extrabold tracking-tight">
                         {hasValidPrice ? (
                           <>
-                            ${numericPrice.toLocaleString()}
+                            ₹{numericPrice.toLocaleString("en-IN")}
                             {prop.listingType === "rent" && (
                               <span className="text-xs font-normal text-slate-200">/mo</span>
                             )}

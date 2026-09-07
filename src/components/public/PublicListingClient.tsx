@@ -112,7 +112,7 @@ export function PublicListingClient({
   const locationSummary = [property.city, property.state].filter(Boolean).join(", ") || property.address || "";
   const whatsAppText = encodeURIComponent(
     `🏡 Check out this property: ${property.title}${locationSummary ? ` in ${locationSummary}` : ""}!\n` +
-    `Price: $${Number(property.price).toLocaleString()}${property.listingType === "rent" ? "/mo" : ""}\n\n` +
+    `Price: ₹${Number(property.price).toLocaleString("en-IN")}${property.listingType === "rent" ? "/mo" : ""}\n\n` +
     `Talk with our 24/7 AI Voice Agent for instant answers & tour booking:\n${shareUrl}`
   );
   const whatsAppUrl = `https://api.whatsapp.com/send?text=${whatsAppText}`;
@@ -247,7 +247,7 @@ export function PublicListingClient({
                     {property.listingType === "rent" ? "Monthly Lease Price" : "Asking Price"}
                   </span>
                   <div className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
-                    ${Number(property.price).toLocaleString()}
+                    ₹{Number(property.price).toLocaleString("en-IN")}
                     {property.listingType === "rent" && (
                       <span className="text-base font-normal text-slate-500"> / month</span>
                     )}
@@ -479,7 +479,7 @@ export function PublicListingClient({
               {property.title}
             </span>
             <span className="text-base font-extrabold text-slate-900">
-              ${Number(property.price).toLocaleString()}
+              ₹{Number(property.price).toLocaleString("en-IN")}
               {property.listingType === "rent" ? "/mo" : ""}
             </span>
           </div>

@@ -12,7 +12,7 @@ import {
 import { DEMO_LISTING } from "@/lib/demo-listing";
 
 export function NegotiationSimulator() {
-  const [callerBudget, setCallerBudget] = useState<number>(3150);
+  const [callerBudget, setCallerBudget] = useState<number>(88000);
   const [leaseMonths, setLeaseMonths] = useState<number>(18);
   const [moveInQuick, setMoveInQuick] = useState<boolean>(true);
 
@@ -30,35 +30,35 @@ export function NegotiationSimulator() {
     negotiatedRent = TARGET_PRICE;
     concessionText = "Standard rate accepted. Zero rent discount needed.";
     dialogueReply =
-      `"Great! The asking rent is $${TARGET_PRICE}/mo. Let's schedule your private tour for this Thursday or Friday to lock this unit in before the weekend."`;
-  } else if (callerBudget < 3000) {
+      `"Great! The asking rent is ₹${TARGET_PRICE.toLocaleString("en-IN")}/mo. Let's schedule your private tour for this Thursday or Friday to lock this unit in before the weekend."`;
+  } else if (callerBudget < 85000) {
     outcomeType = "alternative_pivot";
-    negotiatedRent = 2850;
-    concessionText = `Budget below $${FLOOR_PRICE.toLocaleString()} floor • Graceful Pivot to 1-Bed + Den inventory`;
+    negotiatedRent = 75000;
+    concessionText = `Budget below ₹${FLOOR_PRICE.toLocaleString("en-IN")} floor • Graceful Pivot to 2-BHK executive inventory`;
     dialogueReply =
-      `"I can't drop the 2-Bedroom unit below our landlord minimum of $${FLOOR_PRICE}/mo. However, we have a beautiful 1-Bed + Den unit with private terrace in the same building for $2,850/mo. Would you like to tour that one instead?"`;
+      `"I can't drop this 3-BHK luxury unit below our landlord minimum of ₹${FLOOR_PRICE.toLocaleString("en-IN")}/mo. However, we have a premium 2-BHK unit with private balcony in the same society for ₹75,000/mo. Would you like to tour that one instead?"`;
   } else {
     outcomeType = "accepted_with_trade";
     if (leaseMonths >= 18 && moveInQuick) {
       negotiatedRent = Math.max(FLOOR_PRICE, callerBudget);
-      concessionText = "18-Mo Lease + Fast Move-In Trade • Waive $200 Parking Fee + $250 Rent Reduction";
+      concessionText = "18-Mo Lease + Fast Move-In Trade • Waive ₹8,000 Maintenance + ₹5,000 Rent Reduction";
       dialogueReply =
-        `"Here's what I can do: if you sign an 18-month lease starting by next Friday, I will approve $${negotiatedRent}/mo and waive the $200/month assigned parking fee entirely. Shall we book your walkthrough?"`;
+        `"Here's what I can do: if you sign an 18-month lease starting by next Friday, I will approve ₹${negotiatedRent.toLocaleString("en-IN")}/mo and waive the first month's society maintenance fee entirely. Shall we book your walkthrough?"`;
     } else if (leaseMonths >= 18) {
       negotiatedRent = Math.max(FLOOR_PRICE, callerBudget);
       concessionText = "18-Mo Lease Commitment Trade • 5% Monthly Concession";
       dialogueReply =
-        `"To accommodate your $${negotiatedRent}/mo target, our landlord requires an 18-month lease term. If that timeline works for you, I can lock in that price right now."`;
+        `"To accommodate your ₹${negotiatedRent.toLocaleString("en-IN")}/mo target, our landlord requires an 18-month lease term. If that timeline works for you, I can lock in that price right now."`;
     } else if (moveInQuick) {
-      negotiatedRent = 3350;
-      concessionText = "Immediate Move-In Trade • Waive 1st Month Pet Deposit & $100 off rent";
+      negotiatedRent = 92000;
+      concessionText = "Immediate Move-In Trade • Waive 1st Month Maintenance & ₹3,000 off rent";
       dialogueReply =
-        `"I cannot reach $${callerBudget} on a 12-month lease, but if you can take possession by next week, I can do $3,350/mo and waive the entire pet deposit upfront."`;
+        `"I cannot reach ₹${callerBudget.toLocaleString("en-IN")} on a standard 12-month lease, but if you can take possession by next week, I can do ₹92,000/mo and waive the entire first month's maintenance fee."`;
     } else {
       negotiatedRent = TARGET_PRICE;
       concessionText = "No value trade provided • Floor price protected at standard terms";
       dialogueReply =
-        `"The base rent is $${TARGET_PRICE}/mo. We can only adjust the price if you're open to an extended 18-month lease or an immediate move-in this week. Would either of those options be feasible?"`;
+        `"The base rent is ₹${TARGET_PRICE.toLocaleString("en-IN")}/mo. We can only adjust the price if you're open to an extended 18-month lease or an immediate move-in this week. Would either of those options be feasible?"`;
     }
   }
 
@@ -96,22 +96,22 @@ export function NegotiationSimulator() {
               <div className="flex items-center justify-between text-xs mb-2">
                 <span className="font-semibold text-slate-700">Caller Budget Offer:</span>
                 <span className="font-extrabold text-blue-600 text-sm tabular-nums">
-                  ${callerBudget.toLocaleString()}/mo
+                  ₹{callerBudget.toLocaleString("en-IN")}/mo
                 </span>
               </div>
               <input
                 type="range"
-                min="2800"
-                max="3500"
-                step="50"
+                min="80000"
+                max="100000"
+                step="1000"
                 value={callerBudget}
                 onChange={(e) => setCallerBudget(Number(e.target.value))}
                 className="w-full accent-blue-600 cursor-pointer"
               />
               <div className="flex justify-between text-[11px] text-slate-400 mt-1 font-medium">
-                <span>$2,800 (Low)</span>
-                <span className="text-emerald-700 font-bold">${FLOOR_PRICE.toLocaleString()} Floor</span>
-                <span>${TARGET_PRICE.toLocaleString()} (Target)</span>
+                <span>₹80,000 (Low)</span>
+                <span className="text-emerald-700 font-bold">₹{FLOOR_PRICE.toLocaleString("en-IN")} Floor</span>
+                <span>₹{TARGET_PRICE.toLocaleString("en-IN")} (Target)</span>
               </div>
             </div>
 
@@ -222,13 +222,13 @@ export function NegotiationSimulator() {
                 <span className="text-slate-500 block">Landlord Floor Price:</span>
                 <span className="font-bold text-slate-900 text-sm flex items-center gap-1">
                   <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                  ${FLOOR_PRICE}/mo (Protected)
+                  ₹{FLOOR_PRICE.toLocaleString("en-IN")}/mo (Protected)
                 </span>
               </div>
               <div>
                 <span className="text-slate-500 block">Final Agreed Rent:</span>
                 <span className="font-bold text-blue-700 text-sm">
-                  ${negotiatedRent}/mo
+                  ₹{negotiatedRent.toLocaleString("en-IN")}/mo
                 </span>
               </div>
             </div>

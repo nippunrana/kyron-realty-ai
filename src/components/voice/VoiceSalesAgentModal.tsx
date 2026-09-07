@@ -185,7 +185,7 @@ export function VoiceSalesAgentModal({
                     {property.address || property.city || "Verified Residence"}
                   </p>
                   <p className="text-xs font-black text-blue-600 mt-0.5">
-                    ${Number(property.price).toLocaleString()}
+                    ₹{Number(property.price).toLocaleString("en-IN")}
                     {property.listingType === "rent" ? "/month" : ""}
                   </p>
                 </div>

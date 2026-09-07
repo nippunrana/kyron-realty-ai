@@ -35,7 +35,7 @@ export const properties = pgTable("properties", {
   city: text("city"),
   state: text("state"),
   zipCode: text("zip_code"),
-  country: text("country").default("USA"),
+  country: text("country").default("India"),
   bedrooms: integer("bedrooms"),
   bathrooms: numeric("bathrooms", { precision: 3, scale: 1 }),
   sqft: integer("sqft"),

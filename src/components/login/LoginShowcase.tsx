@@ -66,13 +66,13 @@ export function LoginShowcase() {
           <div className="flex items-baseline justify-between mb-3.5">
             <div>
               <h4 className="text-sm font-bold text-white tracking-tight">
-                Bel Air Modern Villa
+                DLF Phase 5 Sky Penthouse
               </h4>
-              <p className="text-xs text-slate-400 mt-0.5">Los Angeles, CA 90077</p>
+              <p className="text-xs text-slate-400 mt-0.5">Gurugram, HR 122009</p>
             </div>
             <div className="text-right">
               <div className="text-lg xl:text-xl font-extrabold text-white">
-                $8,450,000
+                ₹18.5 Cr
               </div>
               <div className="text-[11px] font-semibold text-emerald-400">
                 +14.2% Projected 3-Yr
@@ -112,7 +112,7 @@ export function LoginShowcase() {
               <span className="text-slate-400"> — Principal, Vance Capital</span>
             </div>
             <span className="text-blue-300 bg-blue-500/15 border border-blue-400/25 px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1">
-              <TrendingUp className="w-3 h-3 text-blue-400" aria-hidden="true" /> $42M Deployed
+              <TrendingUp className="w-3 h-3 text-blue-400" aria-hidden="true" /> ₹350 Cr Deployed
             </span>
           </div>
         </div>
@@ -126,10 +126,10 @@ export function LoginShowcase() {
         </div>
         <div className="p-2 rounded-xl bg-white/[0.02]">
           <div className="text-lg xl:text-xl font-extrabold text-white">50k+</div>
-          <div className="text-[11px] text-slate-400 font-medium mt-0.5">Zipcodes Indexed</div>
+          <div className="text-[11px] text-slate-400 font-medium mt-0.5">PIN Codes Indexed</div>
         </div>
         <div className="p-2 rounded-xl bg-white/[0.02]">
-          <div className="text-lg xl:text-xl font-extrabold text-white">$1.2B+</div>
+          <div className="text-lg xl:text-xl font-extrabold text-white">₹10,000 Cr+</div>
           <div className="text-[11px] text-slate-400 font-medium mt-0.5">Analyzed Pipeline</div>
         </div>
       </div>

@@ -493,7 +493,7 @@ export function LivePropertyInspector({
                   </div>
                 </div>
                 <span className="text-xs font-extrabold text-amber-950 bg-white border border-amber-200 px-2.5 py-1 rounded-lg">
-                  ${Number(negotiationMatrix.minFloorPrice).toLocaleString()}
+                  ₹{Number(negotiationMatrix.minFloorPrice).toLocaleString("en-IN")}
                 </span>
               </div>
             )}

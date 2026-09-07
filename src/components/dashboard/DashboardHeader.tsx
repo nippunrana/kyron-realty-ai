@@ -42,9 +42,9 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
         {/* Brand & Workspace Label */}
         <div className="flex items-center gap-4">
           <Link
-            href="/dashboard"
+            href="/"
             className="flex items-center gap-3 group"
-            aria-label="Kyron Realty AI Dashboard"
+            aria-label="Kyron Realty AI Homepage"
           >
             <div className="p-2 rounded-xl bg-blue-600 text-white shadow-md shadow-blue-500/20 group-hover:bg-blue-700 transition-colors">
               <Building2 className="w-5 h-5" aria-hidden="true" />
