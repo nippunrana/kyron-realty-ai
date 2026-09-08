@@ -23,6 +23,8 @@ import type { PillLabels } from "@/lib/turn-extractor";
 import { VerificationChecklist } from "./VerificationChecklist";
 import { buildAdditionalSpecs, buildChecklistItems } from "./inspector-specs";
 import { ExtraSpecsSuggestionBar } from "./ExtraSpecsSuggestionBar";
+import { HyperLocalSearchHUD } from "./HyperLocalSearchHUD";
+import type { HyperLocalKbData } from "@/db/schema";
 
 interface LivePropertyInspectorProps {
   data: ExtractedPropertyPayload;
@@ -39,6 +41,10 @@ interface LivePropertyInspectorProps {
   isPublishing: boolean;
   isExtracting: boolean;
   isTurnSyncing?: boolean;
+  /** Stage 4.5 background Google Maps research, surfaced live above Additional Specs. */
+  isEnrichingLocation?: boolean;
+  hyperLocalData?: HyperLocalKbData | null;
+  enrichmentError?: string | null;
 }
 
 export function LivePropertyInspector({
@@ -54,6 +60,9 @@ export function LivePropertyInspector({
   isPublishing,
   isExtracting,
   isTurnSyncing = false,
+  isEnrichingLocation = false,
+  hyperLocalData = null,
+  enrichmentError = null,
 }: LivePropertyInspectorProps) {
   const [activeImageIdx, setActiveImageIdx] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -94,6 +103,13 @@ export function LivePropertyInspector({
   const verifiedCount = checklistItems.filter((item) => item.isComplete).length;
   const isFullyVerified = verifiedCount === 6;
   const additionalSpecs = buildAdditionalSpecs(property, knowledgeBase);
+  const showHyperLocalHUD = isEnrichingLocation || Boolean(hyperLocalData) || Boolean(enrichmentError);
+  const showSuggestionBar =
+    isFullyVerified ||
+    onboardingStage === "additional_specs" ||
+    onboardingStage === "photos" ||
+    onboardingStage === "final_review" ||
+    additionalSpecs.length > 0;
 
   const handleApplyChip = (field: string, value: any) => {
     if (field === "parkingDetail" || field === "petPolicyDetail" || field === "utilitiesDetail") {
@@ -325,10 +341,20 @@ export function LivePropertyInspector({
         {/* 6-Point Dynamic Verification Checklist */}
         <VerificationChecklist items={checklistItems} verifiedCount={verifiedCount} />
 
-        {/* Suggestion Chips Bar for Extra Specs */}
-        {(isFullyVerified || onboardingStage === "additional_specs" || onboardingStage === "photos" || onboardingStage === "final_review" || additionalSpecs.length > 0) && (
+        {/* Location Research HUD + Suggestion Chips Bar for Extra Specs.
+            Both share the scroll anchor so the HUD is never parked just above the fold. */}
+        {(showHyperLocalHUD || showSuggestionBar) && (
+          <div ref={suggestionBarSectionRef} className="space-y-4 sm:space-y-5">
+            {showHyperLocalHUD && (
+              <HyperLocalSearchHUD
+                isSearching={isEnrichingLocation}
+                data={hyperLocalData}
+                error={enrichmentError}
+              />
+            )}
+
+            {showSuggestionBar && (
           <div
-            ref={suggestionBarSectionRef}
             className={onboardingStage === "additional_specs" ? "ring-2 ring-indigo-400/40 rounded-2xl transition-all duration-300 shadow-sm" : ""}
           >
             <ExtraSpecsSuggestionBar
@@ -344,6 +370,8 @@ export function LivePropertyInspector({
               pillLabels={pillLabels}
               onApplyChip={handleApplyChip}
             />
+          </div>
+            )}
           </div>
         )}
 

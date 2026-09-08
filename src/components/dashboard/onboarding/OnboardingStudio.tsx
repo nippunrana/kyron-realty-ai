@@ -136,6 +136,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
   const [, setEaScript] = useState<string | null>(null);
   const eaScriptRef = useRef<string | null>(null);
   const [isEnrichingLocation, setIsEnrichingLocation] = useState(false);
+  const [enrichmentError, setEnrichmentError] = useState<string | null>(null);
   const isEnrichingLocationRef = useRef(false);
   const pendingHyperLocalModalOpenRef = useRef(false);
   const [draftId, setDraftId] = useState<number | null>(initialDraftId || null);
@@ -361,6 +362,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
     if (!prop.address || isEnrichingLocationRef.current) return;
     isEnrichingLocationRef.current = true;
     setIsEnrichingLocation(true);
+    setEnrichmentError(null);
     addTelemetryLog("AI-ENRICH", "Triggered background hyper-local location enrichment via Gemini 3.8 Flash", {
       address: prop.address,
       city: prop.city,
@@ -382,6 +384,10 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
           propertyType: prop.propertyType,
         }),
       });
+
+      // A route crash returns HTML, not JSON: parsing it first would put a parser error
+      // in front of the owner instead of a readable status.
+      if (!res.ok) throw new Error(`Location research failed (${res.status}).`);
 
       const json = await res.json();
       if (json.success && json.data) {
@@ -407,9 +413,13 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
           pendingHyperLocalModalOpenRef.current = false;
           setShowHyperLocalModal(true);
         }
+      } else {
+        setEnrichmentError(json.error || "Location research returned no result.");
+        addTelemetryLog("AI-ENRICH", "Hyper-local enrichment returned no data", json, undefined, "warn");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.warn("[Location Enrichment Error]:", err);
+      setEnrichmentError(err?.message || "Location research could not reach Gemini.");
       addTelemetryLog("AI-ENRICH", "Hyper-local enrichment encountered an issue", err, undefined, "warn");
     } finally {
       isEnrichingLocationRef.current = false;
@@ -1286,6 +1296,9 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
             isPublishing={isPublishing}
             isExtracting={isProcessing}
             isTurnSyncing={isTurnSyncing}
+            isEnrichingLocation={isEnrichingLocation}
+            hyperLocalData={hyperLocalData}
+            enrichmentError={enrichmentError}
           />
         </div>
       </div>
