@@ -19,14 +19,10 @@
  *
  * Env: GEMINI_API_KEY (required), GOOGLE_MAPS_API_KEY (distances; absent = no distances).
  */
+/*
+ * Only the entry point is re-exported. The pipeline stages are internal and are imported
+ * directly from their sibling files; re-exporting them here would be unused surface that
+ * `npm run lint:unused` (knip) rejects. The map above, not the export list, is what makes
+ * this layer navigable - add an export here only when something outside the layer imports it.
+ */
 export { enrichPropertyLocationWithAI } from "./enricher";
-export { measurePlaceDistances, getGoogleMapsApiKey } from "./distances";
-export { researchAreaWithMaps } from "./research";
-export { structureResearch, selectDistanceTargets, buildKbData } from "./structuring";
-export type { DistanceTarget } from "./distances";
-export type {
-  HyperLocalEnrichmentInput,
-  HyperLocalEnrichmentResult,
-  MapsSource,
-  ResearchOutcome,
-} from "./types";
