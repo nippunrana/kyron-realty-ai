@@ -75,6 +75,15 @@ export const propertyMedia = pgTable("property_media", {
 });
 
 export interface HyperLocalKbData {
+  /** The locality Google Maps resolved the address to, echoed back so the owner can catch a bad match. */
+  resolvedLocality?: string;
+  locationConfidence?: "high" | "medium" | "low";
+  /** Field names the research covered least well, for targeted owner confirmation. */
+  needsOwnerVerification?: string[];
+  /** False when the Maps grounding tool did not fire: the content is unverified model recall. */
+  grounded?: boolean;
+  /** Google Maps place records backing the content above; required for Maps attribution. */
+  sources?: Array<{ title: string; uri: string; placeId?: string }>;
   transit?: {
     nearestMetro?: string;
     majorHighways?: string[];
