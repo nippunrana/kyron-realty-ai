@@ -64,7 +64,7 @@ export function HyperLocalModal({
                   AI Hyper-Local & Transit Intelligence
                 </h2>
                 <span className="px-2 py-0.5 text-[10px] font-extrabold tracking-wide uppercase rounded-full bg-blue-100 text-blue-800 border border-blue-200">
-                  Gemini 3.8
+                  Map Intelligence
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1 truncate max-w-sm">
@@ -91,7 +91,7 @@ export function HyperLocalModal({
             <div className="py-12 flex flex-col items-center justify-center text-center space-y-3">
               <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
               <p className="text-sm font-semibold text-slate-700">
-                Gemini 3.8 Flash is synthesizing transit, schools, and neighborhood intelligence...
+                Checking the map for transit, schools, and neighborhood details...
               </p>
               <p className="text-xs text-slate-500 max-w-xs">
                 Analyzing geographic connectivity and compiling objection-handling scripts.

@@ -138,6 +138,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
   const [isEnrichingLocation, setIsEnrichingLocation] = useState(false);
   const [enrichmentError, setEnrichmentError] = useState<string | null>(null);
   const isEnrichingLocationRef = useRef(false);
+  const hasRequestedEnrichmentRef = useRef(false);
   const pendingHyperLocalModalOpenRef = useRef(false);
   const [draftId, setDraftId] = useState<number | null>(initialDraftId || null);
   const [uploadToken, setUploadToken] = useState("");
@@ -360,6 +361,16 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
   // Trigger background hyper-local enrichment with Gemini 3.8 Flash
   const triggerLocationEnrichment = useCallback(async (prop: ExtractedPropertyPayload["property"]) => {
     if (!prop.address || isEnrichingLocationRef.current) return;
+    // The search is a single real-world Maps fetch tied to core-spec confirmation. Several
+    // conversational paths can land on this call again later in the session; each one after
+    // the first is a duplicate, not a retry.
+    if (hasRequestedEnrichmentRef.current) {
+      addTelemetryLog("AI-ENRICH", "Skipped duplicate hyper-local enrichment request (already ran this session)", {
+        address: prop.address,
+      });
+      return;
+    }
+    hasRequestedEnrichmentRef.current = true;
     isEnrichingLocationRef.current = true;
     setIsEnrichingLocation(true);
     setEnrichmentError(null);
@@ -419,7 +430,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
       }
     } catch (err: any) {
       console.warn("[Location Enrichment Error]:", err);
-      setEnrichmentError(err?.message || "Location research could not reach Gemini.");
+      setEnrichmentError(err?.message || "Location research could not complete.");
       addTelemetryLog("AI-ENRICH", "Hyper-local enrichment encountered an issue", err, undefined, "warn");
     } finally {
       isEnrichingLocationRef.current = false;
@@ -860,7 +871,11 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
             pendingModalOpenRef.current = true;
           }
         } else if (action === "close_core") {
-          handleConfirmCoreSpecs();
+          if (onboardingStageRef.current === "core") {
+            handleConfirmCoreSpecs();
+          } else {
+            addTelemetryLog("INTENT", "Ignored close_core because onboarding has advanced past core specs", null, undefined, "info");
+          }
         } else if (action === "open_hyper_local") {
           handleOpenHyperLocal();
         } else if (action === "close_hyper_local") {

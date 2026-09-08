@@ -118,7 +118,7 @@ export function HyperLocalSearchHUD({ isSearching, data, error }: HyperLocalSear
                 Live Location Research
               </span>
               <span className="px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200 text-[9px] font-bold shrink-0">
-                Gemini + Maps
+                Map Intelligence
               </span>
             </div>
             <p className="text-xs font-bold text-slate-600 truncate">

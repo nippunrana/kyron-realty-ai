@@ -152,6 +152,7 @@ MANDATORY EXTRACTION WORKFLOW:
      CRITICAL: If the owner or Elena is simply asking or answering regular intake questions, modalAction MUST BE "none".
    - "close_core": Owner confirms or approves the core specs (e.g. "looks good", "proceed", "confirmed", "that's right", "continue") or asks to close/minimize the review card.
    - "open_hyper_local": Elena or owner announces or opens the hyper-local intelligence card (e.g. "According to your address and location we found this information", "open hyper-local card", "show transit details").
+     CRITICAL: Elena saying she is checking or searching the map in the background right after the core specs are confirmed (e.g. "I'm checking the map right now for the nearest metro, schools and hospitals") is the Stage 3 transition, NOT the card being opened. modalAction MUST BE "none".
    - "close_hyper_local": Owner approves or confirms hyper-local intelligence card ("looks good", "that is accurate", "proceed to photos", "continue").
    - "open_final": Elena or owner announces/opens the full specs review card or final review card (e.g. "I've pulled up your full property review card", "open review card").
    - "close_final": Owner confirms or approves the full review card, or says "All is done", "all done", "everything is done", "all set", "looks good", "proceed", or asks to close/minimize the card to move to photo upload.
