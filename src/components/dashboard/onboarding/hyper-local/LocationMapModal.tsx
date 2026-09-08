@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { X, MapPin, Footprints, Car, Building2 } from "lucide-react";
+import { X, MapPin, Footprints, Car, Building2, ExternalLink } from "lucide-react";
+import { buildDirectionsUrl, buildPlaceUrl } from "./maps-links";
 import type { HyperLocalKbData, NearbyPlaceDistance } from "@/db/schema";
 
 /**
@@ -95,14 +96,26 @@ export function LocationMapModal({
               <p className="text-[11px] text-slate-500 truncate">{origin}</p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close map"
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 shrink-0"
-          >
-            <X className="w-4.5 h-4.5" />
-          </button>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {/* Keyless handoff to the real Google Maps, where the owner can navigate. */}
+            <a
+              href={current ? buildDirectionsUrl(origin, current, mode) : buildPlaceUrl(origin)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 text-[11px] font-bold hover:border-blue-300 hover:text-blue-700"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Open in Google Maps</span>
+            </a>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close map"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+            >
+              <X className="w-4.5 h-4.5" />
+            </button>
+          </div>
         </div>
 
         {/* Place selector */}
