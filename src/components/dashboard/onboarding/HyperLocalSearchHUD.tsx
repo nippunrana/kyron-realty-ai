@@ -19,6 +19,9 @@ interface HyperLocalSearchHUDProps {
   isSearching: boolean;
   data: HyperLocalKbData | null;
   error?: string | null;
+  /** Which of `maxAttempts` searches is running. 1 for the only search most sessions need. */
+  attempt?: number;
+  maxAttempts?: number;
 }
 
 /**
@@ -61,7 +64,13 @@ function resolveStep(key: string, data: HyperLocalKbData): string | null {
   }
 }
 
-export function HyperLocalSearchHUD({ isSearching, data, error }: HyperLocalSearchHUDProps) {
+export function HyperLocalSearchHUD({
+  isSearching,
+  data,
+  error,
+  attempt = 1,
+  maxAttempts = 1,
+}: HyperLocalSearchHUDProps) {
   const [elapsedMs, setElapsedMs] = useState(0);
   const [activeStep, setActiveStep] = useState(0);
   const startRef = useRef<number | null>(null);
@@ -91,6 +100,8 @@ export function HyperLocalSearchHUD({ isSearching, data, error }: HyperLocalSear
   const isFailed = !isSearching && !data && Boolean(error);
   const grounded = Boolean(data?.grounded);
   const sourceCount = data?.sources?.length || 0;
+  // The first search came back with nothing to confirm, so this is the one retry it earns.
+  const isRetry = attempt > 1;
 
   const accent = isFailed
     ? "border-rose-200/80 from-rose-50/70"
@@ -123,9 +134,11 @@ export function HyperLocalSearchHUD({ isSearching, data, error }: HyperLocalSear
             </div>
             <p className="text-xs font-bold text-slate-600 truncate">
               {isSearching
-                ? "Searching Google Maps around your address…"
+                ? isRetry
+                  ? "First search found nothing — trying Google Maps once more…"
+                  : "Searching Google Maps around your address…"
                 : isFailed
-                  ? "Location research could not complete"
+                  ? `Location research could not complete after ${attempt} ${attempt === 1 ? "try" : "tries"}`
                   : grounded
                     ? `Searched Google Maps • ${sourceCount} place${sourceCount === 1 ? "" : "s"} verified`
                     : "Completed without Maps grounding — unverified"}
@@ -143,7 +156,7 @@ export function HyperLocalSearchHUD({ isSearching, data, error }: HyperLocalSear
             <span className="text-xs font-bold text-slate-400 ml-0.5">s</span>
           </div>
           <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mt-0.5">
-            {isSearching ? "Searching" : "Search time"}
+            {isSearching ? (isRetry ? `Retry ${attempt}/${maxAttempts}` : "Searching") : "Search time"}
           </div>
         </div>
       </div>

@@ -45,6 +45,8 @@ interface LivePropertyInspectorProps {
   isEnrichingLocation?: boolean;
   hyperLocalData?: HyperLocalKbData | null;
   enrichmentError?: string | null;
+  enrichmentAttempt?: number;
+  maxEnrichmentAttempts?: number;
 }
 
 export function LivePropertyInspector({
@@ -63,6 +65,8 @@ export function LivePropertyInspector({
   isEnrichingLocation = false,
   hyperLocalData = null,
   enrichmentError = null,
+  enrichmentAttempt = 1,
+  maxEnrichmentAttempts = 1,
 }: LivePropertyInspectorProps) {
   const [activeImageIdx, setActiveImageIdx] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -350,6 +354,8 @@ export function LivePropertyInspector({
                 isSearching={isEnrichingLocation}
                 data={hyperLocalData}
                 error={enrichmentError}
+                attempt={enrichmentAttempt}
+                maxAttempts={maxEnrichmentAttempts}
               />
             )}
 

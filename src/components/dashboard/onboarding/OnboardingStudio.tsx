@@ -76,6 +76,28 @@ interface OnboardingStudioProps {
   initialDraftId?: number;
 }
 
+/**
+ * The location search is one real-world Maps fetch. A second is spent only when the first
+ * came back with nothing the owner could confirm - never to refresh a result that landed.
+ */
+const MAX_ENRICHMENT_ATTEMPTS = 2;
+const ENRICHMENT_RETRY_DELAY_MS = 2500;
+
+/**
+ * Did the research name a real place? `resolvedLocality` and `grounded` are trust labels, not
+ * evidence: the structuring call can resolve a locality from the address string alone when the
+ * Maps research came back empty, so only researched places count as a usable result.
+ */
+function isUsableHyperLocalResult(data: HyperLocalKbData | null): boolean {
+  if (!data) return false;
+  return Boolean(
+    data.transit?.nearestMetro ||
+      data.transit?.majorHighways?.length ||
+      data.neighborhood?.topSchools?.length ||
+      data.neighborhood?.topHospitals?.length
+  );
+}
+
 const HUD_STORAGE_KEY = "kyron_telemetry_hud_open";
 let hudListeners: Array<() => void> = [];
 
@@ -138,7 +160,8 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
   const [isEnrichingLocation, setIsEnrichingLocation] = useState(false);
   const [enrichmentError, setEnrichmentError] = useState<string | null>(null);
   const isEnrichingLocationRef = useRef(false);
-  const hasRequestedEnrichmentRef = useRef(false);
+  const [enrichmentAttempt, setEnrichmentAttempt] = useState(0);
+  const enrichmentAttemptsRef = useRef(0);
   const pendingHyperLocalModalOpenRef = useRef(false);
   const [draftId, setDraftId] = useState<number | null>(initialDraftId || null);
   const [uploadToken, setUploadToken] = useState("");
@@ -358,80 +381,130 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
     }));
   };
 
-  // Trigger background hyper-local enrichment with Gemini 3.8 Flash
+  // Trigger background hyper-local enrichment with Gemini 3.8 Flash.
+  // Owns the whole search, retry included: every attempt after the first is scheduled from
+  // inside this loop, so any external call once it has run is a duplicate by definition.
   const triggerLocationEnrichment = useCallback(async (prop: ExtractedPropertyPayload["property"]) => {
     if (!prop.address || isEnrichingLocationRef.current) return;
-    // The search is a single real-world Maps fetch tied to core-spec confirmation. Several
-    // conversational paths can land on this call again later in the session; each one after
-    // the first is a duplicate, not a retry.
-    if (hasRequestedEnrichmentRef.current) {
-      addTelemetryLog("AI-ENRICH", "Skipped duplicate hyper-local enrichment request (already ran this session)", {
+    if (enrichmentAttemptsRef.current > 0) {
+      addTelemetryLog("AI-ENRICH", "Skipped duplicate hyper-local enrichment request (search already ran this session)", {
         address: prop.address,
+        attemptsUsed: enrichmentAttemptsRef.current,
       });
       return;
     }
-    hasRequestedEnrichmentRef.current = true;
+
     isEnrichingLocationRef.current = true;
     setIsEnrichingLocation(true);
     setEnrichmentError(null);
-    addTelemetryLog("AI-ENRICH", "Triggered background hyper-local location enrichment via Gemini 3.8 Flash", {
-      address: prop.address,
-      city: prop.city,
-    });
+
+    /** Runs one attempt. Returns true when the attempt earned another one. */
+    const runAttempt = async (attempt: number): Promise<boolean> => {
+      const isFinalAttempt = attempt >= MAX_ENRICHMENT_ATTEMPTS;
+      // Transport and server faults are transient until something proves otherwise.
+      let shouldRetry = true;
+
+      addTelemetryLog(
+        "AI-ENRICH",
+        `Hyper-local location enrichment attempt ${attempt}/${MAX_ENRICHMENT_ATTEMPTS} via Gemini 3.8 Flash`,
+        { address: prop.address, city: prop.city }
+      );
+
+      try {
+        const res = await fetch(`${BASE_PATH}/api/onboarding/enrich-location`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            address: prop.address,
+            city: prop.city,
+            state: prop.state,
+            price: prop.price,
+            listingType: prop.listingType,
+            bedrooms: prop.bedrooms,
+            bathrooms: prop.bathrooms,
+            sqft: prop.sqft,
+            propertyType: prop.propertyType,
+          }),
+        });
+
+        // A route crash returns HTML, not JSON: parsing it first would put a parser error
+        // in front of the owner instead of a readable status.
+        if (!res.ok) {
+          // A rejected address (400) and an expired session (401) fail identically however
+          // often we ask; only a server-side fault is worth a second attempt.
+          shouldRetry = res.status >= 500;
+          throw new Error(`Location research failed (${res.status}).`);
+        }
+
+        const json = await res.json();
+        if (json.success && json.data) {
+          const usable = isUsableHyperLocalResult(json.data.kbData);
+          shouldRetry = !usable;
+
+          // An empty attempt 1 is not shown to the owner: the retry is still coming, and a
+          // blank card released now would beat the real result to the screen.
+          if (usable || isFinalAttempt) {
+            setHyperLocalData(json.data.kbData);
+            hyperLocalDataRef.current = json.data.kbData;
+            setEaScript(json.data.eaScript);
+            eaScriptRef.current = json.data.eaScript;
+
+            // In-Flight Sync Gate: If Elena or owner announced hyper-local card while in-flight, release gate and open modal now!
+            if (pendingHyperLocalModalOpenRef.current) {
+              pendingHyperLocalModalOpenRef.current = false;
+              setShowHyperLocalModal(true);
+            }
+          }
+
+          addTelemetryLog(
+            "AI-ENRICH",
+            usable
+              ? `Hyper-local enrichment complete (${json.data.latencyMs}ms)`
+              : `Hyper-local enrichment attempt ${attempt} named no places (${json.data.latencyMs}ms)`,
+            {
+              metro: json.data.kbData.transit?.nearestMetro,
+              landmarks: json.data.kbData.neighborhood?.landmarks,
+              model: json.data.modelUsed,
+              grounded: json.data.grounded,
+            },
+            json.data.latencyMs,
+            usable ? "success" : "warn"
+          );
+        } else {
+          addTelemetryLog("AI-ENRICH", `Hyper-local enrichment attempt ${attempt} returned no data`, json, undefined, "warn");
+          if (shouldRetry && !isFinalAttempt) return true;
+          setEnrichmentError(json.error || "Location research returned no result.");
+        }
+      } catch (err: any) {
+        console.warn("[Location Enrichment Error]:", err);
+        addTelemetryLog("AI-ENRICH", `Hyper-local enrichment attempt ${attempt} encountered an issue`, err, undefined, "warn");
+        // A stale error must never outlive a retry that then succeeds, so it is written
+        // only once no further attempt is coming.
+        if (shouldRetry && !isFinalAttempt) return true;
+        setEnrichmentError(err?.message || "Location research could not complete.");
+      }
+
+      return shouldRetry && !isFinalAttempt;
+    };
 
     try {
-      const res = await fetch(`${BASE_PATH}/api/onboarding/enrich-location`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          address: prop.address,
-          city: prop.city,
-          state: prop.state,
-          price: prop.price,
-          listingType: prop.listingType,
-          bedrooms: prop.bedrooms,
-          bathrooms: prop.bathrooms,
-          sqft: prop.sqft,
-          propertyType: prop.propertyType,
-        }),
-      });
+      while (enrichmentAttemptsRef.current < MAX_ENRICHMENT_ATTEMPTS) {
+        const attempt = ++enrichmentAttemptsRef.current;
+        setEnrichmentAttempt(attempt);
 
-      // A route crash returns HTML, not JSON: parsing it first would put a parser error
-      // in front of the owner instead of a readable status.
-      if (!res.ok) throw new Error(`Location research failed (${res.status}).`);
-
-      const json = await res.json();
-      if (json.success && json.data) {
-        setHyperLocalData(json.data.kbData);
-        hyperLocalDataRef.current = json.data.kbData;
-        setEaScript(json.data.eaScript);
-        eaScriptRef.current = json.data.eaScript;
+        if (!(await runAttempt(attempt))) return;
 
         addTelemetryLog(
           "AI-ENRICH",
-          `Hyper-local enrichment complete (${json.data.latencyMs}ms)`,
-          {
-            metro: json.data.kbData.transit?.nearestMetro,
-            landmarks: json.data.kbData.neighborhood?.landmarks,
-            model: json.data.modelUsed,
-          },
-          json.data.latencyMs,
-          "success"
+          `Attempt ${attempt} produced nothing to confirm - retrying once in ${ENRICHMENT_RETRY_DELAY_MS}ms`,
+          null,
+          undefined,
+          "warn"
         );
-
-        // In-Flight Sync Gate: If Elena or owner announced hyper-local card while in-flight, release gate and open modal now!
-        if (pendingHyperLocalModalOpenRef.current) {
-          pendingHyperLocalModalOpenRef.current = false;
-          setShowHyperLocalModal(true);
-        }
-      } else {
-        setEnrichmentError(json.error || "Location research returned no result.");
-        addTelemetryLog("AI-ENRICH", "Hyper-local enrichment returned no data", json, undefined, "warn");
+        // The HUD stays in its searching state across the backoff so the owner sees one
+        // longer search labelled as a retry, not a result flashing red and starting over.
+        await new Promise((resolve) => setTimeout(resolve, ENRICHMENT_RETRY_DELAY_MS));
       }
-    } catch (err: any) {
-      console.warn("[Location Enrichment Error]:", err);
-      setEnrichmentError(err?.message || "Location research could not complete.");
-      addTelemetryLog("AI-ENRICH", "Hyper-local enrichment encountered an issue", err, undefined, "warn");
     } finally {
       isEnrichingLocationRef.current = false;
       setIsEnrichingLocation(false);
@@ -1314,6 +1387,8 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
             isEnrichingLocation={isEnrichingLocation}
             hyperLocalData={hyperLocalData}
             enrichmentError={enrichmentError}
+            enrichmentAttempt={enrichmentAttempt}
+            maxEnrichmentAttempts={MAX_ENRICHMENT_ATTEMPTS}
           />
         </div>
       </div>
