@@ -10,7 +10,29 @@
 [![Drizzle ORM](https://img.shields.io/badge/Drizzle-ORM-C5F74F?style=flat-square&logo=drizzle)](https://orm.drizzle.team/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 
-**[🌐 Live Production App](https://egnitech.com/projects/kyron-realty-ai)** &bull; **[🏛️ System Architecture](#️-system-architecture)** &bull; **[🎙️ Agora Voice Engine](#-agora-products--features-used)** &bull; **[🚀 Quick Start](#-quick-start)**
+<br/>
+
+[![Live Demo](https://img.shields.io/badge/🌐_Live_Demo-Visit_Production_App-2ea44f?style=for-the-badge&logo=google-chrome&logoColor=white)](https://egnitech.com/projects/kyron-realty-ai)
+
+> 🚀 **Live Production Deployment:** **[https://egnitech.com/projects/kyron-realty-ai](https://egnitech.com/projects/kyron-realty-ai)**  
+> *Experience the 24/7 AI Voice Sales Agent and conversational property onboarding live in your browser with zero setup.*
+
+<br/>
+
+**[🌐 Live Demo (egnitech.com)](https://egnitech.com/projects/kyron-realty-ai)** &bull; **[🏛️ System Architecture](#️-system-architecture)** &bull; **[🎙️ Agora Voice Engine](#-agora-products--features-used)** &bull; **[🚀 Quick Start](#-quick-start)**
+
+---
+
+## 🌐 Live Interactive Demo
+
+You can explore and test the full application live in production without local setup:
+
+🔗 **Production URL:** **[https://egnitech.com/projects/kyron-realty-ai](https://egnitech.com/projects/kyron-realty-ai)**
+
+### What you can test live:
+1. **24/7 Buyer Voice Agent (Sarah)**: Open the homepage or any public listing and click **"Talk to Agent"** to talk over Agora SD-RTN WebRTC in real time. Ask about rent, bedrooms, parking, pet policies, negotiate prices within guardrails, or schedule a tour.
+2. **Conversational Onboarding (Elena Vance)**: Navigate to the onboarding studio to experience voice-guided listing creation—intake 6 core specifications, review hyper-local transit & neighborhood data, and scan a QR code to upload photos from your smartphone.
+3. **Live Waveform & Transcripts**: Watch real-time audio frequency visualization and live transcription sync streamed directly via Agora RTM.
 
 ---
 
