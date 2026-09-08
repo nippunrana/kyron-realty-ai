@@ -19,6 +19,7 @@ export interface ExtractTurnInput {
   slidingWindowMessages: TurnMessage[];
   currentPropertyState?: Partial<ExtractedPropertyPayload["property"]>;
   currentKnowledgeBase?: Partial<ExtractedPropertyPayload["knowledgeBase"]>;
+  currentHyperLocalData?: any;
 }
 
 export interface TurnSpecUpdates {
@@ -43,6 +44,13 @@ export interface TurnSpecUpdates {
   features?: string[];
   amenities?: string[];
   pillLabels?: PillLabels;
+  // Hyper-Local Voice-First Adjustments
+  hyperLocalAdjustments?: {
+    nearestMetro?: string;
+    addLandmarks?: string[];
+    removeLandmarks?: string[];
+    notes?: string;
+  };
 }
 
 /**
@@ -54,7 +62,16 @@ export async function extractTurnSpecs(
   input: ExtractTurnInput
 ): Promise<{
   updates: TurnSpecUpdates;
-  modalAction?: "open_core" | "close_core" | "open_final" | "close_final" | "open" | "close" | "none";
+  modalAction?:
+    | "open_core"
+    | "close_core"
+    | "open_hyper_local"
+    | "close_hyper_local"
+    | "open_final"
+    | "close_final"
+    | "open"
+    | "close"
+    | "none";
   usage?: GeminiUsage;
 }> {
   const { slidingWindowMessages, currentPropertyState, currentKnowledgeBase } = input;
@@ -124,10 +141,18 @@ MANDATORY EXTRACTION WORKFLOW:
       - utilitiesPillText: e.g. "Water Included"
       - availableDatePillText: e.g. "In 14 Days"
       - hoaPillText: e.g. "₹3,500/mo Society Dues" or "No Society Dues"
-5. Determine 'modalAction':
+5. HYPER-LOCAL ADJUSTMENTS (VOICE-FIRST):
+   If the owner verbally adjusts or corrects any neighborhood, transit, or landmark detail (e.g. "The nearest metro is Sector 28", "Metro is 5 minutes away", "Remove Fortis hospital", "Add Crown Plaza Mall"), extract:
+   - nearestMetro: string or null
+   - addLandmarks: array of strings or []
+   - removeLandmarks: array of strings or []
+   - notes: string or null
+6. Determine 'modalAction':
    - "open_core": Elena or owner EXPLICITLY announces, pulls up, or asks to show the Core Specs review card (e.g. "I've pulled up your core specs review card on your screen", "open the review card", "show me the card").
      CRITICAL: If the owner or Elena is simply asking or answering regular intake questions, modalAction MUST BE "none".
    - "close_core": Owner confirms or approves the core specs (e.g. "looks good", "proceed", "confirmed", "that's right", "continue") or asks to close/minimize the review card.
+   - "open_hyper_local": Elena or owner announces or opens the hyper-local intelligence card (e.g. "According to your address and location we found this information", "open hyper-local card", "show transit details").
+   - "close_hyper_local": Owner approves or confirms hyper-local intelligence card ("looks good", "that is accurate", "proceed to photos", "continue").
    - "open_final": Elena or owner announces/opens the full specs review card or final review card (e.g. "I've pulled up your full property review card", "open review card").
    - "close_final": Owner confirms or approves the full review card, or says "All is done", "all done", "everything is done", "all set", "looks good", "proceed", or asks to close/minimize the card to move to photo upload.
    - CRITICAL SAFEGUARD: If the owner is adjusting, changing, or correcting any detail (e.g. "Actually change price to 3500", "make it 2 parking spots"), modalAction MUST BE "none" so the review card remains open on screen while values update live.
@@ -193,11 +218,22 @@ ${formattedDialogue}
                 amenities: { type: "array", items: { type: "string" } },
               },
             },
+            hyperLocalAdjustments: {
+              type: "object",
+              properties: {
+                nearestMetro: { type: "string" },
+                addLandmarks: { type: "array", items: { type: "string" } },
+                removeLandmarks: { type: "array", items: { type: "string" } },
+                notes: { type: "string" },
+              },
+            },
             modalAction: {
               type: "string",
               enum: [
                 "open_core",
                 "close_core",
+                "open_hyper_local",
+                "close_hyper_local",
                 "open_final",
                 "close_final",
                 "open",
@@ -214,6 +250,7 @@ ${formattedDialogue}
     const parsed = JSON.parse(response.text || "{}");
     const rawCore = parsed.coreSpecs || {};
     const rawAdditional = parsed.additionalSpecs || {};
+    const rawHyperLocal = parsed.hyperLocalAdjustments || {};
 
     // Filter out null, undefined, and placeholder strings
     const updates: TurnSpecUpdates = {};
@@ -304,6 +341,27 @@ ${formattedDialogue}
 
     if (Object.keys(pillLabels).length > 0) {
       updates.pillLabels = pillLabels;
+    }
+
+    // Hyper-Local Voice-First Adjustments
+    if (rawHyperLocal && typeof rawHyperLocal === "object") {
+      const nearestMetro = cleanString(rawHyperLocal.nearestMetro);
+      const addLandmarks = Array.isArray(rawHyperLocal.addLandmarks)
+        ? (rawHyperLocal.addLandmarks.map(cleanString).filter(Boolean) as string[])
+        : [];
+      const removeLandmarks = Array.isArray(rawHyperLocal.removeLandmarks)
+        ? (rawHyperLocal.removeLandmarks.map(cleanString).filter(Boolean) as string[])
+        : [];
+      const notes = cleanString(rawHyperLocal.notes);
+
+      if (nearestMetro || addLandmarks.length > 0 || removeLandmarks.length > 0 || notes) {
+        updates.hyperLocalAdjustments = {
+          ...(nearestMetro ? { nearestMetro } : {}),
+          ...(addLandmarks.length > 0 ? { addLandmarks } : {}),
+          ...(removeLandmarks.length > 0 ? { removeLandmarks } : {}),
+          ...(notes ? { notes } : {}),
+        };
+      }
     }
 
     const durationMs = Date.now() - startTime;

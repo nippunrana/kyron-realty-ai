@@ -185,6 +185,10 @@ export async function POST(req: NextRequest) {
 
       await db.insert(propertyKnowledgeBases).values({
         propertyId: insertedProperty.id,
+        city: property.city || knowledgeBase.city || null,
+        state: property.state || knowledgeBase.state || null,
+        listingType: property.listingType || knowledgeBase.listingType || "rent",
+        price: property.price ? String(property.price) : null,
         rawScrapedMarkdown: knowledgeBase.rawScrapedMarkdown || "",
         synthesizedSalesPitch: knowledgeBase.synthesizedSalesPitch || "",
         neighborhoodSummary: knowledgeBase.neighborhoodSummary || "",
@@ -194,6 +198,8 @@ export async function POST(req: NextRequest) {
         utilitiesDetail: knowledgeBase.utilitiesDetail || "",
         applicationProcess,
         faqs,
+        kbData: knowledgeBase.kbData || null,
+        eaScript: knowledgeBase.eaScript || null,
         agentTone: knowledgeBase.agentTone || "warm_professional",
         greetingMessage: knowledgeBase.greetingMessage || "",
       });

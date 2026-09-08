@@ -37,7 +37,7 @@ To prevent duplicate code or assuming features that do not yet exist:
 | **Design System** | Built | [design-system.md](docs/built-systems/design-system.md) | `src/app/globals.css` | Dual-pane light/midnight luxury dark system |
 | **Voice Agent / Agora Real-Time** | Built | [voice-agent-and-agora.md](docs/built-systems/voice-agent-and-agora.md) | `src/app/api/agora/`, `src/hooks/`, `src/components/voice/` | Agora Conversational AI Cloud Gateway + WebRTC client |
 | **Conversational Onboarding & Apify**| Built | [property-onboarding-and-apify.md](docs/built-systems/property-onboarding-and-apify.md) | `src/app/dashboard/properties/new`, `src/lib/apify-crawler.ts` | Split-screen studio + Apify crawler + KB synthesizer |
-| **Public Listing & QR Sales Agent** | Built | [public-listings-and-leads.md](docs/built-systems/public-listings-and-leads.md) | `src/app/listings/[slug]`, `src/app/api/leads/` | QR Code generator, Voice Sales Modal, Tour booking |
+| **Public Listing & Discovery** | Built | [public-listings-and-leads.md](docs/built-systems/public-listings-and-leads.md) | `src/app/listings/`, `src/app/api/properties/search/` | Search & city discovery, QR Code generator, Voice Sales Modal, Tour booking |
 
 ---
 

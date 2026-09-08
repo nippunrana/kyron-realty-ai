@@ -6,6 +6,8 @@ import { LivePropertyInspector } from "./LivePropertyInspector";
 import { PublishSuccessModal } from "./PublishSuccessModal";
 import { ReviewSpecsModal } from "./ReviewSpecsModal";
 import { ImageUploadModal } from "./ImageUploadModal";
+import { HyperLocalModal } from "./HyperLocalModal";
+import type { HyperLocalKbData } from "@/db/schema";
 import { TelemetryHUD, type TelemetryLogEvent } from "./TelemetryHUD";
 import { areCoreSpecsVerified, getCoreSpecStatus } from "./inspector-specs";
 import type { UIAction } from "@/hooks/voice-agent-types";
@@ -124,10 +126,18 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
   const [isPublishing, setIsPublishing] = useState(false);
   const [pipelineError, setPipelineError] = useState<string | null>(null);
   const [isTurnSyncing, setIsTurnSyncing] = useState(false);
-  const [onboardingStage, setOnboardingStage] = useState<"core" | "additional_specs" | "photos" | "final_review">("core");
+  const [onboardingStage, setOnboardingStage] = useState<"core" | "additional_specs" | "hyper_local" | "photos" | "final_review">("core");
   const [showCoreModal, setShowCoreModal] = useState(false);
   const [showFinalModal, setShowFinalModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showHyperLocalModal, setShowHyperLocalModal] = useState(false);
+  const [hyperLocalData, setHyperLocalData] = useState<HyperLocalKbData | null>(null);
+  const hyperLocalDataRef = useRef<HyperLocalKbData | null>(null);
+  const [, setEaScript] = useState<string | null>(null);
+  const eaScriptRef = useRef<string | null>(null);
+  const [isEnrichingLocation, setIsEnrichingLocation] = useState(false);
+  const isEnrichingLocationRef = useRef(false);
+  const pendingHyperLocalModalOpenRef = useRef(false);
   const [draftId, setDraftId] = useState<number | null>(initialDraftId || null);
   const [uploadToken, setUploadToken] = useState("");
   const [uploadUrl, setUploadUrl] = useState("");
@@ -346,12 +356,98 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
     }));
   };
 
+  // Trigger background hyper-local enrichment with Gemini 3.8 Flash
+  const triggerLocationEnrichment = useCallback(async (prop: ExtractedPropertyPayload["property"]) => {
+    if (!prop.address || isEnrichingLocationRef.current) return;
+    isEnrichingLocationRef.current = true;
+    setIsEnrichingLocation(true);
+    addTelemetryLog("AI-ENRICH", "Triggered background hyper-local location enrichment via Gemini 3.8 Flash", {
+      address: prop.address,
+      city: prop.city,
+    });
+
+    try {
+      const res = await fetch(`${BASE_PATH}/api/onboarding/enrich-location`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          address: prop.address,
+          city: prop.city,
+          state: prop.state,
+          price: prop.price,
+          listingType: prop.listingType,
+          bedrooms: prop.bedrooms,
+          bathrooms: prop.bathrooms,
+          sqft: prop.sqft,
+          propertyType: prop.propertyType,
+        }),
+      });
+
+      const json = await res.json();
+      if (json.success && json.data) {
+        setHyperLocalData(json.data.kbData);
+        hyperLocalDataRef.current = json.data.kbData;
+        setEaScript(json.data.eaScript);
+        eaScriptRef.current = json.data.eaScript;
+
+        addTelemetryLog(
+          "AI-ENRICH",
+          `Hyper-local enrichment complete (${json.data.latencyMs}ms)`,
+          {
+            metro: json.data.kbData.transit?.nearestMetro,
+            landmarks: json.data.kbData.neighborhood?.landmarks,
+            model: json.data.modelUsed,
+          },
+          json.data.latencyMs,
+          "success"
+        );
+
+        // In-Flight Sync Gate: If Elena or owner announced hyper-local card while in-flight, release gate and open modal now!
+        if (pendingHyperLocalModalOpenRef.current) {
+          pendingHyperLocalModalOpenRef.current = false;
+          setShowHyperLocalModal(true);
+        }
+      }
+    } catch (err) {
+      console.warn("[Location Enrichment Error]:", err);
+      addTelemetryLog("AI-ENRICH", "Hyper-local enrichment encountered an issue", err, undefined, "warn");
+    } finally {
+      isEnrichingLocationRef.current = false;
+      setIsEnrichingLocation(false);
+    }
+  }, [addTelemetryLog]);
+
   // Transition from Stage 1 (Core Specs) to Stage 2 (Additional Specs)
   const handleConfirmCoreSpecs = useCallback(() => {
     setShowCoreModal(false);
     pendingModalOpenRef.current = false;
     setOnboardingStage("additional_specs");
-  }, []);
+    triggerLocationEnrichment(dataRef.current.property);
+  }, [triggerLocationEnrichment]);
+
+  // Transition to Hyper-Local Intelligence (Stage 4.5)
+  const handleOpenHyperLocal = useCallback(() => {
+    setShowFinalModal(false);
+    setOnboardingStage("hyper_local");
+
+    if (hyperLocalDataRef.current) {
+      setShowHyperLocalModal(true);
+      pendingHyperLocalModalOpenRef.current = false;
+    } else if (isEnrichingLocationRef.current) {
+      addTelemetryLog("SYNC-GATE", "Hyper-Local modal latched (waiting for Gemini 3.8 Flash enrichment)", null, undefined, "warn");
+      pendingHyperLocalModalOpenRef.current = true;
+      setTimeout(() => {
+        if (pendingHyperLocalModalOpenRef.current) {
+          pendingHyperLocalModalOpenRef.current = false;
+          setShowHyperLocalModal(true);
+          addTelemetryLog("SYNC-GATE", "Released Hyper-Local sync gate via fallback timeout", null, undefined, "info");
+        }
+      }, 3000);
+    } else {
+      triggerLocationEnrichment(dataRef.current.property);
+      setShowHyperLocalModal(true);
+    }
+  }, [addTelemetryLog, triggerLocationEnrichment]);
 
   // Create or Update Draft Property in DB for photo uplink
   const createOrUpdateDraft = useCallback(async () => {
@@ -390,13 +486,20 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
     return null;
   }, [addTelemetryLog]);
 
-  // Transition from Additional Specs (Stage 4) to Photo Intake (Stage 5)
-  const handleOpenPhotoUpload = useCallback(async () => {
-    setShowFinalModal(false);
+  // Transition from Hyper-Local Intelligence (Stage 4.5) to Photo Intake (Stage 5)
+  const handleConfirmHyperLocal = useCallback(async () => {
+    setShowHyperLocalModal(false);
+    pendingHyperLocalModalOpenRef.current = false;
     setOnboardingStage("photos");
     await createOrUpdateDraft();
     setShowUploadModal(true);
   }, [createOrUpdateDraft]);
+
+  // Transition from Additional Specs (Stage 4) to Photo Intake (Stage 5) or Hyper-Local
+  const handleOpenPhotoUpload = useCallback(async () => {
+    setShowFinalModal(false);
+    handleOpenHyperLocal();
+  }, [handleOpenHyperLocal]);
 
   // Transition from Photo Intake (Stage 5) to Final Unified Review & Deploy (Stage 6)
   const handleProceedToFinalReview = useCallback(() => {
@@ -435,6 +538,12 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
       } else if (action === "close_upload_modal") {
         addTelemetryLog("MODAL-TRIGGER", "Closing Photo Upload Modal via intent", null);
         setShowUploadModal(false);
+      } else if (action === "open_hyper_local") {
+        addTelemetryLog("MODAL-TRIGGER", "Opening Hyper-Local Modal via intent", null, undefined, "success");
+        handleOpenHyperLocal();
+      } else if (action === "close_hyper_local") {
+        addTelemetryLog("MODAL-TRIGGER", "Closing Hyper-Local Modal via intent", null);
+        handleConfirmHyperLocal();
       } else if (action === "open_final_modal") {
         if (onboardingStageRef.current === "core") {
           addTelemetryLog("INTENT", "Ignored open_final_modal because stage is still core", null, undefined, "warn");
@@ -482,6 +591,8 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
             addTelemetryLog("SYNC-GATE", "Core Specs modal latched (turn extraction in-flight)", null, undefined, "warn");
             pendingModalOpenRef.current = true;
           }
+        } else if (onboardingStageRef.current === "additional_specs") {
+          handleOpenHyperLocal();
         } else if (onboardingStageRef.current === "photos") {
           setShowUploadModal(true);
         } else {
@@ -517,16 +628,20 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
         setShowCoreModal(false);
         setShowFinalModal(false);
         setShowUploadModal(false);
+        setShowHyperLocalModal(false);
         pendingModalOpenRef.current = false;
+        pendingHyperLocalModalOpenRef.current = false;
         setFinalGate(false);
         if (onboardingStageRef.current === "core" && areCoreSpecsVerified(dataRef.current.property)) {
           handleConfirmCoreSpecs();
         } else if (onboardingStageRef.current === "additional_specs") {
-          handleOpenPhotoUpload();
+          handleOpenHyperLocal();
+        } else if (onboardingStageRef.current === "hyper_local") {
+          handleConfirmHyperLocal();
         }
       }
     },
-    [handleConfirmCoreSpecs, handleOpenPhotoUpload, addTelemetryLog, setFinalGate]
+    [handleConfirmCoreSpecs, handleOpenHyperLocal, handleConfirmHyperLocal, addTelemetryLog, setFinalGate]
   );
 
   // Trailing Conflating Queue: In-flight Gemini extractions run to completion
@@ -564,6 +679,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
           slidingWindowMessages: slidingWindow,
           currentPropertyState: dataRef.current.property,
           currentKnowledgeBase: dataRef.current.knowledgeBase,
+          currentHyperLocalData: hyperLocalDataRef.current,
         }),
       });
 
@@ -596,6 +712,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
           features: newFeatures,
           amenities: newAmenities,
           pillLabels: newPillLabels,
+          hyperLocalAdjustments,
           ...propertyUpdates
         } = updates;
 
@@ -606,6 +723,41 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
 
         if (newPillLabels && Object.keys(newPillLabels).length > 0) {
           setPillLabels((prev) => ({ ...prev, ...newPillLabels }));
+        }
+
+        // Voice-First Hyper-Local Adjustments from spoken conversation
+        if (hyperLocalAdjustments) {
+          const adj = hyperLocalAdjustments;
+          setHyperLocalData((prev) => {
+            const currentKb = prev || { transit: {}, neighborhood: {}, buyerObjectionsAndPlaybook: [], searchTags: [] };
+            const updatedTransit = {
+              ...currentKb.transit,
+              ...(adj.nearestMetro ? { nearestMetro: adj.nearestMetro } : {}),
+            };
+
+            let updatedLandmarks = [...(currentKb.neighborhood?.landmarks || [])];
+            if (adj.addLandmarks && adj.addLandmarks.length > 0) {
+              updatedLandmarks = Array.from(new Set([...updatedLandmarks, ...adj.addLandmarks]));
+            }
+            if (adj.removeLandmarks && adj.removeLandmarks.length > 0) {
+              updatedLandmarks = updatedLandmarks.filter(
+                (l) => !adj.removeLandmarks?.some((r: string) => l.toLowerCase().includes(r.toLowerCase()))
+              );
+            }
+
+            const updatedNeighborhood = {
+              ...currentKb.neighborhood,
+              landmarks: updatedLandmarks,
+            };
+
+            const nextData: HyperLocalKbData = {
+              ...currentKb,
+              transit: updatedTransit,
+              neighborhood: updatedNeighborhood,
+            };
+            hyperLocalDataRef.current = nextData;
+            return nextData;
+          });
         }
 
         candidateProperty = {
@@ -699,6 +851,10 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
           }
         } else if (action === "close_core") {
           handleConfirmCoreSpecs();
+        } else if (action === "open_hyper_local") {
+          handleOpenHyperLocal();
+        } else if (action === "close_hyper_local") {
+          handleConfirmHyperLocal();
         } else if (action === "open_final") {
           if (pendingExtractionWindowRef.current || !candidateProperty.availableDate) {
             setFinalGate(true);
@@ -710,7 +866,9 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
           setShowFinalModal(false);
           setFinalGate(false);
           if (onboardingStageRef.current === "additional_specs") {
-            handleOpenPhotoUpload();
+            handleOpenHyperLocal();
+          } else if (onboardingStageRef.current === "hyper_local") {
+            handleConfirmHyperLocal();
           }
         } else if (action === "open") {
           if (onboardingStageRef.current === "core") {
@@ -719,6 +877,8 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
             } else {
               pendingModalOpenRef.current = true;
             }
+          } else if (onboardingStageRef.current === "additional_specs") {
+            handleOpenHyperLocal();
           } else {
             if (pendingExtractionWindowRef.current || !candidateProperty.availableDate) {
               setFinalGate(true);
@@ -731,7 +891,9 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
           if (onboardingStageRef.current === "core") {
             handleConfirmCoreSpecs();
           } else if (onboardingStageRef.current === "additional_specs") {
-            handleOpenPhotoUpload();
+            handleOpenHyperLocal();
+          } else if (onboardingStageRef.current === "hyper_local") {
+            handleConfirmHyperLocal();
           } else {
             setShowFinalModal(false);
             setFinalGate(false);
@@ -961,6 +1123,8 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
             greetingMessage: newKb.greetingMessage || prev.knowledgeBase.greetingMessage,
             contactEmail: newKb.contactEmail || prev.knowledgeBase.contactEmail || "",
             unknownFallbackPolicy: newKb.unknownFallbackPolicy || prev.knowledgeBase.unknownFallbackPolicy,
+            kbData: hyperLocalDataRef.current || prev.knowledgeBase.kbData,
+            eaScript: eaScriptRef.current || prev.knowledgeBase.eaScript,
           },
           negotiationMatrix: {
             ...prev.negotiationMatrix,
@@ -990,7 +1154,15 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           property: data.property,
-          knowledgeBase: data.knowledgeBase,
+          knowledgeBase: {
+            ...data.knowledgeBase,
+            city: data.property.city,
+            state: data.property.state,
+            listingType: data.property.listingType,
+            price: data.property.price,
+            kbData: hyperLocalDataRef.current || data.knowledgeBase.kbData,
+            eaScript: eaScriptRef.current || data.knowledgeBase.eaScript,
+          },
           negotiationMatrix: data.negotiationMatrix,
           draftId: draftIdRef.current,
         }),
@@ -1000,6 +1172,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
       if (json.success) {
         setShowFinalModal(false);
         setShowUploadModal(false);
+        setShowHyperLocalModal(false);
         setPublishedResult({
           property: json.property,
           qrCodeSvg: json.qrCodeSvg,
@@ -1152,6 +1325,17 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
           onToggleMute={voiceControl?.toggleMute}
         />
       )}
+
+      {/* 2.5 Hyper-Local & Transit Intelligence Modal (Stage 4.5) */}
+      <HyperLocalModal
+        isOpen={showHyperLocalModal}
+        onClose={() => setShowHyperLocalModal(false)}
+        onConfirm={handleConfirmHyperLocal}
+        data={hyperLocalData}
+        propertyAddress={data.property.address}
+        city={data.property.city || undefined}
+        isLoading={isEnrichingLocation}
+      />
 
       {/* 3. Property Photo Uplink Modal (Stage 5) */}
       <ImageUploadModal

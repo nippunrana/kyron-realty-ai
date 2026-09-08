@@ -7,6 +7,7 @@ import {
   slugify,
 } from "./listing-helpers";
 import { getGeminiApiKey, computeGeminiCost, type GeminiUsage } from "./gemini";
+import type { HyperLocalKbData } from "@/db/schema";
 
 export interface ExtractedPropertyPayload {
   property: {
@@ -56,6 +57,8 @@ export interface ExtractedPropertyPayload {
     agentTone: string;
     greetingMessage: string;
     unknownFallbackPolicy?: string;
+    kbData?: HyperLocalKbData | null;
+    eaScript?: string | null;
   };
   negotiationMatrix: {
     allowNegotiation: boolean;

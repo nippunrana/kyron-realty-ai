@@ -21,6 +21,7 @@ export interface GeminiUsage {
 }
 
 const MODEL_PRICING: Record<string, { inputRatePer1M: number; outputRatePer1M: number }> = {
+  "gemini-3.8-flash": { inputRatePer1M: 0.30, outputRatePer1M: 2.50 },
   "gemini-3.5-flash-lite": { inputRatePer1M: 0.30, outputRatePer1M: 2.50 },
   "gemini-3.1-flash-lite": { inputRatePer1M: 0.25, outputRatePer1M: 1.50 },
   "gemini-2.5-flash": { inputRatePer1M: 0.30, outputRatePer1M: 2.50 },

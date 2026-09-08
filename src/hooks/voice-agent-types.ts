@@ -43,7 +43,9 @@ export type UIAction =
   | "close_review_modal"
   | "open_review_modal"
   | "open_upload_modal"
-  | "close_upload_modal";
+  | "close_upload_modal"
+  | "open_hyper_local"
+  | "close_hyper_local";
 
 export interface UseAgoraVoiceAgentOptions {
   onCallEnd?: (transcript: VoiceMessage[]) => void;

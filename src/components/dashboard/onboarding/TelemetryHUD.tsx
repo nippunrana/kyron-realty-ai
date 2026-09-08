@@ -28,6 +28,7 @@ export interface TelemetryLogEvent {
     | "STATE-UPDATE"
     | "MODAL-TRIGGER"
     | "DISCONNECT-SYNTHESIS"
+    | "AI-ENRICH"
     | "ERROR";
   title: string;
   details?: any;

@@ -189,7 +189,13 @@ STAGE 4 REVIEW: FULL PROPERTY SPECS REVIEW WINDOW
 - Once the owner answers both question bundles for additional specs, summarize the extra details concisely in 1 sentence, and state that you have pulled up the full property review window on their screen showing both their core and additional specs:
   "Wonderful, that covers all our additional specifications! I've pulled up your full property review card on your screen right now with all of your core and additional details. Take a look and let me know if you'd like to adjust anything, or if all is done."
 - CONTINUOUS VERBAL ADJUSTMENTS: If the owner asks to change or adjust ANY detail (core spec like price, address, bedrooms, or additional spec like parking, pets, utilities, move-in timing), acknowledge and confirm the change warmly (e.g. "Got it, I've updated the rent to ₹95,000 for you"). Keep the review card open on screen while they make changes.
-- VERBAL CLOSURE TO PHOTO INTAKE: When the owner confirms the review card, or says "All is done", "all done", "looks good", "everything is done", "proceed", "continue", or "ready for photos", enthusiastically close the specs review card and open the photo upload window:
+- VERBAL CLOSURE TO HYPER-LOCAL INTELLIGENCE: When the owner confirms the review card, or says "All is done", "all done", "looks good", "everything is done", "proceed", or "continue", transition into the hyper-local discovery card:
+  "According to your address and location, we found this neighborhood and transit information. Take a look at your screen and tell me if this is accurate, or if you'd like to adjust anything before we move to photos."
+
+STAGE 4.5: HYPER-LOCAL & TRANSIT INTELLIGENCE REVIEW
+- You have live programmatic control over the Hyper-Local modal on screen.
+- If the owner verbally adjusts any detail (e.g. "The metro is Sector 28", "Metro is 5 minutes away", "Remove Fortis hospital"), acknowledge and confirm the change warmly (e.g. "Got it, I've updated the nearest metro to Sector 28 for you").
+- VERBAL CLOSURE TO PHOTO INTAKE: When the owner confirms or says "looks good", "accurate", "proceed", "continue", or "ready for photos", enthusiastically close the hyper-local card and open the photo upload window:
   "Awesome! Everything is locked in. I've opened up your photo upload window on your screen right now. Please select the photos from your computer that you want to attach to this property, or scan the QR code to upload them straight from your phone."
 
 STAGE 5: PROPERTY PHOTO INTAKE
@@ -212,9 +218,13 @@ VOICE DELIVERY GUIDELINES:
       kbRecord?.greetingMessage ||
       `Hello! Thanks for your interest in ${propertyTitle}. Are you looking to move in this month?`;
 
-    const faqsText = (kbRecord?.faqs || [])
-      .map((f: any) => `Q: ${f.question}\nA: ${f.answer}`)
-      .join("\n\n");
+    // If pre-compiled EA script from Gemini 3.8 Flash exists on the knowledge base, use it directly
+    if (kbRecord?.eaScript && typeof kbRecord.eaScript === "string" && kbRecord.eaScript.trim().length > 80) {
+      systemPrompt = kbRecord.eaScript.trim();
+    } else {
+      const faqsText = (kbRecord?.faqs || [])
+        .map((f: any) => `Q: ${f.question}\nA: ${f.answer}`)
+        .join("\n\n");
 
     const concessionRules: Array<{ condition: string; concession: string }> =
       matrixRecord?.concessionRules?.length ? matrixRecord.concessionRules : demo ? [...demo.concessionRules] : [];
@@ -271,6 +281,7 @@ RULES OF ENGAGEMENT:
 4. When the buyer is interested, proactively offer two time slots to book an in-person viewing.
 ${contactEmail ? `5. If asked for direct owner or leasing office contact, provide the verified contact email: ${contactEmail}.` : ""}
     `.trim();
+    }
   }
 
   // 4. Register Voice Session in Database (agoraSessionId is filled with the remote agent id after join)

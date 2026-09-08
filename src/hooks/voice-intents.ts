@@ -16,6 +16,8 @@ const USER_APPROVE =
 
 const ASSISTANT_OPEN_CORE =
   /(pull|bring|open|show|display).*(core specs|core details|6 core).*(screen|for you|back up|take a look|right now)/i;
+const ASSISTANT_OPEN_HYPER_LOCAL =
+  /(found this neighborhood|neighborhood and transit|hyper[- ]?local|transit information).*(screen|for you|take a look|tell me if this is accurate)/i;
 const ASSISTANT_OPEN_PHOTOS =
   /(pull|bring|open|show|display).*(photo|photos|image|images|upload window|upload modal).*(screen|for you|right now)/i;
 const ASSISTANT_OPEN_FINAL =
@@ -39,6 +41,7 @@ export function detectUserModalIntent(text: string): UIAction | null {
 export function detectAssistantModalIntent(text: string): UIAction | null {
   if (ASSISTANT_CLOSE.test(text)) return "close_review_modal";
   if (ASSISTANT_OPEN_CORE.test(text)) return "open_core_modal";
+  if (ASSISTANT_OPEN_HYPER_LOCAL.test(text)) return "open_hyper_local";
   if (ASSISTANT_OPEN_PHOTOS.test(text)) return "open_upload_modal";
   if (ASSISTANT_OPEN_FINAL.test(text)) return "open_final_modal";
   if (ASSISTANT_OPEN_GENERIC.test(text)) return "open_review_modal";

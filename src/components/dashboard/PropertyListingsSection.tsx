@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import {
   Building2,
@@ -15,6 +15,9 @@ import {
   Trash2,
   ArrowRight,
   FileEdit,
+  Search,
+  X,
+  SlidersHorizontal,
 } from "lucide-react";
 import { DeletePropertyModal } from "./DeletePropertyModal";
 import { BASE_PATH } from "@/lib/base-path";
@@ -43,6 +46,8 @@ interface PropertyListingsSectionProps {
 export function PropertyListingsSection({ initialProperties }: PropertyListingsSectionProps) {
   const [items, setItems] = useState<ListingCardItem[]>(initialProperties);
   const [activeTab, setActiveTab] = useState<"published" | "drafts">("published");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCity, setSelectedCity] = useState("all");
   const [propertyToDelete, setPropertyToDelete] = useState<ListingCardItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -50,7 +55,36 @@ export function PropertyListingsSection({ initialProperties }: PropertyListingsS
   const publishedItems = items.filter((item) => item.status !== "draft");
   const draftItems = items.filter((item) => item.status === "draft");
 
-  const displayedItems = activeTab === "published" ? publishedItems : draftItems;
+  const tabItems = activeTab === "published" ? publishedItems : draftItems;
+
+  // Extract unique cities from current tab's items
+  const availableCities = useMemo(() => {
+    const citiesSet = new Set<string>();
+    tabItems.forEach((item) => {
+      if (item.city && item.city.trim()) {
+        citiesSet.add(item.city.trim());
+      }
+    });
+    return Array.from(citiesSet).sort();
+  }, [tabItems]);
+
+  // Filter items by city and search query
+  const displayedItems = useMemo(() => {
+    return tabItems.filter((item) => {
+      if (selectedCity !== "all") {
+        const itemCity = item.city?.toLowerCase() || "";
+        if (itemCity !== selectedCity.toLowerCase()) return false;
+      }
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchTitle = item.title?.toLowerCase().includes(q);
+        const matchAddress = item.address?.toLowerCase().includes(q);
+        const matchCity = item.city?.toLowerCase().includes(q);
+        if (!matchTitle && !matchAddress && !matchCity) return false;
+      }
+      return true;
+    });
+  }, [tabItems, selectedCity, searchQuery]);
 
   const handleDeleteConfirm = async () => {
     if (!propertyToDelete) return;
@@ -164,8 +198,72 @@ export function PropertyListingsSection({ initialProperties }: PropertyListingsS
         )}
       </div>
 
+      {/* Search & City Filter Bar */}
+      {tabItems.length > 0 && (
+        <div className="mb-6 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+          {/* Search Input */}
+          <div className="relative flex-1 max-w-md">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by title, address, or city..."
+              className="w-full pl-9 pr-9 py-2 rounded-2xl bg-white border border-slate-200 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-xs"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* City Filter Pills */}
+          {availableCities.length > 0 && (
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+              <span className="text-[11px] font-semibold text-slate-400 flex items-center gap-1 shrink-0 mr-1">
+                <SlidersHorizontal className="w-3 h-3" />
+                <span>City:</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedCity("all")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                  selectedCity === "all"
+                    ? "bg-slate-900 text-white shadow-xs"
+                    : "bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300"
+                }`}
+              >
+                All Cities ({tabItems.length})
+              </button>
+              {availableCities.map((c) => {
+                const count = tabItems.filter((i) => i.city?.toLowerCase() === c.toLowerCase()).length;
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setSelectedCity(c)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                      selectedCity.toLowerCase() === c.toLowerCase()
+                        ? "bg-blue-600 text-white shadow-xs"
+                        : "bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300"
+                    }`}
+                  >
+                    {c} ({count})
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Grid or Zero State */}
-      {displayedItems.length === 0 ? (
+      {tabItems.length === 0 ? (
         <div className="bg-white rounded-3xl p-8 sm:p-12 border border-slate-200/90 shadow-sm text-center flex flex-col items-center justify-center">
           <div className="w-16 h-16 rounded-3xl bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center mb-4 shadow-sm">
             {activeTab === "published" ? (
@@ -191,6 +289,28 @@ export function PropertyListingsSection({ initialProperties }: PropertyListingsS
             <Sparkles className="w-4 h-4" />
             <span>Launch Onboarding Studio</span>
           </Link>
+        </div>
+      ) : displayedItems.length === 0 ? (
+        <div className="bg-white rounded-3xl p-8 sm:p-12 border border-slate-200/90 shadow-sm text-center flex flex-col items-center justify-center">
+          <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-500 flex items-center justify-center mb-3">
+            <Search className="w-5 h-5" />
+          </div>
+          <h3 className="text-base font-bold text-slate-900 mb-1">
+            No matching properties found
+          </h3>
+          <p className="text-xs text-slate-500 max-w-sm mb-4">
+            We couldn&apos;t find any {activeTab} properties matching your current search or city filter.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setSearchQuery("");
+              setSelectedCity("all");
+            }}
+            className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
+          >
+            Reset Filters
+          </button>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

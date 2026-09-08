@@ -74,6 +74,26 @@ export const propertyMedia = pgTable("property_media", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export interface HyperLocalKbData {
+  transit?: {
+    nearestMetro?: string;
+    majorHighways?: string[];
+    commuteConnectivity?: string;
+  };
+  neighborhood?: {
+    landmarks?: string[];
+    topSchools?: string[];
+    topHospitals?: string[];
+    vibeAndLivability?: string;
+  };
+  buyerObjectionsAndPlaybook?: Array<{
+    topic: string;
+    likelyQuestion: string;
+    voiceAgentRecommendedAnswer: string;
+  }>;
+  searchTags?: string[];
+}
+
 // ==========================================
 // 3. PROPERTY KNOWLEDGE BASES (RAG & VOICE AGENT BRAIN)
 // ==========================================
@@ -81,6 +101,12 @@ export const propertyKnowledgeBases = pgTable("property_knowledge_bases", {
   id: serial("id").primaryKey(),
   propertyId: integer("property_id").notNull().unique().references(() => properties.id, { onDelete: "cascade" }),
   
+  // Fast Search & Filter Columns
+  city: text("city"),
+  state: text("state"),
+  listingType: text("listing_type"),
+  price: numeric("price", { precision: 12, scale: 2 }),
+
   // Raw and Synthesized Content
   rawScrapedMarkdown: text("raw_scraped_markdown"),
   synthesizedSalesPitch: text("synthesized_sales_pitch"),
@@ -94,6 +120,10 @@ export const propertyKnowledgeBases = pgTable("property_knowledge_bases", {
   // Structured FAQ Array for Real-Time LLM Context
   faqs: jsonb("faqs").$type<Array<{ question: string; answer: string; category: string }>>().default([]),
   
+  // Enriched Hyper-Local Document & Compiled Estate Agent Script
+  kbData: jsonb("kb_data").$type<HyperLocalKbData>(),
+  eaScript: text("ea_script"),
+
   // Agent Persona Settings
   agentTone: text("agent_tone").default("warm_professional"),
   greetingMessage: text("greeting_message"),

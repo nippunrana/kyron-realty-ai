@@ -65,6 +65,13 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
             <Sparkles className="w-3.5 h-3.5 text-blue-600" />
             Intelligence Workspace
           </span>
+
+          <Link
+            href="/listings"
+            className="hidden sm:inline-flex items-center gap-1 text-xs font-semibold text-slate-600 hover:text-blue-600 px-2.5 py-1 rounded-lg hover:bg-slate-100 transition-colors"
+          >
+            <span>Public Listings</span>
+          </Link>
         </div>
 
         {/* User Profile & Sign Out */}
