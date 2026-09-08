@@ -9,7 +9,7 @@ interface PlaceChipProps {
   data: HyperLocalKbData | null | undefined;
   /** Absent when no map key is configured, which hides the map affordance entirely. */
   onViewOnMap?: (name: string, mode: "walk" | "drive") => void;
-  /** Compact drops the map button and tightens padding, for the inspector HUD. */
+  /** Compact drops the standalone map button and tightens padding, for the inspector HUD. */
   compact?: boolean;
 }
 
@@ -42,7 +42,7 @@ export function PlaceChip({ name, data, onViewOnMap, compact = false }: PlaceChi
           pill.mode === "walk" ? "text-emerald-700" : "text-blue-700"
         }`;
 
-        return onViewOnMap && !compact ? (
+        return onViewOnMap ? (
           <button
             key={pill.mode}
             type="button"

@@ -22,7 +22,8 @@ import {
 } from "lucide-react";
 import { distancePills, findDistance } from "./distance-display";
 import { PlaceChip } from "./PlaceChip";
-import { LocationMapModal, getMapEmbedKey } from "./LocationMapModal";
+import { LocationMapModal } from "./LocationMapModal";
+import { buildMapOrigin, getMapEmbedKey } from "./map-embed";
 import { buildDirectionsUrl, buildPlaceUrl } from "./maps-links";
 
 interface HyperLocalModalProps {
@@ -58,7 +59,7 @@ export function HyperLocalModal({
   // The map is free and unlimited, but needs its own public browser key; without one the
   // affordance is hidden rather than rendering a broken frame.
   const mapEnabled = Boolean(getMapEmbedKey());
-  const mapOrigin = [propertyAddress, city, "India"].filter(Boolean).join(", ");
+  const mapOrigin = buildMapOrigin(propertyAddress, city);
 
   /** Keyless fallback: always available, even with no embed key configured. */
   const openInGoogleMaps = (name: string | null, mode: "walk" | "drive" = "drive") => {

@@ -3,18 +3,8 @@
 import { useState } from "react";
 import { X, MapPin, Footprints, Car, Building2, ExternalLink } from "lucide-react";
 import { buildDirectionsUrl, buildPlaceUrl } from "./maps-links";
+import { buildEmbedSrc, buildMapOrigin, getMapEmbedKey } from "./map-embed";
 import type { HyperLocalKbData, NearbyPlaceDistance } from "@/db/schema";
-
-/**
- * Maps Embed API is free with unlimited usage, unlike the metered Routes API that measured
- * the distances. It needs its own browser key: this one is inlined into the page at build
- * time and is publicly visible, so it must be referrer-restricted and must never be the
- * server-side Routes key. Absent key = the whole map affordance is hidden by the callers.
- */
-export function getMapEmbedKey(): string {
-  // Referenced literally so `next build` can inline it; a dynamic lookup would not be replaced.
-  return (process.env.NEXT_PUBLIC_GOOGLE_MAPS_EMBED_KEY || "").trim();
-}
 
 interface LocationMapModalProps {
   isOpen: boolean;
@@ -42,24 +32,14 @@ export function LocationMapModal({
   if (!isOpen) return null;
 
   const key = getMapEmbedKey();
-  const origin = [propertyAddress, city, "India"].filter(Boolean).join(", ");
+  const origin = buildMapOrigin(propertyAddress, city);
   const places = (data?.nearbyDistances || []).filter(
     (p) => p.walkMeters !== undefined || p.driveMeters !== undefined
   );
 
   const current = selected ? places.find((p) => p.name === selected) : null;
 
-  // Directions mode when a place is chosen (it draws the route and labels distance and time),
-  // otherwise a plain pin on the property.
-  const src = current
-    ? `https://www.google.com/maps/embed/v1/directions?key=${key}` +
-      `&origin=${encodeURIComponent(origin)}` +
-      // placeId is exact; the name is a fallback for a place that never carried one.
-      `&destination=${encodeURIComponent(
-        current.placeId ? `place_id:${current.placeId}` : `${current.name}, ${city || ""}`
-      )}` +
-      `&mode=${mode === "walk" ? "walking" : "driving"}`
-    : `https://www.google.com/maps/embed/v1/place?key=${key}&q=${encodeURIComponent(origin)}`;
+  const src = buildEmbedSrc({ key, origin, place: current, mode, city });
 
   const grouped: Array<[string, NearbyPlaceDistance[]]> = [
     ["Transit", places.filter((p) => p.category === "transit")],

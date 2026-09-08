@@ -16,6 +16,10 @@ import {
 } from "lucide-react";
 import type { HyperLocalKbData } from "@/db/schema";
 import { PlaceChip } from "./PlaceChip";
+import { InlineLocationMap } from "./InlineLocationMap";
+import { findDistance } from "./distance-display";
+import { buildMapOrigin, getMapEmbedKey } from "./map-embed";
+import { buildDirectionsUrl, buildPlaceUrl } from "./maps-links";
 
 interface HyperLocalSearchHUDProps {
   isSearching: boolean;
@@ -24,6 +28,9 @@ interface HyperLocalSearchHUDProps {
   /** Which of `maxAttempts` searches is running. 1 for the only search most sessions need. */
   attempt?: number;
   maxAttempts?: number;
+  /** The map origin. Absent address = no map, since there is nothing to centre it on. */
+  propertyAddress?: string;
+  city?: string;
 }
 
 /**
@@ -74,9 +81,15 @@ export function HyperLocalSearchHUD({
   error,
   attempt = 1,
   maxAttempts = 1,
+  propertyAddress,
+  city,
 }: HyperLocalSearchHUDProps) {
   const [elapsedMs, setElapsedMs] = useState(0);
   const [activeStep, setActiveStep] = useState(0);
+  const [mapTarget, setMapTarget] = useState<{ name: string | null; mode: "walk" | "drive" }>({
+    name: null,
+    mode: "drive",
+  });
   const startRef = useRef<number | null>(null);
 
   // Timer: restarts on every idle -> searching transition, freezes on the last value when done.
@@ -106,6 +119,21 @@ export function HyperLocalSearchHUD({
   const sourceCount = data?.sources?.length || 0;
   // The first search came back with nothing to confirm, so this is the one retry it earns.
   const isRetry = attempt > 1;
+
+  const mapOrigin = propertyAddress ? buildMapOrigin(propertyAddress, city) : "";
+  // The embedded map is free and unlimited but needs its own public browser key. Without one
+  // the chips still reach Google Maps, just as plain keyless links in a new tab.
+  const embedEnabled = Boolean(mapOrigin) && Boolean(getMapEmbedKey());
+  const openInGoogleMaps = (name: string, mode: "walk" | "drive") => {
+    const place = findDistance(data, name);
+    const url = place ? buildDirectionsUrl(mapOrigin, place, mode) : buildPlaceUrl(mapOrigin);
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+  const viewOnMap = !mapOrigin
+    ? undefined
+    : embedEnabled
+      ? (name: string, mode: "walk" | "drive") => setMapTarget({ name, mode })
+      : openInGoogleMaps;
 
   const accent = isFailed
     ? "border-rose-200/80 from-rose-50/70"
@@ -197,7 +225,13 @@ export function HyperLocalSearchHUD({
                   <div className="flex flex-wrap gap-1 mt-1">
                     {names.map((name) =>
                       measurable ? (
-                        <PlaceChip key={name} name={name} data={data} compact />
+                        <PlaceChip
+                          key={name}
+                          name={name}
+                          data={data}
+                          onViewOnMap={isDone ? viewOnMap : undefined}
+                          compact
+                        />
                       ) : (
                         <span
                           key={name}
@@ -228,6 +262,18 @@ export function HyperLocalSearchHUD({
           );
         })}
       </div>
+
+      {/* The map itself: property pin by default, a drawn route once a place chip is clicked. */}
+      {isDone && embedEnabled && (
+        <InlineLocationMap
+          data={data}
+          origin={mapOrigin}
+          city={city}
+          selectedName={mapTarget.name}
+          mode={mapTarget.mode}
+          onChange={(name, mode) => setMapTarget({ name, mode })}
+        />
+      )}
 
       {/* Distances were skipped entirely: say so rather than letting the row read as "none found". */}
       {isDone && data?.distancesMeasured === false && (

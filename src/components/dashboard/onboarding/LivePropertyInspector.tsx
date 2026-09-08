@@ -356,6 +356,8 @@ export function LivePropertyInspector({
                 error={enrichmentError}
                 attempt={enrichmentAttempt}
                 maxAttempts={maxEnrichmentAttempts}
+                propertyAddress={property.address}
+                city={property.city || undefined}
               />
             )}
 
