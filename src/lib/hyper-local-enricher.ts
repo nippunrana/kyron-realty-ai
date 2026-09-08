@@ -125,7 +125,11 @@ export async function enrichPropertyLocationWithAI(
   }
 
   const ai = new GoogleGenAI({ apiKey });
-  const preferredModel = process.env.GEMINI_ENRICHMENT_MODEL || process.env.GEMINI_MODEL || "gemini-3.8-flash";
+  const preferredModel =
+    process.env.GEMINI_ENRICHMENT_MODEL || process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
+  // Deliberately a different model than the primary, so a model-specific outage has somewhere to go.
+  const fallbackModel =
+    preferredModel === "gemini-3.5-flash-lite" ? "gemini-3.8-flash" : "gemini-3.5-flash-lite";
   const startTime = Date.now();
 
   const fullLocation = [input.address, input.city, input.state, "India"].filter(Boolean).join(", ");
@@ -146,9 +150,9 @@ export async function enrichPropertyLocationWithAI(
     research = await researchAreaWithMaps(ai, preferredModel, fullLocation);
   } catch (primaryErr: any) {
     console.warn(
-      `[Hyper-Local Enricher] Maps research on ${preferredModel} failed (${primaryErr?.message}). Falling back to gemini-3.5-flash-lite...`
+      `[Hyper-Local Enricher] Maps research on ${preferredModel} failed (${primaryErr?.message}). Falling back to ${fallbackModel}...`
     );
-    modelUsed = "gemini-3.5-flash-lite";
+    modelUsed = fallbackModel;
     try {
       research = await researchAreaWithMaps(ai, modelUsed, fullLocation);
     } catch (fallbackErr: any) {
