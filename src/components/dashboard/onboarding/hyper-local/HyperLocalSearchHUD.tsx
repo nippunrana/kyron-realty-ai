@@ -12,8 +12,10 @@ import {
   MinusCircle,
   AlertTriangle,
   ShieldCheck,
+  Ruler,
 } from "lucide-react";
 import type { HyperLocalKbData } from "@/db/schema";
+import { formatDistance, findDistance } from "./distance-display";
 
 interface HyperLocalSearchHUDProps {
   isSearching: boolean;
@@ -25,7 +27,7 @@ interface HyperLocalSearchHUDProps {
 }
 
 /**
- * The five categories the Maps research prompt in `src/lib/hyper-local-enricher.ts` actually
+ * The five categories the Maps research prompt in `src/lib/hyper-local/research.ts` actually
  * looks up. The enrichment API is a single opaque await, so in-flight rows are shown as a
  * moving focus only - nothing is marked found or empty until the real result lands.
  */
@@ -35,6 +37,7 @@ const RESEARCH_STEPS = [
   { key: "highways", icon: Navigation, label: "Highways & arterial roads" },
   { key: "schools", icon: School, label: "Schools nearby" },
   { key: "hospitals", icon: Hospital, label: "Hospitals nearby" },
+  { key: "distances", icon: Ruler, label: "Measuring walk & drive distances" },
 ] as const;
 
 function formatElapsed(ms: number) {
@@ -58,6 +61,18 @@ function resolveStep(key: string, data: HyperLocalKbData): string | null {
     case "hospitals": {
       const list = data.neighborhood?.topHospitals || [];
       return list.length ? list.join(" • ") : null;
+    }
+    case "distances": {
+      // Only rows Routes actually routed count; a named place with no route is not a measurement.
+      const measured = (data.nearbyDistances || []).filter(
+        (d) => d.walkMeters !== undefined || d.driveMeters !== undefined
+      );
+      if (!measured.length) return null;
+      const metro = data.transit?.nearestMetro
+        ? formatDistance(findDistance(data, data.transit.nearestMetro))
+        : null;
+      const lead = metro ? `nearest transit ${metro.label}` : `${measured.length} places measured`;
+      return `${measured.length} measured • ${lead}`;
     }
     default:
       return null;
@@ -135,7 +150,7 @@ export function HyperLocalSearchHUD({
             <p className="text-xs font-bold text-slate-600 truncate">
               {isSearching
                 ? isRetry
-                  ? "First search found nothing — trying Google Maps once more…"
+                  ? "First search didn't come back — trying Google Maps once more…"
                   : "Searching Google Maps around your address…"
                 : isFailed
                   ? `Location research could not complete after ${attempt} ${attempt === 1 ? "try" : "tries"}`
@@ -203,6 +218,16 @@ export function HyperLocalSearchHUD({
           );
         })}
       </div>
+
+      {/* Distances were skipped entirely: say so rather than letting the row read as "none found". */}
+      {isDone && data?.distancesMeasured === false && (
+        <div className="px-3.5 py-2 bg-slate-50 border-t border-slate-100 flex items-start gap-1.5">
+          <Ruler className="w-3.5 h-3.5 text-slate-400 mt-px shrink-0" />
+          <p className="text-[10px] font-semibold text-slate-500">
+            Distance measurement unavailable — places are listed without distances.
+          </p>
+        </div>
+      )}
 
       {/* Trust footer: grounding status, or the failure reason */}
       {isFailed ? (

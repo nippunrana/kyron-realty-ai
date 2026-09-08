@@ -23,7 +23,7 @@ import type { PillLabels } from "@/lib/turn-extractor";
 import { VerificationChecklist } from "./VerificationChecklist";
 import { buildAdditionalSpecs, buildChecklistItems } from "./inspector-specs";
 import { ExtraSpecsSuggestionBar } from "./ExtraSpecsSuggestionBar";
-import { HyperLocalSearchHUD } from "./HyperLocalSearchHUD";
+import { HyperLocalSearchHUD } from "./hyper-local/HyperLocalSearchHUD";
 import type { HyperLocalKbData } from "@/db/schema";
 
 interface LivePropertyInspectorProps {

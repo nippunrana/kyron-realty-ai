@@ -15,7 +15,10 @@ import {
   ShieldCheck,
   Radio,
   MapPin,
+  Footprints,
+  Car,
 } from "lucide-react";
+import { formatDistance, findDistance } from "./distance-display";
 
 interface HyperLocalModalProps {
   isOpen: boolean;
@@ -43,6 +46,23 @@ export function HyperLocalModal({
   const transit = data?.transit || {};
   const neighborhood = data?.neighborhood || {};
   const objections = data?.buyerObjectionsAndPlaybook || [];
+
+  // Names come from the string lists; the distance is an annotation that renders only when
+  // Routes actually measured that place.
+  const PlaceChip = ({ name }: { name: string }) => {
+    const dist = formatDistance(findDistance(data, name));
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-800 text-xs font-medium">
+        <span>{name}</span>
+        {dist && (
+          <span className="inline-flex items-center gap-1 pl-1.5 border-l border-slate-200 text-[11px] font-semibold text-emerald-700">
+            {dist.mode === "walk" ? <Footprints className="w-3 h-3" /> : <Car className="w-3 h-3" />}
+            {dist.label}
+          </span>
+        )}
+      </span>
+    );
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
@@ -128,6 +148,15 @@ export function HyperLocalModal({
                       <div className="text-xs font-bold text-slate-900 mt-0.5">
                         {transit.nearestMetro}
                       </div>
+                      {(() => {
+                        const dist = formatDistance(findDistance(data, transit.nearestMetro || ""));
+                        return dist ? (
+                          <div className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700">
+                            {dist.mode === "walk" ? <Footprints className="w-3 h-3" /> : <Car className="w-3 h-3" />}
+                            {dist.label}
+                          </div>
+                        ) : null;
+                      })()}
                     </div>
                   </div>
                 ) : (
@@ -175,12 +204,7 @@ export function HyperLocalModal({
                     </div>
                     <div className="flex flex-wrap gap-1.5">
                       {neighborhood.topSchools.map((sch, i) => (
-                        <span
-                          key={i}
-                          className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-800 text-xs font-medium"
-                        >
-                          {sch}
-                        </span>
+                        <PlaceChip key={i} name={sch} />
                       ))}
                     </div>
                   </div>
@@ -195,12 +219,7 @@ export function HyperLocalModal({
                     </div>
                     <div className="flex flex-wrap gap-1.5">
                       {neighborhood.topHospitals.map((hosp, i) => (
-                        <span
-                          key={i}
-                          className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-800 text-xs font-medium"
-                        >
-                          {hosp}
-                        </span>
+                        <PlaceChip key={i} name={hosp} />
                       ))}
                     </div>
                   </div>

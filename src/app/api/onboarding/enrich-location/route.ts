@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { enrichPropertyLocationWithAI } from "@/lib/hyper-local-enricher";
+import { enrichPropertyLocationWithAI } from "@/lib/hyper-local";
 
 export async function POST(req: NextRequest) {
   try {

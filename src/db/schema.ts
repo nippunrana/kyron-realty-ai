@@ -74,6 +74,24 @@ export const propertyMedia = pgTable("property_media", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+/**
+ * One measured travel distance from the property to a nearby place.
+ *
+ * Sourced ONLY from Google Routes API Compute Route Matrix, keyed on the Google Maps
+ * placeId that Gemini's Maps grounding returned. Never populated from model estimates.
+ */
+export interface NearbyPlaceDistance {
+  /** Google Maps placeId the distance was measured against. */
+  placeId: string;
+  /** Place name as shown to the owner, matching the string lists below. */
+  name: string;
+  category: "transit" | "school" | "hospital";
+  walkMeters?: number;
+  walkSeconds?: number;
+  driveMeters?: number;
+  driveSeconds?: number;
+}
+
 export interface HyperLocalKbData {
   /** The locality Google Maps resolved the address to, echoed back so the owner can catch a bad match. */
   resolvedLocality?: string;
@@ -84,6 +102,14 @@ export interface HyperLocalKbData {
   grounded?: boolean;
   /** Google Maps place records backing the content above; required for Maps attribution. */
   sources?: Array<{ title: string; uri: string; placeId?: string }>;
+  /**
+   * Measured walk/drive distances for the places named below. Additive: the string lists
+   * stay authoritative for names, this only annotates them. Absent on rows enriched
+   * before distance measurement existed, and whenever `distancesMeasured` is false.
+   */
+  nearbyDistances?: NearbyPlaceDistance[];
+  /** False when Routes API was unconfigured or unreachable, so distances are simply absent. */
+  distancesMeasured?: boolean;
   transit?: {
     nearestMetro?: string;
     majorHighways?: string[];

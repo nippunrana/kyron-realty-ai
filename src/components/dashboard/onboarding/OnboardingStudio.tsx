@@ -6,7 +6,7 @@ import { LivePropertyInspector } from "./LivePropertyInspector";
 import { PublishSuccessModal } from "./PublishSuccessModal";
 import { ReviewSpecsModal } from "./ReviewSpecsModal";
 import { ImageUploadModal } from "./ImageUploadModal";
-import { HyperLocalModal } from "./HyperLocalModal";
+import { HyperLocalModal } from "./hyper-local/HyperLocalModal";
 import type { HyperLocalKbData } from "@/db/schema";
 import { TelemetryHUD, type TelemetryLogEvent } from "./TelemetryHUD";
 import { areCoreSpecsVerified, getCoreSpecStatus } from "./inspector-specs";
@@ -466,6 +466,8 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
               landmarks: json.data.kbData.neighborhood?.landmarks,
               model: json.data.modelUsed,
               grounded: json.data.grounded,
+              distancesMeasured: json.data.distancesMeasured,
+              placesMeasured: json.data.kbData.nearbyDistances?.length || 0,
             },
             json.data.latencyMs,
             usable ? "success" : "warn"
