@@ -15,7 +15,7 @@ import {
   Ruler,
 } from "lucide-react";
 import type { HyperLocalKbData } from "@/db/schema";
-import { formatDistance, findDistance } from "./distance-display";
+import { PlaceChip } from "./PlaceChip";
 
 interface HyperLocalSearchHUDProps {
   isSearching: boolean;
@@ -37,6 +37,8 @@ const RESEARCH_STEPS = [
   { key: "highways", icon: Navigation, label: "Highways & arterial roads" },
   { key: "schools", icon: School, label: "Schools nearby" },
   { key: "hospitals", icon: Hospital, label: "Hospitals nearby" },
+  // Progress only. Once measured, distances render inline on the rows above, so this row is
+  // dropped rather than repeating them as a summary.
   { key: "distances", icon: Ruler, label: "Measuring walk & drive distances" },
 ] as const;
 
@@ -44,38 +46,25 @@ function formatElapsed(ms: number) {
   return (ms / 1000).toFixed(2);
 }
 
-function resolveStep(key: string, data: HyperLocalKbData): string | null {
+/**
+ * The names a finished step resolved to. Rendered as one chip per place so each can carry
+ * its own measured distance, rather than a single joined line with the distances orphaned
+ * in a row of their own.
+ */
+function resolveStep(key: string, data: HyperLocalKbData): string[] {
   switch (key) {
     case "locality":
-      return data.resolvedLocality || null;
+      return data.resolvedLocality ? [data.resolvedLocality] : [];
     case "metro":
-      return data.transit?.nearestMetro || null;
-    case "highways": {
-      const list = data.transit?.majorHighways || [];
-      return list.length ? list.join(" • ") : null;
-    }
-    case "schools": {
-      const list = data.neighborhood?.topSchools || [];
-      return list.length ? list.join(" • ") : null;
-    }
-    case "hospitals": {
-      const list = data.neighborhood?.topHospitals || [];
-      return list.length ? list.join(" • ") : null;
-    }
-    case "distances": {
-      // Only rows Routes actually routed count; a named place with no route is not a measurement.
-      const measured = (data.nearbyDistances || []).filter(
-        (d) => d.walkMeters !== undefined || d.driveMeters !== undefined
-      );
-      if (!measured.length) return null;
-      const metro = data.transit?.nearestMetro
-        ? formatDistance(findDistance(data, data.transit.nearestMetro))
-        : null;
-      const lead = metro ? `nearest transit ${metro.label}` : `${measured.length} places measured`;
-      return `${measured.length} measured • ${lead}`;
-    }
+      return data.transit?.nearestMetro ? [data.transit.nearestMetro] : [];
+    case "highways":
+      return data.transit?.majorHighways || [];
+    case "schools":
+      return data.neighborhood?.topSchools || [];
+    case "hospitals":
+      return data.neighborhood?.topHospitals || [];
     default:
-      return null;
+      return [];
   }
 }
 
@@ -180,25 +169,46 @@ export function HyperLocalSearchHUD({
       <div className="px-3.5 py-2.5 space-y-1.5">
         {RESEARCH_STEPS.map((step, idx) => {
           const Icon = step.icon;
-          const result = !isSearching && data ? resolveStep(step.key, data) : null;
+          // The measuring step is in-flight progress; its results belong on the rows above.
+          if (step.key === "distances" && !isSearching) return null;
+
+          const names = !isSearching && data ? resolveStep(step.key, data) : [];
+          const found = names.length > 0;
           const isActive = isSearching && idx === activeStep;
+          // Highways are roads, not places, so they never carry a measured distance.
+          const measurable = step.key !== "highways" && step.key !== "locality";
 
           return (
             <div key={step.key} className="flex items-start gap-2 text-[11px]">
               <Icon
                 className={`w-3.5 h-3.5 mt-px shrink-0 ${
-                  isActive ? "text-indigo-600" : result ? "text-emerald-600" : "text-slate-300"
+                  isActive ? "text-indigo-600" : found ? "text-emerald-600" : "text-slate-300"
                 }`}
               />
               <div className="min-w-0 flex-1">
                 <span
                   className={`font-semibold ${
-                    isActive ? "text-indigo-800" : result ? "text-slate-700" : "text-slate-400"
+                    isActive ? "text-indigo-800" : found ? "text-slate-700" : "text-slate-400"
                   }`}
                 >
                   {step.label}
                 </span>
-                {result && <p className="text-slate-500 font-medium truncate">{result}</p>}
+                {found && (
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {names.map((name) =>
+                      measurable ? (
+                        <PlaceChip key={name} name={name} data={data} compact />
+                      ) : (
+                        <span
+                          key={name}
+                          className="px-2 py-0.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-[11px] font-medium"
+                        >
+                          {name}
+                        </span>
+                      )
+                    )}
+                  </div>
+                )}
               </div>
               {isSearching ? (
                 isActive && (
@@ -208,7 +218,7 @@ export function HyperLocalSearchHUD({
                   </span>
                 )
               ) : isDone ? (
-                result ? (
+                found ? (
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                 ) : (
                   <MinusCircle className="w-3.5 h-3.5 text-slate-300 shrink-0" />

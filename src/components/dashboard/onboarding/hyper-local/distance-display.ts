@@ -1,54 +1,67 @@
 import type { HyperLocalKbData, NearbyPlaceDistance } from "@/db/schema";
 
 /**
- * Below this, walking is the honest way to describe the trip. A metro station 1.4km away is
- * a 19 minute walk but a 4.3km drive around a divided carriageway - leading with the drive
- * would make it sound further than it is, and leading with a walk on a 3km school would make
- * it sound closer. One threshold, applied to the measured walking distance.
+ * At or under this, driving is absurd - nobody drives 150m - so only the walk is offered.
  */
-const WALKABLE_METERS = 1500;
+const WALK_ONLY_MAX_METERS = 200;
 
-export interface DisplayDistance {
-  /** e.g. "1.4 km walk · 19 min" */
-  label: string;
+/**
+ * Beyond this, walking stops being a real option and offering it is noise: a 2.8km "39 min
+ * walk" is not how anyone reaches a school. Only the drive is offered.
+ */
+const WALK_VIABLE_MAX_METERS = 1500;
+
+export interface DistancePill {
   mode: "walk" | "drive";
+  /** e.g. "670 m · 9 min" */
+  label: string;
 }
 
 function km(meters: number) {
   return meters < 950 ? `${Math.round(meters / 10) * 10} m` : `${(meters / 1000).toFixed(1)} km`;
 }
 
-function mins(seconds: number) {
+function mins(seconds?: number) {
+  if (seconds === undefined) return "";
   const m = Math.round(seconds / 60);
-  return m < 1 ? "under a min" : `${m} min`;
+  return m < 1 ? " · under a min" : ` · ${m} min`;
 }
 
-/** Returns null when the place was named but never successfully routed. */
-export function formatDistance(d: NearbyPlaceDistance | undefined): DisplayDistance | null {
-  if (!d) return null;
+/**
+ * Turns one measured place into the pills shown beside its name.
+ *
+ * The walking distance is the yardstick, because it is what decides whether walking is a
+ * real option at all. Between the two thresholds both modes are genuinely useful and both
+ * are shown - a 1.4km metro is a 19 minute walk *or* a 10 minute drive, and which one the
+ * owner cares about depends on the owner.
+ */
+export function distancePills(d: NearbyPlaceDistance | undefined): DistancePill[] {
+  if (!d) return [];
 
-  const walkable = d.walkMeters !== undefined && d.walkMeters <= WALKABLE_METERS;
-  if (walkable && d.walkMeters !== undefined) {
-    const time = d.walkSeconds !== undefined ? ` · ${mins(d.walkSeconds)}` : "";
-    return { label: `${km(d.walkMeters)} walk${time}`, mode: "walk" };
-  }
-  if (d.driveMeters !== undefined) {
-    const time = d.driveSeconds !== undefined ? ` · ${mins(d.driveSeconds)}` : "";
-    return { label: `${km(d.driveMeters)} drive${time}`, mode: "drive" };
-  }
-  // Drive failed but walk succeeded beyond the threshold: still better than showing nothing.
-  if (d.walkMeters !== undefined) {
-    const time = d.walkSeconds !== undefined ? ` · ${mins(d.walkSeconds)}` : "";
-    return { label: `${km(d.walkMeters)} walk${time}`, mode: "walk" };
-  }
-  return null;
+  const walk: DistancePill | null =
+    d.walkMeters !== undefined
+      ? { mode: "walk", label: `${km(d.walkMeters)}${mins(d.walkSeconds)}` }
+      : null;
+  const drive: DistancePill | null =
+    d.driveMeters !== undefined
+      ? { mode: "drive", label: `${km(d.driveMeters)}${mins(d.driveSeconds)}` }
+      : null;
+
+  // Only one mode routed: show it whatever the distance, rather than nothing.
+  if (!walk) return drive ? [drive] : [];
+  if (!drive) return [walk];
+
+  if (d.walkMeters! <= WALK_ONLY_MAX_METERS) return [walk];
+  if (d.walkMeters! > WALK_VIABLE_MAX_METERS) return [drive];
+  return [walk, drive];
 }
 
 /**
  * Looks up a measured distance by the place name shown in the string lists.
  *
- * The string lists stay authoritative for names; `nearbyDistances` only annotates them, so a
- * name with no match simply renders without a distance.
+ * Exact match first: containment alone would let "Life Hospital" claim the distance of a
+ * genuinely different "New Life Hospital". Containment is still needed as a fallback because
+ * Maps titles carry marketing suffixes ("Fortis Hospital Noida - Best Hospital in Noida").
  */
 export function findDistance(
   data: HyperLocalKbData | null | undefined,
@@ -56,8 +69,10 @@ export function findDistance(
 ): NearbyPlaceDistance | undefined {
   if (!data?.nearbyDistances?.length || !name) return undefined;
   const needle = name.trim().toLowerCase();
+  const exact = data.nearbyDistances.find((d) => d.name.trim().toLowerCase() === needle);
+  if (exact) return exact;
   return data.nearbyDistances.find((d) => {
     const hay = d.name.trim().toLowerCase();
-    return hay === needle || hay.includes(needle) || needle.includes(hay);
+    return hay.includes(needle) || needle.includes(hay);
   });
 }
