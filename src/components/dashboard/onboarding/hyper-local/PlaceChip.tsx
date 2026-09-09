@@ -11,6 +11,8 @@ interface PlaceChipProps {
   onViewOnMap?: (name: string, mode: "walk" | "drive") => void;
   /** Compact drops the standalone map button and tightens padding, for the inspector HUD. */
   compact?: boolean;
+  /** The place the map is currently routing to, so the list reads as the map's selector. */
+  isActive?: boolean;
 }
 
 /**
@@ -19,16 +21,38 @@ interface PlaceChipProps {
  * Names come from the `HyperLocalKbData` string lists, which stay authoritative; a place
  * with no measurement simply renders as a plain name.
  */
-export function PlaceChip({ name, data, onViewOnMap, compact = false }: PlaceChipProps) {
+export function PlaceChip({
+  name,
+  data,
+  onViewOnMap,
+  compact = false,
+  isActive = false,
+}: PlaceChipProps) {
   const pills = distancePills(findDistance(data, name));
+  // An unmeasured place has no route to draw, so its name stays plain text rather than a
+  // button that would only ever re-centre the map on the property.
+  const nameOpensMap = Boolean(onViewOnMap) && pills.length > 0;
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-lg bg-white border border-slate-200 text-slate-800 font-medium ${
-        compact ? "px-2 py-0.5 text-[11px]" : "px-2.5 py-1 text-xs"
-      }`}
+      className={`inline-flex items-center gap-1.5 rounded-lg font-medium border ${
+        isActive
+          ? "bg-blue-50 border-blue-300 text-blue-900"
+          : "bg-white border-slate-200 text-slate-800"
+      } ${compact ? "px-2 py-0.5 text-[11px]" : "px-2.5 py-1 text-xs"}`}
     >
-      <span>{name}</span>
+      {nameOpensMap ? (
+        <button
+          type="button"
+          onClick={() => onViewOnMap!(name, pills[0].mode)}
+          className="text-left hover:underline cursor-pointer"
+          title={`Show ${name} on the map`}
+        >
+          {name}
+        </button>
+      ) : (
+        <span>{name}</span>
+      )}
 
       {pills.map((pill) => {
         const Icon = pill.mode === "walk" ? Footprints : Car;

@@ -13,6 +13,8 @@ import {
   AlertTriangle,
   ShieldCheck,
   Ruler,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import type { HyperLocalKbData } from "@/db/schema";
 import { PlaceChip } from "./PlaceChip";
@@ -48,6 +50,15 @@ const RESEARCH_STEPS = [
   // dropped rather than repeating them as a summary.
   { key: "distances", icon: Ruler, label: "Measuring walk & drive distances" },
 ] as const;
+
+/**
+ * Chips shown per place row before the rest are folded behind a toggle.
+ *
+ * Ten measured hospitals is the research working, but rendered in full it pushes the map -
+ * the thing the owner actually reads the panel for - below the fold. Nothing is dropped:
+ * the full list is one click away, and the voice agent's knowledge base is untouched either way.
+ */
+const PREVIEW_CHIP_COUNT = 1;
 
 function formatElapsed(ms: number) {
   return (ms / 1000).toFixed(2);
@@ -90,6 +101,7 @@ export function HyperLocalSearchHUD({
     name: null,
     mode: "drive",
   });
+  const [expandedRows, setExpandedRows] = useState<string[]>([]);
   const startRef = useRef<number | null>(null);
 
   // Timer: restarts on every idle -> searching transition, freezes on the last value when done.
@@ -205,6 +217,12 @@ export function HyperLocalSearchHUD({
           const isActive = isSearching && idx === activeStep;
           // Highways are roads, not places, so they never carry a measured distance.
           const measurable = step.key !== "highways" && step.key !== "locality";
+          const expanded = expandedRows.includes(step.key);
+          const collapsible = names.length > PREVIEW_CHIP_COUNT;
+          const shown = expanded ? names : names.slice(0, PREVIEW_CHIP_COUNT);
+          // Counted off the cap, not off what is rendered, so the toggle keeps its label
+          // once the row is open and the row can be closed again.
+          const hidden = names.length - PREVIEW_CHIP_COUNT;
 
           return (
             <div key={step.key} className="flex items-start gap-2 text-[11px]">
@@ -223,13 +241,14 @@ export function HyperLocalSearchHUD({
                 </span>
                 {found && (
                   <div className="flex flex-wrap gap-1 mt-1">
-                    {names.map((name) =>
+                    {shown.map((name) =>
                       measurable ? (
                         <PlaceChip
                           key={name}
                           name={name}
                           data={data}
                           onViewOnMap={isDone ? viewOnMap : undefined}
+                          isActive={embedEnabled && mapTarget.name === name}
                           compact
                         />
                       ) : (
@@ -240,6 +259,30 @@ export function HyperLocalSearchHUD({
                           {name}
                         </span>
                       )
+                    )}
+
+                    {collapsible && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setExpandedRows((rows) =>
+                            expanded ? rows.filter((k) => k !== step.key) : [...rows, step.key]
+                          )
+                        }
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white border border-dashed border-slate-300 text-slate-500 text-[11px] font-bold hover:border-blue-300 hover:text-blue-700"
+                      >
+                        {expanded ? (
+                          <>
+                            <ChevronUp className="w-3 h-3" />
+                            Show less
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown className="w-3 h-3" />
+                            {hidden} more
+                          </>
+                        )}
+                      </button>
                     )}
                   </div>
                 )}
