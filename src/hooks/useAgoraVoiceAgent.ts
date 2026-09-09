@@ -191,6 +191,9 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
 
       processedTurnIdsRef.current.clear();
       processedAssistantTurnIntentsRef.current.clear();
+      localMessagesRef.current = [];
+      mappedRemoteRef.current = [];
+      setTranscript([]);
       setErrorMessage(null);
       setCallState("connecting");
 
@@ -285,18 +288,6 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
         });
         voiceAiRef.current = ai;
 
-        // Render initial greeting if provided
-        if (sessionData.greeting) {
-          const greetingMsg: VoiceMessage = {
-            id: `greeting-${Date.now()}`,
-            role: "assistant",
-            text: sessionData.greeting,
-            timestamp: formatTimestamp(),
-          };
-          mappedRemoteRef.current = [greetingMsg];
-          setTranscript([greetingMsg]);
-        }
-
         const isUserTranscription = (item: any) =>
           isUserTranscriptionItem(item, [stringUserUid, String(userUidRef.current)]);
 
@@ -312,10 +303,7 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
             (local) => !mapped.some((remote) => remote.role === "user" && remote.text.toLowerCase() === local.text.toLowerCase())
           );
 
-          // Preserve initial greeting if remote transcript doesn't repeat it yet
-          const fullList = sessionData.greeting && !mapped.some((m) => m.role === "assistant")
-            ? [{ id: "init-greeting", role: "assistant" as const, text: sessionData.greeting, timestamp: formatTimestamp() }, ...mapped, ...localMessagesRef.current]
-            : [...mapped, ...localMessagesRef.current];
+          const fullList = [...mapped, ...localMessagesRef.current];
 
           transcriptRef.current = fullList;
           setTranscript(fullList);

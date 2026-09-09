@@ -145,11 +145,11 @@ export async function startAgoraAgentSession(
     const resolvedEmail = (ownerEmail || "").trim();
 
     const opener =
-      "To get started, is this property for rent or for sale, and what kind of place is it — a flat, an independent house, or a commercial space?";
+      "To start, is it for rent or sale, and what type: a flat, house, or commercial space?";
 
     greeting = firstName
-      ? `Hello ${firstName}! I'm Elena Vance, your Kyron Realty onboarding partner. I'll help you set up your listing and launch your 24/7 AI voice sales agent. ${opener}`
-      : `Hello there! I'm Elena Vance, your Kyron Realty onboarding partner. I'll help you set up your listing and launch your 24/7 AI voice sales agent. ${opener}`;
+      ? `Hi ${firstName}! I'm Elena. Let's get your property out to buyers and tenants. ${opener}`
+      : `Hi there! I'm Elena. Let's get your property out to buyers and tenants. ${opener}`;
 
     systemPrompt = `
 You are 'Elena Vance', Principal Luxury Listing Specialist & Real Estate Intelligence Partner at Kyron Realty AI.
