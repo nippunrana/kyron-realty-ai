@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
           ilike(properties.city, qPattern),
           sql`${properties.knowledgeBase}->>'eaScript' ILIKE ${qPattern}`,
           sql`${properties.knowledgeBase}->>'neighborhoodSummary' ILIKE ${qPattern}`,
-          sql`${properties.knowledgeBase}->'kbData'::text ILIKE ${qPattern}`
+          sql`(${properties.knowledgeBase}->'kbData')::text ILIKE ${qPattern}`
         )!
       );
     }
@@ -119,11 +119,9 @@ export async function GET(req: NextRequest) {
       properties: formatted,
     });
   } catch (error: unknown) {
-    const message =
-      error instanceof Error ? error.message : "Failed to search properties.";
     console.error("Error in GET /api/properties/search:", error);
     return NextResponse.json(
-      { success: false, error: message },
+      { success: false, error: "Failed to search properties." },
       { status: 500 }
     );
   }
