@@ -326,11 +326,13 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
   // Latest state for async turn-extraction and voice callbacks; synced after each commit
   const dataRef = useRef(data);
   const onboardingStageRef = useRef(onboardingStage);
+  const showFinalModalRef = useRef(showFinalModal);
   useEffect(() => {
     dataRef.current = data;
     onboardingStageRef.current = onboardingStage;
     draftIdRef.current = draftId;
-  }, [data, onboardingStage, draftId]);
+    showFinalModalRef.current = showFinalModal;
+  }, [data, onboardingStage, draftId, showFinalModal]);
 
   const turnSequenceRef = useRef<number>(0);
   const isExtractionBusyRef = useRef<boolean>(false);
@@ -598,6 +600,33 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
     setShowUploadModal(true);
   }, [createOrUpdateDraft, setFinalGate]);
 
+  /**
+   * The owner approving the full review card.
+   *
+   * "Looks good", "that's right" and "continue" are also just how an owner finishes an ordinary
+   * answer, and the approval patterns in `src/hooks/voice-intents.ts` match the spoken turn
+   * itself - before Elena has announced or opened anything. An approval that lands while no
+   * review card is on screen is filler, not consent, and must never advance the flow: acting on
+   * one opened the photo uploader mid-intake, which Elena's announcement then closed again a
+   * second later. Elena's announcement, the turn extractor and the inspector's Review button
+   * all still open the card, so ignoring the stray approval strands nobody.
+   */
+  const confirmFullReview = useCallback(() => {
+    // Read from the last committed render, so a `setShowFinalModal(false)` earlier in the same
+    // handler cannot make an open card look closed.
+    if (!showFinalModalRef.current) {
+      addTelemetryLog(
+        "INTENT",
+        "Ignored approval because no review card is on screen",
+        { stage: onboardingStageRef.current },
+        undefined,
+        "warn"
+      );
+      return;
+    }
+    handleOpenPhotoUpload();
+  }, [addTelemetryLog, handleOpenPhotoUpload]);
+
   // Transition from Photo Intake (Stage 5) to Final Unified Review & Deploy (Stage 6)
   const handleProceedToFinalReview = useCallback(() => {
     setShowUploadModal(false);
@@ -647,7 +676,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
         openFullReview();
       } else if (action === "close_hyper_local") {
         addTelemetryLog("MODAL-TRIGGER", "Closing Full Review Modal via hyper-local intent", null);
-        handleOpenPhotoUpload();
+        confirmFullReview();
       } else if (action === "open_final_modal") {
         if (onboardingStageRef.current === "core") {
           addTelemetryLog("INTENT", "Ignored open_final_modal because stage is still core", null, undefined, "warn");
@@ -682,11 +711,11 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
         if (onboardingStageRef.current === "core" && areCoreSpecsVerified(dataRef.current.property)) {
           handleConfirmCoreSpecs();
         } else if (onboardingStageRef.current === "additional_specs") {
-          handleOpenPhotoUpload();
+          confirmFullReview();
         }
       }
     },
-    [handleConfirmCoreSpecs, openFullReview, handleOpenPhotoUpload, addTelemetryLog, setFinalGate]
+    [handleConfirmCoreSpecs, openFullReview, handleOpenPhotoUpload, confirmFullReview, addTelemetryLog, setFinalGate]
   );
 
   // Trailing Conflating Queue: In-flight Gemini extractions run to completion
@@ -903,7 +932,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
         } else if (action === "open_hyper_local") {
           openFullReview();
         } else if (action === "close_hyper_local") {
-          handleOpenPhotoUpload();
+          confirmFullReview();
         } else if (action === "open_final") {
           if (pendingExtractionWindowRef.current || !candidateProperty.availableDate) {
             setFinalGate(true);
@@ -912,10 +941,13 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
             setFinalGate(false);
           }
         } else if (action === "close_final") {
-          setShowFinalModal(false);
-          setFinalGate(false);
           if (onboardingStageRef.current === "additional_specs") {
-            handleOpenPhotoUpload();
+            // Leaves a latched open-gate alone: the card the owner has not seen yet is still
+            // coming, and cancelling it here would leave them with nothing to approve.
+            confirmFullReview();
+          } else {
+            setShowFinalModal(false);
+            setFinalGate(false);
           }
         } else if (action === "open") {
           if (onboardingStageRef.current === "core") {
@@ -938,7 +970,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
           if (onboardingStageRef.current === "core") {
             handleConfirmCoreSpecs();
           } else if (onboardingStageRef.current === "additional_specs") {
-            handleOpenPhotoUpload();
+            confirmFullReview();
           } else {
             setShowFinalModal(false);
             setFinalGate(false);
