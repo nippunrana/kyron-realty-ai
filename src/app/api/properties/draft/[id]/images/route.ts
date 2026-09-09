@@ -125,6 +125,9 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
     }
 
     const currentImages = Array.isArray(property.images) ? [...property.images] : [];
+    if (!currentImages.includes(imageUrl)) {
+      return NextResponse.json({ error: "Image not found on this listing." }, { status: 404 });
+    }
     const updatedImages = currentImages.filter((img) => img !== imageUrl);
 
     let newCover = property.coverImageUrl;
@@ -150,7 +153,7 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
     try {
       const uploadPrefix = `${BASE_PATH}/uploads/properties/${draftId}/`;
       if (imageUrl.startsWith(uploadPrefix)) {
-        const filename = imageUrl.slice(uploadPrefix.length);
+        const filename = path.basename(imageUrl.slice(uploadPrefix.length));
         const filePath = path.join(process.cwd(), "public", "uploads", "properties", String(draftId), filename);
         await unlink(filePath).catch(() => {});
       }
