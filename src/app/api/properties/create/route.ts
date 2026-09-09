@@ -8,7 +8,7 @@ import {
   type PropertyNegotiationRules,
 } from "@/db/schema";
 import QRCode from "qrcode";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { buildDefaultTitle, computeFloorPrice, parseAvailableDate, randomSlugSuffix, slugify } from "@/lib/listing-helpers";
 import { BASE_PATH } from "@/lib/base-path";
 
@@ -176,8 +176,12 @@ export async function POST(req: NextRequest) {
           sourceUrl: property.sourceUrl || null,
           updatedAt: new Date(),
         })
-        .where(eq(properties.id, Number(draftId)))
+        .where(and(eq(properties.id, Number(draftId)), eq(properties.ownerId, userId ?? "")))
         .returning();
+
+      if (!updated) {
+        return NextResponse.json({ error: "Draft not found." }, { status: 404 });
+      }
 
       insertedProperty = updated;
 
