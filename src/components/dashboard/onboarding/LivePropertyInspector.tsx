@@ -29,7 +29,7 @@ import type { HyperLocalKbData } from "@/db/schema";
 interface LivePropertyInspectorProps {
   data: ExtractedPropertyPayload;
   ownerName?: string;
-  onboardingStage?: "core" | "additional_specs" | "hyper_local" | "photos" | "final_review";
+  onboardingStage?: "core" | "additional_specs" | "photos" | "final_review";
   pillLabels?: PillLabels;
   onUpdateProperty: (updates: Partial<ExtractedPropertyPayload["property"]>) => void;
   onUpdateKnowledgeBase: (updates: Partial<ExtractedPropertyPayload["knowledgeBase"]>) => void;
