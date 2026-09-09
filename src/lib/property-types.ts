@@ -155,19 +155,7 @@ export function formatCompositeAddress(facts: AddressFacts): string | null {
   return parts.length > 0 ? parts.join(", ") : null;
 }
 
-/** What the type row still needs, phrased for the checklist's pending line. */
-export function describeMissingTypeSlot(slot: TypeSlot): string {
-  switch (slot) {
-    case "type":
-      return "Flat, house, or commercial space";
-    case "floor":
-      return "Which floor is it on?";
-    case "storeys":
-      return "Single storey or double storey?";
-    case "rentScope":
-      return "Does the rent cover both floors?";
-  }
-}
+
 
 /**
  * Rows written before the India-first vocabulary landed still carry the old US enum, so
