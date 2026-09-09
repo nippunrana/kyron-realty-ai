@@ -1,8 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import Link from "next/link";
-import QRCode from "qrcode";
 import {
   CheckCircle2,
   Copy,
@@ -45,41 +43,7 @@ export function PublishSuccessModal({
   onToggleMute,
 }: PublishSuccessModalProps) {
   const { copied, copy } = useCopyToClipboard(2500);
-  const [dynamicQrSvg, setDynamicQrSvg] = useState<string>("");
-
-  // Dual-layer QR generation: if server SVG was absent, generate client-side dynamically from shareUrl
-  useEffect(() => {
-    let isMounted = true;
-    if (qrCodeSvg && qrCodeSvg.trim().length > 0) {
-      return;
-    }
-
-    if (shareUrl) {
-      QRCode.toString(shareUrl, {
-        type: "svg",
-        width: 256,
-        margin: 2,
-        color: {
-          dark: "#0f172a",
-          light: "#ffffff",
-        },
-      })
-        .then((svg) => {
-          if (isMounted) {
-            setDynamicQrSvg(svg);
-          }
-        })
-        .catch((err) => {
-          console.error("Client-side QR code generation error:", err);
-        });
-    }
-
-    return () => {
-      isMounted = false;
-    };
-  }, [qrCodeSvg, shareUrl]);
-
-  const activeQrSvg = (qrCodeSvg && qrCodeSvg.trim().length > 0) ? qrCodeSvg : dynamicQrSvg;
+  const activeQrSvg = qrCodeSvg && qrCodeSvg.trim().length > 0 ? qrCodeSvg : "";
 
   const handleDownloadQrSvg = () => {
     if (!activeQrSvg) return;
