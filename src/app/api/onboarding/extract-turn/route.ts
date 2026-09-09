@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { slidingWindowMessages, currentPropertyState, currentKnowledgeBase, currentHyperLocalData } = body || {};
+    const { slidingWindowMessages, currentPropertyState, currentKnowledgeBase } = body || {};
 
     if (!slidingWindowMessages || !Array.isArray(slidingWindowMessages) || slidingWindowMessages.length === 0) {
       return NextResponse.json({
@@ -25,7 +25,6 @@ export async function POST(req: NextRequest) {
       slidingWindowMessages,
       currentPropertyState,
       currentKnowledgeBase,
-      currentHyperLocalData,
     });
 
     const durationMs = Date.now() - startTime;

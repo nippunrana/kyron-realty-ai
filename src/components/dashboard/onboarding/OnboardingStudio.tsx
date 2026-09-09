@@ -763,7 +763,6 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
           slidingWindowMessages: slidingWindow,
           currentPropertyState: dataRef.current.property,
           currentKnowledgeBase: dataRef.current.knowledgeBase,
-          currentHyperLocalData: hyperLocalDataRef.current,
         }),
       });
 

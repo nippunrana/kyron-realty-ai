@@ -27,7 +27,6 @@ export interface ExtractTurnInput {
   slidingWindowMessages: TurnMessage[];
   currentPropertyState?: Partial<ExtractedPropertyPayload["property"]>;
   currentKnowledgeBase?: Partial<ExtractedPropertyPayload["knowledgeBase"]>;
-  currentHyperLocalData?: any;
 }
 
 export interface TurnSpecUpdates {
