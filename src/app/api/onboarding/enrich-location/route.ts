@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
       bedrooms: bedrooms ? Number(bedrooms) : undefined,
       bathrooms: bathrooms ? Number(bathrooms) : undefined,
       sqft: sqft ? Number(sqft) : undefined,
-      propertyType: propertyType || "apartment",
+      propertyType: propertyType || undefined,
     });
 
     return NextResponse.json({

@@ -26,6 +26,7 @@ import { ListingPoliciesCard } from "./ListingPoliciesCard";
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
 import { defaultTourDateTime } from "@/lib/listing-helpers";
 import { BASE_PATH } from "@/lib/base-path";
+import { formatPropertyTypeLabel } from "@/lib/property-types";
 
 interface PublicListingClientProps {
   property: any;
@@ -182,7 +183,7 @@ export function PublicListingClient({
                   {property.listingType === "rent" ? "For Rent" : "For Sale"}
                 </span>
                 <span className="px-3 py-1 rounded-xl bg-emerald-500/90 backdrop-blur-md text-white text-xs font-bold uppercase tracking-wider">
-                  {property.propertyType}
+                  {formatPropertyTypeLabel(property.propertyType)}
                 </span>
               </div>
 

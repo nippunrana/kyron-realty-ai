@@ -4,6 +4,8 @@
  * safe to bundle into the browser.
  */
 
+import { formatPropertyTypeLabel, isCommercial, type PropertyType } from "./property-types";
+
 export type ListingType = "rent" | "sale" | "";
 
 /** Share of the target price the voice agent may never go below when no floor is set. */
@@ -24,10 +26,18 @@ export function randomSlugSuffix(): string {
   return Math.random().toString(36).substring(2, 6);
 }
 
-export function buildDefaultTitle(address: string, bedrooms?: number, listingType?: ListingType): string {
+export function buildDefaultTitle(
+  address: string,
+  bedrooms?: number,
+  listingType?: ListingType,
+  propertyType?: string
+): string {
+  // An office or a shop is not a "Residence", and it has no bedroom count to lead with.
+  const commercial = isCommercial(propertyType as PropertyType);
+  const noun = commercial ? formatPropertyTypeLabel(propertyType) : "Residence";
   const typeLabel =
-    listingType === "rent" ? "Residence for Rent" : listingType === "sale" ? "Residence for Sale" : "Residence";
-  return `${bedrooms ? `${bedrooms}-Bedroom ` : ""}${typeLabel} at ${address}`;
+    listingType === "rent" ? `${noun} for Rent` : listingType === "sale" ? `${noun} for Sale` : noun;
+  return `${!commercial && bedrooms ? `${bedrooms}-Bedroom ` : ""}${typeLabel} at ${address}`;
 }
 
 /**

@@ -19,8 +19,9 @@ export function VerificationChecklist({
   items,
   verifiedCount,
 }: VerificationChecklistProps) {
-  const isFullyVerified = verifiedCount === 6;
-  const pct = Math.round((verifiedCount / 6) * 100);
+  const total = items.length;
+  const isFullyVerified = total > 0 && verifiedCount === total;
+  const pct = total > 0 ? Math.round((verifiedCount / total) * 100) : 0;
 
   return (
     <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-50 via-white to-blue-50/20 border border-slate-200/90 shadow-xs">
@@ -54,7 +55,7 @@ export function VerificationChecklist({
                 isFullyVerified ? "text-emerald-600" : "text-slate-700"
               }`}
             >
-              {verifiedCount}/6
+              {verifiedCount}/{total}
             </span>
           </div>
 
@@ -70,8 +71,8 @@ export function VerificationChecklist({
             </h4>
             <p className="text-[11px] text-slate-500">
               {isFullyVerified
-                ? "All 6 core listing attributes verified by AI"
-                : `${6 - verifiedCount} attributes remaining before agent deployment`}
+                ? `All ${total} core listing attributes verified by AI`
+                : `${total - verifiedCount} attributes remaining before agent deployment`}
             </p>
           </div>
         </div>
@@ -88,7 +89,7 @@ export function VerificationChecklist({
         </div>
       </div>
 
-      {/* 6-Point Checklist Grid */}
+      {/* Core Checklist Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         {items.map((item, idx) => (
           <div

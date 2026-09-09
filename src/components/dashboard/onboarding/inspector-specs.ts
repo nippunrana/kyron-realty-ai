@@ -1,5 +1,4 @@
 import {
-  Building2,
   Calendar,
   Car,
   Clock,
@@ -12,6 +11,14 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { ExtractedPropertyPayload } from "@/lib/kb-extractor";
+import {
+  describeMissingTypeSlot,
+  describePropertyType,
+  FURNISHING_LABELS,
+  getMissingTypeSlot,
+  isCommercial,
+  type FurnishingStatus,
+} from "@/lib/property-types";
 import type { ChecklistItemData } from "./VerificationChecklist";
 
 type Property = ExtractedPropertyPayload["property"];
@@ -34,98 +41,163 @@ export function isStudioListing(property: Property): boolean {
 }
 
 /**
+ * Which seven rows the checklist is made of. A commercial unit has no bedrooms and no
+ * bathrooms, so those two slots are replaced by washrooms and furnishing status rather
+ * than left permanently unverifiable - which is what used to lock commercial listings
+ * out of deployment entirely.
+ */
+const RESIDENTIAL_ROWS = [
+  "listingType",
+  "propertyType",
+  "address",
+  "price",
+  "bedrooms",
+  "bathrooms",
+  "sqft",
+] as const;
+
+const COMMERCIAL_ROWS = [
+  "listingType",
+  "propertyType",
+  "address",
+  "price",
+  "sqft",
+  "washrooms",
+  "furnishingStatus",
+] as const;
+
+export type CoreSpecKey = (typeof RESIDENTIAL_ROWS)[number] | (typeof COMMERCIAL_ROWS)[number];
+
+export function getCoreSpecRows(property: Property): readonly CoreSpecKey[] {
+  return isCommercial(property.propertyType) ? COMMERCIAL_ROWS : RESIDENTIAL_ROWS;
+}
+
+/**
  * The one definition of "core specs verified". The checklist, the deploy lock, the
  * studio's review-card gate, the review card, and the end-of-call merge all consume
  * it; never re-derive these rules in a component.
+ *
+ * Every key is answered honestly here; `getCoreSpecRows` decides which seven of them
+ * this listing is actually judged on.
  */
-export function getCoreSpecStatus(property: Property) {
+export function getCoreSpecStatus(property: Property): Record<CoreSpecKey, boolean> {
   return {
     listingType: property.listingType === "rent" || property.listingType === "sale",
+    // The type row also carries the fact that type makes mandatory: a floor for a flat,
+    // storeys for a house, and the rent's scope on a multi-storey house let for rent.
+    propertyType: getMissingTypeSlot(property) === null,
     address: Boolean(property.address && property.address.trim().length > 3),
     price: Number(property.price) > 0,
     bedrooms: Number(property.bedrooms) > 0 || isStudioListing(property),
     bathrooms: Number(property.bathrooms) > 0,
     sqft: Number(property.sqft) > 0,
+    // A shop with no washroom is a real answer, so 0 counts and only null is silence.
+    washrooms: property.washrooms !== null && property.washrooms !== undefined && property.washrooms >= 0,
+    furnishingStatus: Boolean(property.furnishingStatus),
   };
 }
 
 export function areCoreSpecsVerified(property: Property): boolean {
-  return Object.values(getCoreSpecStatus(property)).every(Boolean);
+  const status = getCoreSpecStatus(property);
+  return getCoreSpecRows(property).every((key) => status[key]);
 }
 
-/** The six core attributes the deploy button waits on, with their display values. */
+/** The seven core attributes the deploy button waits on, with their display values. */
 export function buildChecklistItems(property: Property): ChecklistItemData[] {
-  const {
-    listingType: hasListingType,
-    address: hasAddress,
-    price: hasPrice,
-    bedrooms: hasBeds,
-    bathrooms: hasBaths,
-    sqft: hasSqft,
-  } = getCoreSpecStatus(property);
+  const status = getCoreSpecStatus(property);
+  const commercial = isCommercial(property.propertyType);
+  const missingTypeSlot = getMissingTypeSlot(property);
 
-  const checklistItems: ChecklistItemData[] = [
-    {
+  const items: Record<CoreSpecKey, ChecklistItemData> = {
+    listingType: {
       id: "listing_type",
       label: "Listing Type",
       sublabel: "Rent vs. Sale",
-      isComplete: hasListingType,
-      valueDisplay: hasListingType
+      isComplete: status.listingType,
+      valueDisplay: status.listingType
         ? property.listingType === "rent"
           ? "For Rent"
           : "For Sale"
         : null,
     },
-    {
+    propertyType: {
+      id: "property_type",
+      label: "Property Type",
+      sublabel: missingTypeSlot
+        ? describeMissingTypeSlot(missingTypeSlot)
+        : "Flat, house, or commercial space",
+      isComplete: status.propertyType,
+      valueDisplay: describePropertyType(property),
+    },
+    address: {
       id: "address",
       label: "Location & Address",
       sublabel: "Street, City, State",
-      isComplete: hasAddress,
-      valueDisplay: hasAddress
+      isComplete: status.address,
+      valueDisplay: status.address
         ? `${property.address}${property.city ? `, ${property.city}` : ""}`
         : null,
     },
-    {
+    price: {
       id: "price",
       label: "Price / Monthly Rent",
       sublabel: "Asking price or monthly rent",
-      isComplete: hasPrice,
-      valueDisplay: hasPrice
+      isComplete: status.price,
+      valueDisplay: status.price
         ? `₹${Number(property.price).toLocaleString("en-IN")}${
             property.listingType === "rent" ? "/mo" : ""
           }`
         : null,
     },
-    {
+    bedrooms: {
       id: "bedrooms",
       label: "Bedrooms count",
       sublabel: "Number of bedrooms",
-      isComplete: hasBeds,
-      valueDisplay: hasBeds ? (isStudioListing(property) ? "Studio" : `${property.bedrooms} Beds`) : null,
+      isComplete: status.bedrooms,
+      valueDisplay: status.bedrooms
+        ? isStudioListing(property)
+          ? "Studio"
+          : `${property.bedrooms} Beds`
+        : null,
     },
-    {
+    bathrooms: {
       id: "bathrooms",
       label: "Bathrooms count",
       sublabel: "Number of full/half baths",
-      isComplete: hasBaths,
-      valueDisplay: hasBaths ? `${property.bathrooms} Baths` : null,
+      isComplete: status.bathrooms,
+      valueDisplay: status.bathrooms ? `${property.bathrooms} Baths` : null,
     },
-    {
+    sqft: {
       id: "sqft",
-      label: "Square footage / Size",
-      sublabel: "Interior floor area (sf)",
-      isComplete: hasSqft,
-      valueDisplay: hasSqft ? `${Number(property.sqft).toLocaleString("en-IN")} sqft` : null,
+      label: commercial ? "Carpet area" : "Square footage / Size",
+      sublabel: commercial ? "Usable carpet area (sf)" : "Interior floor area (sf)",
+      isComplete: status.sqft,
+      valueDisplay: status.sqft ? `${Number(property.sqft).toLocaleString("en-IN")} sqft` : null,
     },
-  ];
+    washrooms: {
+      id: "washrooms",
+      label: "Washrooms",
+      sublabel: "Number of washrooms on site",
+      isComplete: status.washrooms,
+      valueDisplay: status.washrooms ? `${property.washrooms} Washrooms` : null,
+    },
+    furnishingStatus: {
+      id: "furnishing_status",
+      label: "Furnishing",
+      sublabel: "Bare shell, semi- or fully furnished",
+      isComplete: status.furnishingStatus,
+      valueDisplay: property.furnishingStatus
+        ? FURNISHING_LABELS[property.furnishingStatus as Exclude<FurnishingStatus, "">]
+        : null,
+    },
+  };
 
-
-  return checklistItems;
+  return getCoreSpecRows(property).map((key) => items[key]);
 }
 
 /** Secondary attributes revealed only once they are actually present in the draft. */
 export function buildAdditionalSpecs(property: Property, knowledgeBase: KnowledgeBase): AdditionalSpec[] {
-  // Track additional/secondary parameters (excluding the 6 core checklist items)
+  // Track additional/secondary parameters (excluding the 7 core checklist rows)
   const additionalSpecs: AdditionalSpec[] = [];
 
   // 1. Year Built
@@ -139,28 +211,7 @@ export function buildAdditionalSpecs(property: Property, knowledgeBase: Knowledg
     });
   }
 
-  // 2. Property Subtype
-  if (
-    property.propertyType &&
-    property.propertyType.trim().length > 0 &&
-    property.propertyType !== "apartment"
-  ) {
-    const subtypeLabels: Record<string, string> = {
-      single_family: "Single Family Home",
-      condo: "Condominium",
-      townhouse: "Townhouse",
-      commercial: "Commercial Space",
-    };
-    const formattedType = subtypeLabels[property.propertyType] || "Residential Property";
-
-    additionalSpecs.push({
-      id: "property_type",
-      label: "Property Subtype",
-      value: formattedType,
-      icon: Building2,
-      color: "blue",
-    });
-  }
+  // 2. (Property type is a core checklist row - never repeat it here.)
 
   // 3. Unit / Suite Number
   if (property.unitNumber && property.unitNumber.trim().length > 0) {

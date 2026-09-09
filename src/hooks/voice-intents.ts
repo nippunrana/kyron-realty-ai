@@ -1,7 +1,7 @@
 import type { UIAction } from "./voice-agent-types";
 
 const USER_OPEN_CORE =
-  /(pull|bring|open|show|display|pop).*(core specs|core details|6 core)/i;
+  /(pull|bring|open|show|display|pop).*(core specs|core details|\d+ core)/i;
 const USER_OPEN_PHOTOS =
   /(pull|bring|open|show|display|pop).*(photo|photos|image|images|upload window|upload modal)/i;
 const USER_CLOSE_PHOTOS =
@@ -15,7 +15,7 @@ const USER_APPROVE =
   /(all is done|all done|everything is done|all set|looks good|all looks good|look good|we can proceed|proceed further|let's proceed|let's move on|that's right|confirmed|continue|ready for photos|move on to photos)/i;
 
 const ASSISTANT_OPEN_CORE =
-  /(pull|bring|open|show|display).*(core specs|core details|6 core).*(screen|for you|back up|take a look|right now)/i;
+  /(pull|bring|open|show|display).*(core specs|core details|\d+ core).*(screen|for you|back up|take a look|right now)/i;
 const ASSISTANT_OPEN_HYPER_LOCAL =
   /(found this neighborhood|neighborhood and transit|hyper[- ]?local|transit information).*(screen|for you|take a look|tell me if this is accurate)/i;
 const ASSISTANT_OPEN_PHOTOS =

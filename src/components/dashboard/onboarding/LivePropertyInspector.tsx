@@ -22,7 +22,9 @@ import type { ExtractedPropertyPayload } from "@/lib/kb-extractor";
 import type { PillLabels } from "@/lib/turn-extractor";
 import { VerificationChecklist } from "./VerificationChecklist";
 import { buildAdditionalSpecs, buildChecklistItems } from "./inspector-specs";
+import { formatPropertyTypeLabel, isCommercial } from "@/lib/property-types";
 import { ExtraSpecsSuggestionBar } from "./ExtraSpecsSuggestionBar";
+import { CoreSpecsSuggestionBar } from "./CoreSpecsSuggestionBar";
 import { HyperLocalSearchHUD } from "./hyper-local/HyperLocalSearchHUD";
 import type { HyperLocalKbData } from "@/db/schema";
 
@@ -105,7 +107,7 @@ export function LivePropertyInspector({
 
   const checklistItems = buildChecklistItems(property);
   const verifiedCount = checklistItems.filter((item) => item.isComplete).length;
-  const isFullyVerified = verifiedCount === 6;
+  const isFullyVerified = verifiedCount === checklistItems.length;
   const additionalSpecs = buildAdditionalSpecs(property, knowledgeBase);
   const showHyperLocalHUD = isEnrichingLocation || Boolean(hyperLocalData) || Boolean(enrichmentError);
   const showSuggestionBar =
@@ -122,6 +124,14 @@ export function LivePropertyInspector({
       onUpdateProperty({ hoaFeeMonthly: Number(value) });
     } else if (field === "availableDate") {
       onUpdateProperty({ availableDate: value });
+    } else if (
+      field === "propertyType" ||
+      field === "rentScope" ||
+      field === "furnishingStatus"
+    ) {
+      onUpdateProperty({ [field]: value });
+    } else if (field === "floorNumber" || field === "storeys") {
+      onUpdateProperty({ [field]: Number(value) });
     } else if (field === "feature") {
       const existing = property.features || [];
       if (!existing.includes(value)) {
@@ -217,7 +227,7 @@ export function LivePropertyInspector({
               }`}
             >
               <ShieldCheck className="w-3.5 h-3.5" />
-              <span>{isFullyVerified ? "6/6 Verified" : `${verifiedCount}/6 Verified`}</span>
+              <span>{`${verifiedCount}/${checklistItems.length} Verified`}</span>
             </div>
           )}
         </div>
@@ -246,7 +256,7 @@ export function LivePropertyInspector({
                   : "Type Pending"}
               </span>
               <span className="px-2.5 py-1 rounded-lg bg-emerald-500/90 backdrop-blur-md text-white text-[11px] font-bold uppercase tracking-wider">
-                {property.propertyType || "Property"}
+                {formatPropertyTypeLabel(property.propertyType)}
               </span>
             </div>
 
@@ -342,8 +352,13 @@ export function LivePropertyInspector({
           </div>
         )}
 
-        {/* 6-Point Dynamic Verification Checklist */}
+        {/* Dynamic Core Verification Checklist */}
         <VerificationChecklist items={checklistItems} verifiedCount={verifiedCount} />
+
+        {/* Stage 1 tap-or-speak answers, retired once every core row is answered. */}
+        {!isFullyVerified && onboardingStage === "core" && (
+          <CoreSpecsSuggestionBar property={property} onApplyChip={handleApplyChip} />
+        )}
 
         {/* Location Research HUD + Suggestion Chips Bar for Extra Specs.
             Both share the scroll anchor so the HUD is never parked just above the fold. */}
@@ -367,6 +382,7 @@ export function LivePropertyInspector({
           >
             <ExtraSpecsSuggestionBar
               listingType={property.listingType === "sale" ? "sale" : "rent"}
+              isCommercial={isCommercial(property.propertyType)}
               currentValues={{
                 parkingDetail: knowledgeBase.parkingDetail,
                 petPolicyDetail: knowledgeBase.petPolicyDetail,
@@ -586,7 +602,7 @@ export function LivePropertyInspector({
             <>
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
               <span className="text-slate-600 font-medium">
-                6/6 Attributes Verified • Ready to deploy with Elena Vance
+                {checklistItems.length}/{checklistItems.length} Attributes Verified • Ready to deploy with Elena Vance
               </span>
             </>
           ) : (

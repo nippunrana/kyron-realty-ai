@@ -33,7 +33,7 @@ const COPY = {
     step: "Step 1 of 2",
     title: "Check your main details",
     subtitle:
-      "Elena has the six main details of your home. Check them, then move on to the extra details.",
+      "Elena has the main details of your property. Check them, then move on to the extra details.",
   },
   additional: {
     step: "Step 2 of 2",
@@ -50,7 +50,7 @@ const COPY = {
 } as const;
 
 /**
- * The one review card. `core` shows the six main details on their own; `additional` and
+ * The one review card. `core` shows the main details on their own; `additional` and
  * `final` show the whole listing - main details, extra details and nearby places - so the
  * owner reviews everything in one window instead of three.
  */

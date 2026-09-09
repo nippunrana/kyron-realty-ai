@@ -20,7 +20,9 @@ export const properties = pgTable("properties", {
   title: text("title").notNull(),
   description: text("description"),
   listingType: text("listing_type").notNull().default("rent"), // 'rent' | 'sale'
-  propertyType: text("property_type").notNull().default("apartment"), // 'apartment' | 'single_family' | 'condo' | 'townhouse' | 'commercial'
+  // Vocabulary and the follow-up fact each type requires live in src/lib/property-types.ts.
+  // Deliberately has no default: an unstated type must never be written as "apartment".
+  propertyType: text("property_type").notNull(),
   status: text("status").notNull().default("active"), // 'draft' | 'active' | 'under_contract' | 'closed'
   
   // Pricing & Terms
@@ -38,7 +40,12 @@ export const properties = pgTable("properties", {
   country: text("country").default("India"),
   bedrooms: integer("bedrooms"),
   bathrooms: numeric("bathrooms", { precision: 3, scale: 1 }),
-  sqft: integer("sqft"),
+  sqft: integer("sqft"), // Carpet area on commercial listings
+  floorNumber: integer("floor_number"), // 0 = ground; negative = basement
+  storeys: integer("storeys"),
+  rentScope: text("rent_scope"), // 'whole_property' | 'single_floor' - multi-storey rentals only
+  washrooms: integer("washrooms"), // Commercial counterpart to bathrooms
+  furnishingStatus: text("furnishing_status"), // 'bare_shell' | 'semi_furnished' | 'fully_furnished'
   yearBuilt: integer("year_built"),
   availableDate: timestamp("available_date"),
   

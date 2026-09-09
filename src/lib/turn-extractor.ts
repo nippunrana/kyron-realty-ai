@@ -1,6 +1,14 @@
 import { GoogleGenAI } from "@google/genai";
 import type { ExtractedPropertyPayload } from "./kb-extractor";
 import { getGeminiApiKey, computeGeminiCost, type GeminiUsage } from "./gemini";
+import {
+  COMMERCIAL_TYPES,
+  isPropertyType,
+  RESIDENTIAL_TYPES,
+  type FurnishingStatus,
+  type PropertyType,
+  type RentScope,
+} from "./property-types";
 
 export interface TurnMessage {
   role: "assistant" | "user";
@@ -24,6 +32,12 @@ export interface ExtractTurnInput {
 
 export interface TurnSpecUpdates {
   listingType?: "rent" | "sale";
+  propertyType?: PropertyType;
+  floorNumber?: number;
+  storeys?: number;
+  rentScope?: RentScope;
+  washrooms?: number;
+  furnishingStatus?: FurnishingStatus;
   price?: number;
   bedrooms?: number;
   bathrooms?: number;
@@ -94,6 +108,12 @@ export async function extractTurnSpecs(
   const currentVerifiedSummary = `
 CURRENT VERIFIED STATE:
 - listingType: ${currentPropertyState?.listingType || "pending"}
+- propertyType: ${currentPropertyState?.propertyType || "pending"}
+- floorNumber: ${currentPropertyState?.floorNumber ?? "pending"}
+- storeys: ${currentPropertyState?.storeys ?? "pending"}
+- rentScope: ${currentPropertyState?.rentScope || "pending"}
+- washrooms: ${currentPropertyState?.washrooms ?? "pending"}
+- furnishingStatus: ${currentPropertyState?.furnishingStatus || "pending"}
 - address: ${currentPropertyState?.address || "pending"}
 - price: ${currentPropertyState?.price ? `₹${currentPropertyState.price}` : "pending"}
 - bedrooms: ${currentPropertyState?.bedrooms !== undefined && currentPropertyState?.bedrooms !== null ? currentPropertyState.bedrooms : "pending"}
@@ -117,6 +137,27 @@ MANDATORY EXTRACTION WORKFLOW:
 2. Evaluate 'coreSpecs':
    - listingType: "rent" or "sale" (or null if unknown).
      CRITICAL POLICY: If listingType in CURRENT VERIFIED STATE is already "rent" or "sale", it is PERMANENTLY LOCKED and cannot be changed!
+   - propertyType: what kind of place it is, or null. NEVER guess this - "apartment" is not a safe default.
+     Map the owner's own words: "flat", "apartment", "2BHK flat", "society flat" -> "apartment";
+     "builder floor", "independent floor", "ground floor of a builder floor" -> "builder_floor";
+     "house", "kothi", "independent house", "duplex" -> "independent_house"; "villa", "bungalow" -> "villa";
+     "office", "office space", "commercial office" -> "office"; "shop", "retail", "retail unit" -> "shop_retail";
+     "showroom" -> "showroom"; "warehouse", "godown", "industrial shed" -> "warehouse".
+   - floorNumber: which floor the unit is on, for a flat, builder floor, office, shop or showroom.
+     Ground floor = 0, basement = -1, "third floor" = 3.
+     CRITICAL: A unit or flat number NEVER establishes a floor. "Flat 402" does NOT mean floorNumber 4 - return null
+     unless the owner actually said which floor.
+   - storeys: how many storeys an independent house, villa or warehouse has ("single storey" = 1, "double storey",
+     "two floors", "G+1", "duplex" = 2, "G+2" = 3), or null.
+   - rentScope: for a RENT listing on a multi-storey house only - "whole_property" if the rent covers the entire
+     building ("the whole house", "both floors", "complete house"), "single_floor" if it covers one floor only
+     ("just the first floor", "only the upper portion"). null otherwise. NEVER infer this; it must be stated.
+   - washrooms: number of washrooms in a COMMERCIAL property (the commercial counterpart to bathrooms), or null.
+   - furnishingStatus: for a COMMERCIAL property - "bare_shell" ("bare shell", "warm shell", "unfurnished", "raw"),
+     "semi_furnished" ("semi furnished", "partly furnished"), or "fully_furnished" ("fully furnished", "plug and play",
+     "ready to move with furniture"). null otherwise.
+   - COMMERCIAL LISTINGS: bedrooms and bathrooms do not apply. Leave them null and use washrooms and furnishingStatus
+     instead. sqft on a commercial listing is the carpet area.
    - price: numerical monthly rent or purchase price (e.g. 25000, or null)
    - bedrooms: number of bedrooms (e.g. 4, 0 for studio, or null)
    - bathrooms: number of full/half bathrooms (e.g. 3, 1.5, or null)
@@ -188,6 +229,20 @@ ${formattedDialogue}
               description: "Core property specifications. Output the value if spoken or confirmed, or null if unknown.",
               properties: {
                 listingType: { type: "string", enum: ["rent", "sale"], nullable: true },
+                propertyType: {
+                  type: "string",
+                  enum: [...RESIDENTIAL_TYPES, ...COMMERCIAL_TYPES],
+                  nullable: true,
+                },
+                floorNumber: { type: "number", nullable: true },
+                storeys: { type: "number", nullable: true },
+                rentScope: { type: "string", enum: ["whole_property", "single_floor"], nullable: true },
+                washrooms: { type: "number", nullable: true },
+                furnishingStatus: {
+                  type: "string",
+                  enum: ["bare_shell", "semi_furnished", "fully_furnished"],
+                  nullable: true,
+                },
                 price: { type: "number", nullable: true },
                 bedrooms: { type: "number", nullable: true },
                 bathrooms: { type: "number", nullable: true },
@@ -197,7 +252,7 @@ ${formattedDialogue}
                 state: { type: "string", nullable: true },
                 zipCode: { type: "string", nullable: true },
               },
-              required: ["listingType", "price", "bedrooms", "bathrooms", "sqft", "address"],
+              required: ["listingType", "propertyType", "price", "bedrooms", "bathrooms", "sqft", "address"],
             },
             additionalSpecs: {
               type: "object",
@@ -273,6 +328,37 @@ ${formattedDialogue}
       updates.listingType = rawCore.listingType;
     }
 
+    // Property type stays correctable all session (unlike listingType); an owner who misspeaks
+    // "flat" for "builder floor" must be able to fix it.
+    if (isPropertyType(rawCore.propertyType)) {
+      updates.propertyType = rawCore.propertyType;
+    }
+    // Ground floor is 0 and a basement is negative, so truthiness would silently drop both.
+    if (
+      typeof rawCore.floorNumber === "number" &&
+      !isNaN(rawCore.floorNumber) &&
+      rawCore.floorNumber >= -5 &&
+      rawCore.floorNumber <= 200
+    ) {
+      updates.floorNumber = Math.round(rawCore.floorNumber);
+    }
+    if (typeof rawCore.storeys === "number" && !isNaN(rawCore.storeys) && rawCore.storeys >= 1) {
+      updates.storeys = Math.round(rawCore.storeys);
+    }
+    if (rawCore.rentScope === "whole_property" || rawCore.rentScope === "single_floor") {
+      updates.rentScope = rawCore.rentScope;
+    }
+    // A shop with no washroom is a real answer, so 0 is stated data and null is silence.
+    if (typeof rawCore.washrooms === "number" && !isNaN(rawCore.washrooms) && rawCore.washrooms >= 0) {
+      updates.washrooms = Math.round(rawCore.washrooms);
+    }
+    if (
+      rawCore.furnishingStatus === "bare_shell" ||
+      rawCore.furnishingStatus === "semi_furnished" ||
+      rawCore.furnishingStatus === "fully_furnished"
+    ) {
+      updates.furnishingStatus = rawCore.furnishingStatus;
+    }
     if (typeof rawCore.price === "number" && !isNaN(rawCore.price) && rawCore.price > 0) {
       updates.price = rawCore.price;
     }

@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { VoiceSalesAgentModal } from "@/components/voice/VoiceSalesAgentModal";
 import { BASE_PATH } from "@/lib/base-path";
+import { formatPropertyTypeLabel } from "@/lib/property-types";
 
 export interface DiscoveryPropertyItem {
   id: number;
@@ -362,7 +363,7 @@ export function ListingsDiscoveryClient({
                           {prop.listingType === "rent" ? "For Rent" : "For Sale"}
                         </span>
                         <span className="px-2.5 py-0.5 rounded-lg bg-emerald-500/90 text-white text-[10px] font-bold uppercase">
-                          {prop.propertyType}
+                          {formatPropertyTypeLabel(prop.propertyType)}
                         </span>
                       </div>
 

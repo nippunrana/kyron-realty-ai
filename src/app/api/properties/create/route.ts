@@ -24,12 +24,20 @@ export async function POST(req: NextRequest) {
     const { property, knowledgeBase, negotiationMatrix, draftId } = body || {};
 
     if (property && !property.title && property.address) {
-      property.title = buildDefaultTitle(property.address, property.bedrooms);
+      property.title = buildDefaultTitle(property.address, property.bedrooms, property.listingType, property.propertyType);
     }
 
-    if (!property || !property.title || !property.price || !property.address || !property.listingType) {
+    // "" is a valid non-null text column, so the no-default rule needs a gate here, not just a comment.
+    if (
+      !property ||
+      !property.title ||
+      !property.price ||
+      !property.address ||
+      !property.listingType ||
+      !property.propertyType
+    ) {
       return NextResponse.json(
-        { error: "Property title, price, address, and listing type are required." },
+        { error: "Property title, price, address, listing type, and property type are required." },
         { status: 400 }
       );
     }
@@ -74,7 +82,7 @@ export async function POST(req: NextRequest) {
           title: property.title,
           description: property.description || "",
           listingType: property.listingType,
-          propertyType: property.propertyType || "apartment",
+          propertyType: property.propertyType,
           status: "active",
           price: String(property.price),
           securityDeposit: property.securityDeposit ? String(property.securityDeposit) : null,
@@ -89,6 +97,11 @@ export async function POST(req: NextRequest) {
           bedrooms: property.bedrooms ? Number(property.bedrooms) : null,
           bathrooms: property.bathrooms ? String(property.bathrooms) : null,
           sqft: property.sqft ? Number(property.sqft) : null,
+          floorNumber: property.floorNumber ?? null,
+          storeys: property.storeys ?? null,
+          rentScope: property.rentScope || null,
+          washrooms: property.washrooms ?? null,
+          furnishingStatus: property.furnishingStatus || null,
           yearBuilt: property.yearBuilt ? Number(property.yearBuilt) : null,
           availableDate: parseAvailableDate(property.availableDate),
           coverImageUrl: property.coverImageUrl || (property.images && property.images[0]) || null,
@@ -124,7 +137,7 @@ export async function POST(req: NextRequest) {
           title: property.title,
           description: property.description || "",
           listingType: property.listingType,
-          propertyType: property.propertyType || "apartment",
+          propertyType: property.propertyType,
           status: "active",
           price: String(property.price),
           securityDeposit: property.securityDeposit ? String(property.securityDeposit) : null,
@@ -139,6 +152,11 @@ export async function POST(req: NextRequest) {
           bedrooms: property.bedrooms ? Number(property.bedrooms) : null,
           bathrooms: property.bathrooms ? String(property.bathrooms) : null,
           sqft: property.sqft ? Number(property.sqft) : null,
+          floorNumber: property.floorNumber ?? null,
+          storeys: property.storeys ?? null,
+          rentScope: property.rentScope || null,
+          washrooms: property.washrooms ?? null,
+          furnishingStatus: property.furnishingStatus || null,
           yearBuilt: property.yearBuilt ? Number(property.yearBuilt) : null,
           availableDate: parseAvailableDate(property.availableDate),
           coverImageUrl: property.coverImageUrl || (property.images && property.images[0]) || null,

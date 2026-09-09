@@ -8,6 +8,7 @@ import {
 } from "./listing-helpers";
 import { getGeminiApiKey, computeGeminiCost, type GeminiUsage } from "./gemini";
 import type { HyperLocalKbData } from "@/db/schema";
+import type { FurnishingStatus, PropertyType, RentScope } from "./property-types";
 
 export interface ExtractedPropertyPayload {
   property: {
@@ -15,7 +16,7 @@ export interface ExtractedPropertyPayload {
     slug: string;
     description: string;
     listingType: ListingType;
-    propertyType: "apartment" | "single_family" | "condo" | "townhouse" | "commercial";
+    propertyType: PropertyType;
     price: number;
     securityDeposit: number;
     minLeaseMonths: number;
@@ -29,6 +30,11 @@ export interface ExtractedPropertyPayload {
     bedrooms: number;
     bathrooms: number;
     sqft: number;
+    floorNumber: number | null;
+    storeys: number | null;
+    rentScope: RentScope;
+    washrooms: number | null;
+    furnishingStatus: FurnishingStatus;
     yearBuilt: number;
     availableDate?: string;
     amenities: string[];
@@ -146,6 +152,12 @@ CORE ZERO-HALLUCINATION & FACT-VS-COPY PRINCIPLES:
    - ZERO-HALLUCINATION RULE: ONLY extract facts that are EXPLICITLY stated in the input.
    - If an atomic fact has not been stated, you MUST return 0 for numeric fields and "" for text fields.
    - NEVER invent or guess street addresses, prices, bedroom/bathroom counts, or square footage.
+   - PROPERTY TYPE IS NEVER A DEFAULT: return propertyType "" unless the owner actually said what kind of
+     place it is. "apartment" is not a safe guess - it is a false claim about the property.
+   - floorNumber, storeys, rentScope, washrooms and furnishingStatus follow the same rule: null or "" unless stated.
+     A unit number such as "Flat 402" does NOT establish a floor. Never derive floorNumber from it.
+   - rentScope is "single_floor" only if the owner said the rent covers one floor of a multi-storey building,
+     and "whole_property" only if they said it covers the whole building.
    - If analyzing a conversation transcript between an owner and Elena Vance, extract facts ONLY from what the owner states, NEVER from assistant suggestions or examples.
 
 2. AUDIT & RECONCILIATION TASK:
@@ -179,7 +191,7 @@ Return a strictly valid JSON object matching this schema:
     "title": string,
     "description": string,
     "listingType": "rent" | "sale" | "",
-    "propertyType": "apartment" | "single_family" | "condo" | "townhouse" | "commercial",
+    "propertyType": "apartment" | "builder_floor" | "independent_house" | "villa" | "office" | "shop_retail" | "showroom" | "warehouse" | "",
     "price": number,
     "securityDeposit": number,
     "minLeaseMonths": number,
@@ -193,6 +205,11 @@ Return a strictly valid JSON object matching this schema:
     "bedrooms": number,
     "bathrooms": number,
     "sqft": number,
+    "floorNumber": number | null,
+    "storeys": number | null,
+    "rentScope": "whole_property" | "single_floor" | "",
+    "washrooms": number | null,
+    "furnishingStatus": "bare_shell" | "semi_furnished" | "fully_furnished" | "",
     "yearBuilt": number,
     "availableDate": string,
     "amenities": string[],

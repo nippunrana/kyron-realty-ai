@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (!property.title && property.address) {
-      property.title = buildDefaultTitle(property.address, property.bedrooms);
+      property.title = buildDefaultTitle(property.address, property.bedrooms, property.listingType, property.propertyType);
     }
 
     const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || "localhost:3000";
@@ -67,6 +67,11 @@ export async function POST(req: NextRequest) {
           bedrooms: property.bedrooms ? Number(property.bedrooms) : existingDraft.bedrooms,
           bathrooms: property.bathrooms ? String(property.bathrooms) : existingDraft.bathrooms,
           sqft: property.sqft ? Number(property.sqft) : existingDraft.sqft,
+          floorNumber: property.floorNumber ?? existingDraft.floorNumber,
+          storeys: property.storeys ?? existingDraft.storeys,
+          rentScope: property.rentScope || existingDraft.rentScope,
+          washrooms: property.washrooms ?? existingDraft.washrooms,
+          furnishingStatus: property.furnishingStatus || existingDraft.furnishingStatus,
           availableDate: parseAvailableDate(property.availableDate) ?? existingDraft.availableDate,
           images: Array.isArray(property.images) ? property.images : existingDraft.images,
           coverImageUrl: property.coverImageUrl || existingDraft.coverImageUrl,
@@ -95,7 +100,7 @@ export async function POST(req: NextRequest) {
           title: property.title || "Untitled Draft Property",
           description: property.description || "",
           listingType: property.listingType || "rent",
-          propertyType: property.propertyType || "apartment",
+          propertyType: property.propertyType,
           status: "draft",
           price: String(property.price || 0),
           securityDeposit: property.securityDeposit ? String(property.securityDeposit) : null,
@@ -110,6 +115,11 @@ export async function POST(req: NextRequest) {
           bedrooms: property.bedrooms ? Number(property.bedrooms) : null,
           bathrooms: property.bathrooms ? String(property.bathrooms) : null,
           sqft: property.sqft ? Number(property.sqft) : null,
+          floorNumber: property.floorNumber ?? null,
+          storeys: property.storeys ?? null,
+          rentScope: property.rentScope || null,
+          washrooms: property.washrooms ?? null,
+          furnishingStatus: property.furnishingStatus || null,
           yearBuilt: property.yearBuilt ? Number(property.yearBuilt) : null,
           availableDate: parseAvailableDate(property.availableDate),
           coverImageUrl: property.coverImageUrl || (Array.isArray(property.images) && property.images[0]) || null,

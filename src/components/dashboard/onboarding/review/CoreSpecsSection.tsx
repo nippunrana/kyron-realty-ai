@@ -1,8 +1,14 @@
 "use client";
 
-import { Bed, Bath, Maximize2, CheckCircle2 } from "lucide-react";
+import { Bed, Bath, Maximize2, CheckCircle2, Building2, Sofa } from "lucide-react";
 import type { ExtractedPropertyPayload } from "@/lib/kb-extractor";
-import { getCoreSpecStatus, isStudioListing } from "../inspector-specs";
+import { getCoreSpecRows, getCoreSpecStatus, isStudioListing } from "../inspector-specs";
+import {
+  describePropertyType,
+  FURNISHING_LABELS,
+  isCommercial,
+  type FurnishingStatus,
+} from "@/lib/property-types";
 
 /** A detail the owner has not given yet says so. Never fill in a plausible guess. */
 const PENDING = "Not given yet";
@@ -12,14 +18,16 @@ interface CoreSpecsSectionProps {
 }
 
 /**
- * The six main details, anchored by one dark card carrying the listing's identity -
+ * The seven main details, anchored by one dark card carrying the listing's identity -
  * address, price and rent-or-sale - so the eye lands there first in an otherwise light card.
  */
 export function CoreSpecsSection({ property }: CoreSpecsSectionProps) {
   const isRent = property.listingType === "rent";
   const status = getCoreSpecStatus(property);
-  const checkedCount = Object.values(status).filter(Boolean).length;
+  const rows = getCoreSpecRows(property);
+  const checkedCount = rows.filter((key) => status[key]).length;
   const isStudio = isStudioListing(property);
+  const commercial = isCommercial(property.propertyType);
 
   const fullAddress =
     [property.address, property.city, property.state].filter(Boolean).join(", ") || PENDING;
@@ -31,30 +39,52 @@ export function CoreSpecsSection({ property }: CoreSpecsSectionProps) {
 
   const listingLabel = status.listingType ? (isRent ? "For rent" : "For sale") : PENDING;
 
-  const cells = [
-    {
-      icon: Bed,
-      label: "Bedrooms",
-      value: status.bedrooms ? (isStudio ? "Studio" : `${property.bedrooms}`) : PENDING,
-    },
-    {
-      icon: Bath,
-      label: "Bathrooms",
-      value: status.bathrooms ? `${property.bathrooms}` : PENDING,
-    },
-    {
-      icon: Maximize2,
-      label: "Size",
-      value: status.sqft ? `${Number(property.sqft).toLocaleString("en-IN")} sqft` : PENDING,
-    },
-  ];
+  const typeLabel = describePropertyType(property) || PENDING;
+
+  const cells = commercial
+    ? [
+        {
+          icon: Bath,
+          label: "Washrooms",
+          value: status.washrooms ? `${property.washrooms}` : PENDING,
+        },
+        {
+          icon: Sofa,
+          label: "Furnishing",
+          value: property.furnishingStatus
+            ? FURNISHING_LABELS[property.furnishingStatus as Exclude<FurnishingStatus, "">]
+            : PENDING,
+        },
+        {
+          icon: Maximize2,
+          label: "Carpet area",
+          value: status.sqft ? `${Number(property.sqft).toLocaleString("en-IN")} sqft` : PENDING,
+        },
+      ]
+    : [
+        {
+          icon: Bed,
+          label: "Bedrooms",
+          value: status.bedrooms ? (isStudio ? "Studio" : `${property.bedrooms}`) : PENDING,
+        },
+        {
+          icon: Bath,
+          label: "Bathrooms",
+          value: status.bathrooms ? `${property.bathrooms}` : PENDING,
+        },
+        {
+          icon: Maximize2,
+          label: "Size",
+          value: status.sqft ? `${Number(property.sqft).toLocaleString("en-IN")} sqft` : PENDING,
+        },
+      ];
 
   return (
     <section className="space-y-2.5">
       <SectionLabel
         title="Main details"
-        note={`${checkedCount} of 6 filled in`}
-        isComplete={checkedCount === 6}
+        note={`${checkedCount} of ${rows.length} filled in`}
+        isComplete={checkedCount === rows.length}
       />
 
       {/* Dark anchor: the three facts a buyer asks for first. */}
@@ -74,6 +104,13 @@ export function CoreSpecsSection({ property }: CoreSpecsSectionProps) {
               Listing
             </p>
             <p className="text-lg font-bold">{listingLabel}</p>
+          </div>
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+              <Building2 className="w-3 h-3" />
+              Property type
+            </p>
+            <p className="text-lg font-bold break-words">{typeLabel}</p>
           </div>
         </div>
       </div>

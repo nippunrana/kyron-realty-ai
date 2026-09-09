@@ -21,6 +21,8 @@ interface SuggestionGroup {
 
 interface ExtraSpecsSuggestionBarProps {
   listingType: "rent" | "sale";
+  /** A commercial space has no pet policy and no occupancy story - see Elena's Stage 3 bundles. */
+  isCommercial?: boolean;
   currentValues: {
     parkingDetail?: string;
     petPolicyDetail?: string;
@@ -69,6 +71,7 @@ function deriveFallbackPill(text: string, category: string): string {
 
 export function ExtraSpecsSuggestionBar({
   listingType,
+  isCommercial = false,
   currentValues,
   pillLabels,
   onApplyChip,
@@ -294,7 +297,12 @@ export function ExtraSpecsSuggestionBar({
     []
   );
 
-  const groups = isRent ? rentGroups : saleGroups;
+  // Elena never asks a commercial owner for a pet policy or an occupancy story, so the
+  // chips must not offer them either; the rest of the bar applies to any listing.
+  const COMMERCIAL_EXCLUDED = ["pets", "occupancy"];
+  const groups = (isRent ? rentGroups : saleGroups).filter(
+    (g) => !isCommercial || !COMMERCIAL_EXCLUDED.includes(g.id)
+  );
 
   /** Precise chip active detection eliminating substring false positives */
   const isChipActive = (chip: ChipItem): boolean => {
@@ -383,7 +391,7 @@ export function ExtraSpecsSuggestionBar({
           </div>
         </div>
         <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full">
-          {isRent ? "Rental Insights" : "Sale Intelligence"}
+          {isCommercial ? "Commercial Insights" : isRent ? "Rental Insights" : "Sale Intelligence"}
         </span>
       </div>
 

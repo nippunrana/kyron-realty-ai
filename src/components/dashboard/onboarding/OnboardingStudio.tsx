@@ -23,7 +23,7 @@ const emptyInitialDraftState: ExtractedPropertyPayload = {
     slug: "",
     description: "",
     listingType: "",
-    propertyType: "apartment",
+    propertyType: "",
     price: 0,
     securityDeposit: 0,
     minLeaseMonths: 12,
@@ -37,6 +37,11 @@ const emptyInitialDraftState: ExtractedPropertyPayload = {
     bedrooms: 0,
     bathrooms: 0,
     sqft: 0,
+    floorNumber: null,
+    storeys: null,
+    rentScope: "",
+    washrooms: null,
+    furnishingStatus: "",
     yearBuilt: 0,
     amenities: [],
     features: [],
@@ -269,6 +274,11 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
             bedrooms: prop.bedrooms ?? 0,
             bathrooms: Number(prop.bathrooms) || 0,
             sqft: prop.sqft ?? 0,
+            floorNumber: prop.floorNumber ?? null,
+            storeys: prop.storeys ?? null,
+            rentScope: prop.rentScope || "",
+            washrooms: prop.washrooms ?? null,
+            furnishingStatus: prop.furnishingStatus || "",
             yearBuilt: prop.yearBuilt ?? 0,
             amenities: Array.isArray(prop.amenities) ? prop.amenities : prev.property.amenities,
             features: Array.isArray(prop.features) ? prop.features : prev.property.features,
@@ -644,7 +654,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
       if (action === "open_core_modal") {
         if (onboardingStageRef.current === "core") {
           if (areCoreSpecsVerified(dataRef.current.property)) {
-            addTelemetryLog("MODAL-TRIGGER", "Opening Core Specs Review Card (Verified 6/6)", null, undefined, "success");
+            addTelemetryLog("MODAL-TRIGGER", "Opening Core Specs Review Card (all core specs verified)", null, undefined, "success");
             setShowCoreModal(true);
             pendingModalOpenRef.current = false;
           } else {
@@ -689,7 +699,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
       } else if (action === "open_review_modal") {
         if (onboardingStageRef.current === "core") {
           if (areCoreSpecsVerified(dataRef.current.property)) {
-            addTelemetryLog("MODAL-TRIGGER", "Opening Core Specs Review Card (Verified 6/6)", null, undefined, "success");
+            addTelemetryLog("MODAL-TRIGGER", "Opening Core Specs Review Card (all core specs verified)", null, undefined, "success");
             setShowCoreModal(true);
             pendingModalOpenRef.current = false;
           } else {
@@ -897,7 +907,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
         );
       }
 
-      // Check if all 6 core specs are now verified in state
+      // Check if every core spec is now verified in state
       const isCoreComplete = areCoreSpecsVerified(candidateProperty);
 
       // In-Flight Sync Gate: Core Specs
@@ -916,7 +926,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
       if (json.success && json.data?.modalAction) {
         const action = json.data.modalAction;
         if (action === "open_core") {
-          // Strictly guard: Only open if all 6 core specs are truly verified
+          // Strictly guard: Only open if every core spec is truly verified
           if (isCoreComplete) {
             setShowCoreModal(true);
           } else {
@@ -1117,7 +1127,12 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
             description: newProp.description || prev.property.description,
             // Protect live-verified specs: do not let end-of-call synthesis clobber them
             listingType: verified.listingType ? prev.property.listingType : newProp.listingType,
-            propertyType: prev.property.propertyType || newProp.propertyType,
+            propertyType: prev.property.propertyType || newProp.propertyType || "",
+            floorNumber: prev.property.floorNumber ?? newProp.floorNumber ?? null,
+            storeys: prev.property.storeys ?? newProp.storeys ?? null,
+            rentScope: prev.property.rentScope || newProp.rentScope || "",
+            washrooms: prev.property.washrooms ?? newProp.washrooms ?? null,
+            furnishingStatus: prev.property.furnishingStatus || newProp.furnishingStatus || "",
             price: verified.price ? prev.property.price : (newProp.price || 0),
             securityDeposit: newProp.securityDeposit || prev.property.securityDeposit,
             minLeaseMonths: newProp.minLeaseMonths || prev.property.minLeaseMonths,
@@ -1323,7 +1338,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
         </div>
       </div>
 
-      {/* 1. Core Specs Review Modal (Stage 2: 6/6 Core Specs Verified) */}
+      {/* 1. Core Specs Review Modal (Stage 2: all core specs verified) */}
       {showCoreModal && (
         <ReviewSpecsModal
           mode="core"
