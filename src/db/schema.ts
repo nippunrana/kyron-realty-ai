@@ -177,9 +177,6 @@ export interface PropertyNegotiationRules {
   notesForAgent?: string | null;
 }
 
-export type PropertyKnowledgeBase = PropertyKnowledgeBaseData;
-export type NegotiationMatrix = PropertyNegotiationRules;
-
 // ==========================================
 // 5. VOICE SESSIONS (AGORA CALL RECORDS)
 // ==========================================
