@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, Layers, Home, KeyRound, Sofa, Check } from "lucide-react";
+import { Building2, Layers, Home, KeyRound, Sofa, Bath, Check } from "lucide-react";
 import type { ExtractedPropertyPayload } from "@/lib/kb-extractor";
 import {
   COMMERCIAL_TYPES,
@@ -14,10 +14,11 @@ import {
 } from "@/lib/property-types";
 
 type Property = ExtractedPropertyPayload["property"];
+type KnowledgeBase = ExtractedPropertyPayload["knowledgeBase"];
 
 interface CoreChip {
   label: string;
-  field: "propertyType" | "floorNumber" | "storeys" | "rentScope" | "furnishingStatus";
+  field: "propertyType" | "floorNumber" | "storeys" | "rentScope" | "furnishingStatus" | "washrooms" | "washroomDetail";
   value: string | number;
 }
 
@@ -33,6 +34,7 @@ const STOREY_CHOICES = [1, 2, 3];
 
 interface CoreSpecsSuggestionBarProps {
   property: Property;
+  knowledgeBase?: KnowledgeBase;
   onApplyChip: (field: string, value: string | number) => void;
 }
 
@@ -43,7 +45,7 @@ interface CoreSpecsSuggestionBarProps {
  * Only the groups this property's type actually needs are rendered, so a flat owner is
  * never shown a storeys row and a seller is never shown the rent-scope row.
  */
-export function CoreSpecsSuggestionBar({ property, onApplyChip }: CoreSpecsSuggestionBarProps) {
+export function CoreSpecsSuggestionBar({ property, knowledgeBase, onApplyChip }: CoreSpecsSuggestionBarProps) {
   const commercial = isCommercial(property.propertyType);
   const missingSlot = getMissingTypeSlot(property);
 
@@ -111,6 +113,18 @@ export function CoreSpecsSuggestionBar({ property, onApplyChip }: CoreSpecsSugge
         value: v,
       })),
     });
+
+    groups.push({
+      id: "washrooms",
+      label: "Washrooms",
+      icon: Bath,
+      chips: [
+        { label: "Tower Provided", field: "washroomDetail", value: "Provided by the tower" },
+        { label: "1 Washroom", field: "washrooms", value: 1 },
+        { label: "2 Washrooms", field: "washrooms", value: 2 },
+        { label: "3+ Washrooms", field: "washrooms", value: 3 },
+      ],
+    });
   }
 
   const isChipActive = (chip: CoreChip): boolean => {
@@ -125,6 +139,10 @@ export function CoreSpecsSuggestionBar({ property, onApplyChip }: CoreSpecsSugge
         return property.rentScope === chip.value;
       case "furnishingStatus":
         return property.furnishingStatus === chip.value;
+      case "washroomDetail":
+        return knowledgeBase?.washroomDetail === chip.value;
+      case "washrooms":
+        return property.washrooms === chip.value;
     }
   };
 

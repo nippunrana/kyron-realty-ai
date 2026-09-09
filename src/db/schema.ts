@@ -63,6 +63,12 @@ export const properties = pgTable("properties", {
   aiGrowthScore: integer("ai_growth_score"),
   onboardingSource: text("onboarding_source").default("conversational_wizard"), // 'voice_chat' | 'manual'
   sourceUrl: text("source_url"),
+
+  // Consolidated AI Knowledge Base & Intelligence (RAG & Voice Brain)
+  knowledgeBase: jsonb("knowledge_base").$type<PropertyKnowledgeBaseData>(),
+
+  // Consolidated Financial & Negotiation Guardrails
+  negotiationRules: jsonb("negotiation_rules").$type<PropertyNegotiationRules>(),
   
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -136,67 +142,43 @@ export interface HyperLocalKbData {
   searchTags?: string[];
 }
 
-// ==========================================
-// 3. PROPERTY KNOWLEDGE BASES (RAG & VOICE AGENT BRAIN)
-// ==========================================
-export const propertyKnowledgeBases = pgTable("property_knowledge_bases", {
-  id: serial("id").primaryKey(),
-  propertyId: integer("property_id").notNull().unique().references(() => properties.id, { onDelete: "cascade" }),
-  
-  // Fast Search & Filter Columns
-  city: text("city"),
-  state: text("state"),
-  listingType: text("listing_type"),
-  price: numeric("price", { precision: 12, scale: 2 }),
+export interface PropertyKnowledgeBaseData {
+  rawScrapedMarkdown?: string | null;
+  synthesizedSalesPitch?: string | null;
+  neighborhoodSummary?: string | null;
+  schoolDistrictInfo?: string | null;
+  petPolicyDetail?: string | null;
+  parkingDetail?: string | null;
+  utilitiesDetail?: string | null;
+  washroomDetail?: string | null;
+  applicationProcess?: string | null;
+  faqs?: Array<{ question: string; answer: string; category: string }>;
+  kbData?: HyperLocalKbData | null;
+  eaScript?: string | null;
+  agentTone?: string | null;
+  greetingMessage?: string | null;
+  contactEmail?: string | null;
+}
 
-  // Raw and Synthesized Content
-  rawScrapedMarkdown: text("raw_scraped_markdown"),
-  synthesizedSalesPitch: text("synthesized_sales_pitch"),
-  neighborhoodSummary: text("neighborhood_summary"),
-  schoolDistrictInfo: text("school_district_info"),
-  petPolicyDetail: text("pet_policy_detail"),
-  parkingDetail: text("parking_detail"),
-  utilitiesDetail: text("utilities_detail"),
-  applicationProcess: text("application_process"),
-  
-  // Structured FAQ Array for Real-Time LLM Context
-  faqs: jsonb("faqs").$type<Array<{ question: string; answer: string; category: string }>>().default([]),
-  
-  // Enriched Hyper-Local Document & Compiled Estate Agent Script
-  kbData: jsonb("kb_data").$type<HyperLocalKbData>(),
-  eaScript: text("ea_script"),
+export interface ConcessionRule {
+  condition: string;
+  concession: string;
+  maxConcessionValue: number;
+  requiresApproval: boolean;
+}
 
-  // Agent Persona Settings
-  agentTone: text("agent_tone").default("warm_professional"),
-  greetingMessage: text("greeting_message"),
-  
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+export interface PropertyNegotiationRules {
+  allowNegotiation?: boolean;
+  targetPrice?: number;
+  minFloorPrice?: number;
+  maxAllowedDiscountPct?: number;
+  concessionRules?: ConcessionRule[];
+  brokerEscalationThreshold?: number | null;
+  notesForAgent?: string | null;
+}
 
-// ==========================================
-// 4. NEGOTIATION MATRICES & CONCESSION GUARDRAILS
-// ==========================================
-export const negotiationMatrices = pgTable("negotiation_matrices", {
-  id: serial("id").primaryKey(),
-  propertyId: integer("property_id").notNull().unique().references(() => properties.id, { onDelete: "cascade" }),
-  
-  allowNegotiation: boolean("allow_negotiation").default(true),
-  targetPrice: numeric("target_price", { precision: 12, scale: 2 }).notNull(),
-  minFloorPrice: numeric("min_floor_price", { precision: 12, scale: 2 }).notNull(),
-  maxAllowedDiscountPct: numeric("max_allowed_discount_pct", { precision: 4, scale: 2 }).default("5.00"),
-  
-  concessionRules: jsonb("concession_rules").$type<Array<{
-    condition: string;
-    concession: string;
-    maxConcessionValue: number;
-    requiresApproval: boolean;
-  }>>().default([]),
-  
-  brokerEscalationThreshold: numeric("broker_escalation_threshold", { precision: 12, scale: 2 }),
-  notesForAgent: text("notes_for_agent"),
-  
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+export type PropertyKnowledgeBase = PropertyKnowledgeBaseData;
+export type NegotiationMatrix = PropertyNegotiationRules;
 
 // ==========================================
 // 5. VOICE SESSIONS (AGORA CALL RECORDS)

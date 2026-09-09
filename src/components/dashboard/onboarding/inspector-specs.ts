@@ -80,7 +80,10 @@ export function getCoreSpecRows(property: Property): readonly CoreSpecKey[] {
  * Every key is answered honestly here; `getCoreSpecRows` decides which seven of them
  * this listing is actually judged on.
  */
-export function getCoreSpecStatus(property: Property): Record<CoreSpecKey, boolean> {
+export function getCoreSpecStatus(
+  property: Property,
+  knowledgeBase?: Partial<KnowledgeBase>
+): Record<CoreSpecKey, boolean> {
   return {
     listingType: property.listingType === "rent" || property.listingType === "sale",
     // Property type verifies as soon as a valid property type is selected/stated.
@@ -90,20 +93,28 @@ export function getCoreSpecStatus(property: Property): Record<CoreSpecKey, boole
     bedrooms: Number(property.bedrooms) > 0 || isStudioListing(property),
     bathrooms: Number(property.bathrooms) > 0,
     sqft: Number(property.sqft) > 0,
-    // A shop with no washroom is a real answer, so 0 counts and only null is silence.
-    washrooms: property.washrooms !== null && property.washrooms !== undefined && property.washrooms >= 0,
+    // A commercial unit with tower-provided or stated washrooms counts as verified.
+    washrooms:
+      (property.washrooms !== null && property.washrooms !== undefined && property.washrooms >= 0) ||
+      Boolean(knowledgeBase?.washroomDetail && knowledgeBase.washroomDetail.trim().length > 0),
     furnishingStatus: Boolean(property.furnishingStatus),
   };
 }
 
-export function areCoreSpecsVerified(property: Property): boolean {
-  const status = getCoreSpecStatus(property);
+export function areCoreSpecsVerified(
+  property: Property,
+  knowledgeBase?: Partial<KnowledgeBase>
+): boolean {
+  const status = getCoreSpecStatus(property, knowledgeBase);
   return getCoreSpecRows(property).every((key) => status[key]);
 }
 
 /** The seven core attributes the deploy button waits on, with their display values. */
-export function buildChecklistItems(property: Property): ChecklistItemData[] {
-  const status = getCoreSpecStatus(property);
+export function buildChecklistItems(
+  property: Property,
+  knowledgeBase?: Partial<KnowledgeBase>
+): ChecklistItemData[] {
+  const status = getCoreSpecStatus(property, knowledgeBase);
   const commercial = isCommercial(property.propertyType);
 
   const items: Record<CoreSpecKey, ChecklistItemData> = {
@@ -173,9 +184,15 @@ export function buildChecklistItems(property: Property): ChecklistItemData[] {
     washrooms: {
       id: "washrooms",
       label: "Washrooms",
-      sublabel: "Number of washrooms on site",
+      sublabel: "Washroom arrangement",
       isComplete: status.washrooms,
-      valueDisplay: status.washrooms ? `${property.washrooms} Washrooms` : null,
+      valueDisplay: status.washrooms
+        ? knowledgeBase?.washroomDetail
+          ? knowledgeBase.washroomDetail
+          : property.washrooms === 0
+          ? "Tower Provided"
+          : `${property.washrooms} Washroom${property.washrooms === 1 ? "" : "s"}`
+        : null,
     },
     furnishingStatus: {
       id: "furnishing_status",

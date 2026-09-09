@@ -2,7 +2,7 @@ import { cache } from "react";
 import { notFound } from "next/navigation";
 import { Metadata } from "next";
 import { db } from "@/db";
-import { properties, propertyKnowledgeBases, propertyMedia } from "@/db/schema";
+import { properties, propertyMedia } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { PublicListingClient } from "@/components/public/PublicListingClient";
 import { BASE_PATH, PUBLIC_ORIGIN } from "@/lib/base-path";
@@ -59,12 +59,8 @@ export default async function PublicListingPage({ params }: ListingPageProps) {
     notFound();
   }
 
-  // 2. Fetch Knowledge Base
-  const [knowledgeBase] = await db
-    .select()
-    .from(propertyKnowledgeBases)
-    .where(eq(propertyKnowledgeBases.propertyId, property.id))
-    .limit(1);
+  // 2. Knowledge Base is stored directly on property
+  const knowledgeBase = property.knowledgeBase;
 
   // 3. Fetch Media
   const media = await db

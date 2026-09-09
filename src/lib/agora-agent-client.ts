@@ -6,7 +6,7 @@ import {
   getAgoraCredentials,
 } from "./agora-token";
 import { db } from "@/db";
-import { properties, propertyKnowledgeBases, negotiationMatrices, voiceSessions, users } from "@/db/schema";
+import { properties, voiceSessions, users } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { computeFloorPrice } from "./listing-helpers";
 import { DEMO_LISTING, DEMO_LISTING_SLUG } from "./demo-listing";
@@ -77,10 +77,8 @@ export async function startAgoraAgentSession(
   // Validated once here; the token builders below re-read the same credentials.
   const { appId } = getAgoraCredentials();
 
-  // 1. Fetch property, knowledge base & guardrails
+  // 1. Fetch property (with its consolidated knowledge base & guardrails)
   let propertyRecord: any = null;
-  let kbRecord: any = null;
-  let matrixRecord: any = null;
   let ownerUserRecord: any = null;
 
   if (propertyId) {
@@ -91,34 +89,19 @@ export async function startAgoraAgentSession(
     propertyRecord = p;
   }
 
-  if (propertyRecord) {
-    // The three follow-up reads are independent; run them together instead of one after another.
-    const [[kb], [matrix], owner] = await Promise.all([
-      db
-        .select()
-        .from(propertyKnowledgeBases)
-        .where(eq(propertyKnowledgeBases.propertyId, propertyRecord.id))
-        .limit(1),
-      db
-        .select()
-        .from(negotiationMatrices)
-        .where(eq(negotiationMatrices.propertyId, propertyRecord.id))
-        .limit(1),
-      propertyRecord.ownerId
-        ? db
-            .select({ id: users.id, name: users.name, email: users.email })
-            .from(users)
-            .where(eq(users.id, propertyRecord.ownerId))
-            .limit(1)
-            .then(([u]) => u ?? null)
-            .catch((err) => {
-              console.warn("[Agora Voice Agent] Could not fetch owner user record:", err);
-              return null;
-            })
-        : Promise.resolve(null),
-    ]);
-    kbRecord = kb;
-    matrixRecord = matrix;
+  const kbRecord = propertyRecord?.knowledgeBase || null;
+  const matrixRecord = propertyRecord?.negotiationRules || null;
+
+  if (propertyRecord?.ownerId) {
+    const [owner] = await db
+      .select({ id: users.id, name: users.name, email: users.email })
+      .from(users)
+      .where(eq(users.id, propertyRecord.ownerId))
+      .limit(1)
+      .catch((err) => {
+        console.warn("[Agora Voice Agent] Could not fetch owner user record:", err);
+        return [null];
+      });
     ownerUserRecord = owner;
   }
 

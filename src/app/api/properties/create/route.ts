@@ -3,9 +3,9 @@ import { auth } from "@/auth";
 import { db } from "@/db";
 import {
   properties,
-  propertyKnowledgeBases,
-  negotiationMatrices,
   propertyMedia,
+  type PropertyKnowledgeBaseData,
+  type PropertyNegotiationRules,
 } from "@/db/schema";
 import QRCode from "qrcode";
 import { eq } from "drizzle-orm";
@@ -40,6 +40,66 @@ export async function POST(req: NextRequest) {
         { error: "Property title, price, address, listing type, and property type are required." },
         { status: 400 }
       );
+    }
+
+    // Prepare unified knowledge base payload
+    let knowledgeBasePayload: PropertyKnowledgeBaseData | null = null;
+    if (knowledgeBase) {
+      const faqs = Array.isArray(knowledgeBase.faqs) ? [...knowledgeBase.faqs] : [];
+      if (
+        knowledgeBase.contactEmail &&
+        !faqs.some(
+          (f: { category?: string; question?: string }) =>
+            f.category === "Contact" ||
+            (f.question && f.question.toLowerCase().includes("contact email"))
+        )
+      ) {
+        faqs.push({
+          category: "Contact",
+          question: "What is the contact email for inquiries?",
+          answer: `You can reach the listing contact directly at ${knowledgeBase.contactEmail}.`,
+        });
+      }
+
+      const applicationProcess = knowledgeBase.applicationProcess
+        ? `${knowledgeBase.applicationProcess}${
+            knowledgeBase.contactEmail && !knowledgeBase.applicationProcess.includes(knowledgeBase.contactEmail)
+              ? ` (Contact: ${knowledgeBase.contactEmail})`
+              : ""
+          }`
+        : knowledgeBase.contactEmail
+        ? `Direct inquiry contact: ${knowledgeBase.contactEmail}`
+        : "";
+
+      knowledgeBasePayload = {
+        rawScrapedMarkdown: knowledgeBase.rawScrapedMarkdown || "",
+        synthesizedSalesPitch: knowledgeBase.synthesizedSalesPitch || "",
+        neighborhoodSummary: knowledgeBase.neighborhoodSummary || "",
+        schoolDistrictInfo: knowledgeBase.schoolDistrictInfo || "",
+        petPolicyDetail: knowledgeBase.petPolicyDetail || "",
+        parkingDetail: knowledgeBase.parkingDetail || "",
+        utilitiesDetail: knowledgeBase.utilitiesDetail || "",
+        washroomDetail: knowledgeBase.washroomDetail || "",
+        applicationProcess,
+        faqs,
+        kbData: knowledgeBase.kbData || null,
+        eaScript: knowledgeBase.eaScript || null,
+        agentTone: knowledgeBase.agentTone || "warm_professional",
+        greetingMessage: knowledgeBase.greetingMessage || "",
+      };
+    }
+
+    // Prepare unified negotiation rules payload
+    let negotiationRulesPayload: PropertyNegotiationRules | null = null;
+    if (negotiationMatrix) {
+      negotiationRulesPayload = {
+        allowNegotiation: negotiationMatrix.allowNegotiation ?? true,
+        targetPrice: Number(negotiationMatrix.targetPrice || property.price),
+        minFloorPrice: Number(negotiationMatrix.minFloorPrice || computeFloorPrice(Number(property.price))),
+        maxAllowedDiscountPct: Number(negotiationMatrix.maxAllowedDiscountPct || 5),
+        concessionRules: negotiationMatrix.concessionRules || [],
+        notesForAgent: negotiationMatrix.notesForAgent || "",
+      };
     }
 
     // Determine public URL with subpath
@@ -108,6 +168,8 @@ export async function POST(req: NextRequest) {
           images: property.images || [],
           amenities: property.amenities || [],
           features: property.features || [],
+          knowledgeBase: knowledgeBasePayload,
+          negotiationRules: negotiationRulesPayload,
           qrCodeSvg,
           shareUrl,
           onboardingSource: property.onboardingSource || "conversational_wizard",
@@ -119,16 +181,14 @@ export async function POST(req: NextRequest) {
 
       insertedProperty = updated;
 
-      // Clean up previous draft knowledgebase & matrix rows if present to prevent duplicate conflicts
+      // Clean up previous draft media rows if present to prevent duplicate conflicts
       if (insertedProperty) {
-        await db.delete(propertyKnowledgeBases).where(eq(propertyKnowledgeBases.propertyId, insertedProperty.id));
-        await db.delete(negotiationMatrices).where(eq(negotiationMatrices.propertyId, insertedProperty.id));
         await db.delete(propertyMedia).where(eq(propertyMedia.propertyId, insertedProperty.id));
       }
     }
 
     if (!insertedProperty) {
-      // 1. Insert New Property
+      // 1. Insert New Property with unified JSONB columns
       const [inserted] = await db
         .insert(properties)
         .values({
@@ -163,6 +223,8 @@ export async function POST(req: NextRequest) {
           images: property.images || [],
           amenities: property.amenities || [],
           features: property.features || [],
+          knowledgeBase: knowledgeBasePayload,
+          negotiationRules: negotiationRulesPayload,
           qrCodeSvg,
           shareUrl,
           onboardingSource: property.onboardingSource || "conversational_wizard",
@@ -171,69 +233,6 @@ export async function POST(req: NextRequest) {
         .returning();
 
       insertedProperty = inserted;
-    }
-
-    // 2. Insert Knowledge Base
-    if (knowledgeBase) {
-      const faqs = Array.isArray(knowledgeBase.faqs) ? [...knowledgeBase.faqs] : [];
-      if (
-        knowledgeBase.contactEmail &&
-        !faqs.some(
-          (f: { category?: string; question?: string }) =>
-            f.category === "Contact" ||
-            (f.question && f.question.toLowerCase().includes("contact email"))
-        )
-      ) {
-        faqs.push({
-          category: "Contact",
-          question: "What is the contact email for inquiries?",
-          answer: `You can reach the listing contact directly at ${knowledgeBase.contactEmail}.`,
-        });
-      }
-
-      const applicationProcess = knowledgeBase.applicationProcess
-        ? `${knowledgeBase.applicationProcess}${
-            knowledgeBase.contactEmail && !knowledgeBase.applicationProcess.includes(knowledgeBase.contactEmail)
-              ? ` (Contact: ${knowledgeBase.contactEmail})`
-              : ""
-          }`
-        : knowledgeBase.contactEmail
-        ? `Direct inquiry contact: ${knowledgeBase.contactEmail}`
-        : "";
-
-      await db.insert(propertyKnowledgeBases).values({
-        propertyId: insertedProperty.id,
-        city: property.city || knowledgeBase.city || null,
-        state: property.state || knowledgeBase.state || null,
-        listingType: property.listingType || knowledgeBase.listingType || "rent",
-        price: property.price ? String(property.price) : null,
-        rawScrapedMarkdown: knowledgeBase.rawScrapedMarkdown || "",
-        synthesizedSalesPitch: knowledgeBase.synthesizedSalesPitch || "",
-        neighborhoodSummary: knowledgeBase.neighborhoodSummary || "",
-        schoolDistrictInfo: knowledgeBase.schoolDistrictInfo || "",
-        petPolicyDetail: knowledgeBase.petPolicyDetail || "",
-        parkingDetail: knowledgeBase.parkingDetail || "",
-        utilitiesDetail: knowledgeBase.utilitiesDetail || "",
-        applicationProcess,
-        faqs,
-        kbData: knowledgeBase.kbData || null,
-        eaScript: knowledgeBase.eaScript || null,
-        agentTone: knowledgeBase.agentTone || "warm_professional",
-        greetingMessage: knowledgeBase.greetingMessage || "",
-      });
-    }
-
-    // 3. Insert Negotiation Matrix
-    if (negotiationMatrix) {
-      await db.insert(negotiationMatrices).values({
-        propertyId: insertedProperty.id,
-        allowNegotiation: negotiationMatrix.allowNegotiation ?? true,
-        targetPrice: String(negotiationMatrix.targetPrice || property.price),
-        minFloorPrice: String(negotiationMatrix.minFloorPrice || computeFloorPrice(Number(property.price))),
-        maxAllowedDiscountPct: String(negotiationMatrix.maxAllowedDiscountPct || "5.00"),
-        concessionRules: negotiationMatrix.concessionRules || [],
-        notesForAgent: negotiationMatrix.notesForAgent || "",
-      });
     }
 
     // 4. Insert Media Assets

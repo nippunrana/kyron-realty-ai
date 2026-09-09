@@ -16,15 +16,16 @@ const PENDING = "Not given yet";
 
 interface CoreSpecsSectionProps {
   property: ExtractedPropertyPayload["property"];
+  knowledgeBase?: ExtractedPropertyPayload["knowledgeBase"];
 }
 
 /**
  * The seven main details, anchored by one dark card carrying the listing's identity -
  * address, price and rent-or-sale - so the eye lands there first in an otherwise light card.
  */
-export function CoreSpecsSection({ property }: CoreSpecsSectionProps) {
+export function CoreSpecsSection({ property, knowledgeBase }: CoreSpecsSectionProps) {
   const isRent = property.listingType === "rent";
-  const status = getCoreSpecStatus(property);
+  const status = getCoreSpecStatus(property, knowledgeBase);
   const rows = getCoreSpecRows(property);
   const checkedCount = rows.filter((key) => status[key]).length;
   const isStudio = isStudioListing(property);
@@ -46,7 +47,13 @@ export function CoreSpecsSection({ property }: CoreSpecsSectionProps) {
         {
           icon: Bath,
           label: "Washrooms",
-          value: status.washrooms ? `${property.washrooms}` : PENDING,
+          value: status.washrooms
+            ? knowledgeBase?.washroomDetail
+              ? knowledgeBase.washroomDetail
+              : property.washrooms === 0
+              ? "Tower / Common"
+              : `${property.washrooms} Washroom${property.washrooms === 1 ? "" : "s"}`
+            : PENDING,
         },
         {
           icon: Sofa,

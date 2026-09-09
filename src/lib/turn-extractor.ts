@@ -37,6 +37,7 @@ export interface TurnSpecUpdates {
   storeys?: number;
   rentScope?: RentScope;
   washrooms?: number;
+  washroomDetail?: string;
   furnishingStatus?: FurnishingStatus;
   price?: number;
   bedrooms?: number;
@@ -157,7 +158,9 @@ MANDATORY EXTRACTION WORKFLOW:
    - rentScope: for a RENT listing on a multi-storey house only - "whole_property" if the rent covers the entire
      building ("the whole house", "both floors", "complete house"), "single_floor" if it covers one floor only
      ("just the first floor", "only the upper portion"). null otherwise. NEVER infer this; it must be stated.
-   - washrooms: number of washrooms in a COMMERCIAL property (the commercial counterpart to bathrooms), or null.
+   - washrooms: number of private washrooms inside the commercial unit/space (e.g. 1, 2, 0).
+     If the washroom is shared or provided by the building/tower/floor (e.g. "washrooms provided by tower", "common washroom", "shared on floor", "tower provided"), set washrooms: 0 AND populate washroomDetail: "Provided by the tower" (or "Shared on floor").
+   - washroomDetail: qualitative description of washroom setup (e.g. "Provided by the tower", "Common washrooms on floor", "2 Private Attached Washrooms"). Always populate this whenever washroom arrangements are discussed!
    - furnishingStatus: for a COMMERCIAL property - "bare_shell" ("bare shell", "warm shell", "unfurnished", "raw"),
      "semi_furnished" ("semi furnished", "partly furnished"), or "fully_furnished" ("fully furnished", "plug and play",
      "ready to move with furniture"). null otherwise.
@@ -243,6 +246,7 @@ ${formattedDialogue}
                 storeys: { type: "number", nullable: true },
                 rentScope: { type: "string", enum: ["whole_property", "single_floor"], nullable: true },
                 washrooms: { type: "number", nullable: true },
+                washroomDetail: { type: "string", nullable: true },
                 furnishingStatus: {
                   type: "string",
                   enum: ["bare_shell", "semi_furnished", "fully_furnished"],
@@ -354,9 +358,16 @@ ${formattedDialogue}
     if (rawCore.rentScope === "whole_property" || rawCore.rentScope === "single_floor") {
       updates.rentScope = rawCore.rentScope;
     }
-    // A shop with no washroom is a real answer, so 0 is stated data and null is silence.
+    // A shop/office with tower-provided or no washroom is a real answer, so 0 is stated data and null is silence.
     if (typeof rawCore.washrooms === "number" && !isNaN(rawCore.washrooms) && rawCore.washrooms >= 0) {
       updates.washrooms = Math.round(rawCore.washrooms);
+    }
+    const cleanWashroomDetail = cleanString(rawCore.washroomDetail || rawAdditional.washroomDetail);
+    if (cleanWashroomDetail) {
+      updates.washroomDetail = cleanWashroomDetail;
+      if (updates.washrooms === undefined && (currentPropertyState?.washrooms === undefined || currentPropertyState?.washrooms === null)) {
+        updates.washrooms = 0;
+      }
     }
     if (
       rawCore.furnishingStatus === "bare_shell" ||

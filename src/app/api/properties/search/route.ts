@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { properties, propertyKnowledgeBases } from "@/db/schema";
+import { properties } from "@/db/schema";
 import { and, or, eq, ne, ilike, gte, lte, desc, sql } from "drizzle-orm";
 
 export async function GET(req: NextRequest) {
@@ -17,26 +17,16 @@ export async function GET(req: NextRequest) {
 
     const conditions = [ne(properties.status, "draft")];
 
-    // City filter (checks both property.city and propertyKnowledgeBases.city)
+    // City filter
     if (city && city.toLowerCase() !== "all") {
       const cityPattern = `%${city}%`;
-      conditions.push(
-        or(
-          ilike(properties.city, cityPattern),
-          ilike(propertyKnowledgeBases.city, cityPattern)
-        )!
-      );
+      conditions.push(ilike(properties.city, cityPattern));
     }
 
     // State filter
     if (state && state.toLowerCase() !== "all") {
       const statePattern = `%${state}%`;
-      conditions.push(
-        or(
-          ilike(properties.state, statePattern),
-          ilike(propertyKnowledgeBases.state, statePattern)
-        )!
-      );
+      conditions.push(ilike(properties.state, statePattern));
     }
 
     // Listing type filter (rent vs sale)
@@ -52,7 +42,7 @@ export async function GET(req: NextRequest) {
       conditions.push(lte(properties.price, maxPrice));
     }
 
-    // General text query (title, address, city, neighborhood, eaScript, and JSONB kbData)
+    // General text query (title, address, city, and JSONB knowledgeBase fields)
     if (query) {
       const qPattern = `%${query}%`;
       conditions.push(
@@ -60,10 +50,9 @@ export async function GET(req: NextRequest) {
           ilike(properties.title, qPattern),
           ilike(properties.address, qPattern),
           ilike(properties.city, qPattern),
-          ilike(propertyKnowledgeBases.city, qPattern),
-          ilike(propertyKnowledgeBases.eaScript, qPattern),
-          ilike(propertyKnowledgeBases.neighborhoodSummary, qPattern),
-          sql`${propertyKnowledgeBases.kbData}::text ILIKE ${qPattern}`
+          sql`${properties.knowledgeBase}->>'eaScript' ILIKE ${qPattern}`,
+          sql`${properties.knowledgeBase}->>'neighborhoodSummary' ILIKE ${qPattern}`,
+          sql`${properties.knowledgeBase}->'kbData'::text ILIKE ${qPattern}`
         )!
       );
     }
@@ -75,8 +64,8 @@ export async function GET(req: NextRequest) {
         title: properties.title,
         description: properties.description,
         address: properties.address,
-        city: sql<string>`coalesce(${propertyKnowledgeBases.city}, ${properties.city})`,
-        state: sql<string>`coalesce(${propertyKnowledgeBases.state}, ${properties.state})`,
+        city: properties.city,
+        state: properties.state,
         listingType: properties.listingType,
         propertyType: properties.propertyType,
         price: properties.price,
@@ -87,14 +76,9 @@ export async function GET(req: NextRequest) {
         images: properties.images,
         status: properties.status,
         createdAt: properties.createdAt,
-        eaScript: propertyKnowledgeBases.eaScript,
-        kbData: propertyKnowledgeBases.kbData,
+        knowledgeBase: properties.knowledgeBase,
       })
       .from(properties)
-      .leftJoin(
-        propertyKnowledgeBases,
-        eq(properties.id, propertyKnowledgeBases.propertyId)
-      )
       .where(and(...conditions))
       .orderBy(desc(properties.createdAt))
       .limit(limit)
@@ -102,7 +86,8 @@ export async function GET(req: NextRequest) {
 
     // Format response items with helper fields
     const formatted = rows.map((row) => {
-      const kbData = row.kbData;
+      const kb = row.knowledgeBase;
+      const kbData = kb?.kbData;
       return {
         id: row.id,
         slug: row.slug,
@@ -121,7 +106,7 @@ export async function GET(req: NextRequest) {
         images: row.images,
         status: row.status,
         createdAt: row.createdAt,
-        eaScript: row.eaScript || null,
+        eaScript: kb?.eaScript || null,
         searchTags: kbData?.searchTags || [],
         transit: kbData?.transit || null,
         neighborhood: kbData?.neighborhood || null,

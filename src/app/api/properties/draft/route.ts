@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     const userId = session.user.id || null;
 
     const body = await req.json();
-    const { property, draftId } = body || {};
+    const { property, knowledgeBase, negotiationMatrix, draftId } = body || {};
 
     if (!property) {
       return NextResponse.json({ error: "Property data is required." }, { status: 400 });
@@ -75,6 +75,8 @@ export async function POST(req: NextRequest) {
           availableDate: parseAvailableDate(property.availableDate) ?? existingDraft.availableDate,
           images: Array.isArray(property.images) ? property.images : existingDraft.images,
           coverImageUrl: property.coverImageUrl || existingDraft.coverImageUrl,
+          knowledgeBase: knowledgeBase || property.knowledgeBase || existingDraft.knowledgeBase,
+          negotiationRules: negotiationMatrix || property.negotiationRules || existingDraft.negotiationRules,
           uploadToken,
           updatedAt: new Date(),
         })
@@ -126,6 +128,8 @@ export async function POST(req: NextRequest) {
           images: Array.isArray(property.images) ? property.images : [],
           amenities: property.amenities || [],
           features: property.features || [],
+          knowledgeBase: knowledgeBase || property.knowledgeBase || null,
+          negotiationRules: negotiationMatrix || property.negotiationRules || null,
           uploadToken,
           onboardingSource: property.onboardingSource || "conversational_wizard",
           sourceUrl: property.sourceUrl || null,

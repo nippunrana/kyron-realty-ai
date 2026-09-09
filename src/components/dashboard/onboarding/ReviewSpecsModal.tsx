@@ -121,7 +121,7 @@ export function ReviewSpecsModal({
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-5 sm:px-7 py-5 space-y-5">
-          <CoreSpecsSection property={property} />
+          <CoreSpecsSection property={property} knowledgeBase={knowledgeBase} />
 
           {!isCoreMode && (
             <>

@@ -653,8 +653,8 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
 
       if (action === "open_core_modal") {
         if (onboardingStageRef.current === "core") {
-          if (areCoreSpecsVerified(dataRef.current.property)) {
-            addTelemetryLog("MODAL-TRIGGER", "Opening Core Specs Review Card (all core specs verified)", null, undefined, "success");
+          if (!isTurnSyncingRef.current || areCoreSpecsVerified(dataRef.current.property, dataRef.current.knowledgeBase)) {
+            addTelemetryLog("MODAL-TRIGGER", "Opening Core Specs Review Card", null, undefined, "success");
             setShowCoreModal(true);
             pendingModalOpenRef.current = false;
           } else {
@@ -698,8 +698,8 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
         openFullReview();
       } else if (action === "open_review_modal") {
         if (onboardingStageRef.current === "core") {
-          if (areCoreSpecsVerified(dataRef.current.property)) {
-            addTelemetryLog("MODAL-TRIGGER", "Opening Core Specs Review Card (all core specs verified)", null, undefined, "success");
+          if (!isTurnSyncingRef.current || areCoreSpecsVerified(dataRef.current.property, dataRef.current.knowledgeBase)) {
+            addTelemetryLog("MODAL-TRIGGER", "Opening Core Specs Review Card", null, undefined, "success");
             setShowCoreModal(true);
             pendingModalOpenRef.current = false;
           } else {
@@ -718,7 +718,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
         setShowUploadModal(false);
         pendingModalOpenRef.current = false;
         setFinalGate(false);
-        if (onboardingStageRef.current === "core" && areCoreSpecsVerified(dataRef.current.property)) {
+        if (onboardingStageRef.current === "core" && areCoreSpecsVerified(dataRef.current.property, dataRef.current.knowledgeBase)) {
           handleConfirmCoreSpecs();
         } else if (onboardingStageRef.current === "additional_specs") {
           confirmFullReview();
@@ -771,6 +771,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
       const json = await res.json();
       const elapsedMs = Date.now() - startTime;
       let candidateProperty = { ...dataRef.current.property };
+      let candidateKb = { ...dataRef.current.knowledgeBase };
 
       const usage = json.data?.usage || json.usage;
       if (usage) {
@@ -793,6 +794,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
           parkingDetail,
           petPolicyDetail,
           utilitiesDetail,
+          washroomDetail,
           features: newFeatures,
           amenities: newAmenities,
           pillLabels: newPillLabels,
@@ -857,6 +859,15 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
               : candidateProperty.amenities,
         };
 
+        candidateKb = {
+          ...dataRef.current.knowledgeBase,
+          ...(contactEmail ? { contactEmail } : {}),
+          ...(parkingDetail ? { parkingDetail } : {}),
+          ...(petPolicyDetail ? { petPolicyDetail } : {}),
+          ...(utilitiesDetail ? { utilitiesDetail } : {}),
+          ...(washroomDetail ? { washroomDetail } : {}),
+        };
+
         setData((prev) => {
           const updatedKb = {
             ...prev.knowledgeBase,
@@ -864,6 +875,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
             ...(parkingDetail ? { parkingDetail } : {}),
             ...(petPolicyDetail ? { petPolicyDetail } : {}),
             ...(utilitiesDetail ? { utilitiesDetail } : {}),
+            ...(washroomDetail ? { washroomDetail } : {}),
           };
 
           return {
@@ -908,10 +920,10 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
       }
 
       // Check if every core spec is now verified in state
-      const isCoreComplete = areCoreSpecsVerified(candidateProperty);
+      const isCoreComplete = areCoreSpecsVerified(candidateProperty, candidateKb);
 
       // In-Flight Sync Gate: Core Specs
-      if (isCoreComplete && pendingModalOpenRef.current && onboardingStageRef.current === "core") {
+      if (pendingModalOpenRef.current && onboardingStageRef.current === "core") {
         pendingModalOpenRef.current = false;
         setShowCoreModal(true);
       }
@@ -926,13 +938,8 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
       if (json.success && json.data?.modalAction) {
         const action = json.data.modalAction;
         if (action === "open_core") {
-          // Strictly guard: Only open if every core spec is truly verified
-          if (isCoreComplete) {
-            setShowCoreModal(true);
-          } else {
-            // Latch pending modal open until specs land
-            pendingModalOpenRef.current = true;
-          }
+          setShowCoreModal(true);
+          pendingModalOpenRef.current = false;
         } else if (action === "close_core") {
           if (onboardingStageRef.current === "core") {
             handleConfirmCoreSpecs();

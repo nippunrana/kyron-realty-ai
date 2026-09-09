@@ -50,6 +50,7 @@ export interface ExtractedPropertyPayload {
     petPolicyDetail: string;
     parkingDetail: string;
     utilitiesDetail: string;
+    washroomDetail?: string;
     applicationProcess: string;
     contactEmail?: string;
     pillLabels?: {

@@ -1,13 +1,13 @@
 import "dotenv/config";
 import { assertSampleDataWritesAllowed } from "./sample-data-guard";
 import { db } from "../src/db";
-import { properties, propertyKnowledgeBases, negotiationMatrices } from "../src/db/schema";
+import { properties } from "../src/db/schema";
 import QRCode from "qrcode";
 import { BASE_PATH, PUBLIC_ORIGIN } from "../src/lib/base-path";
 
 async function testPropertyCreation() {
   assertSampleDataWritesAllowed();
-  console.log("=== Testing Phase 3 Property Creation in Database ===\n");
+  console.log("=== Testing Property Creation in Database ===\n");
 
   const sampleTitle = "Luxury 2-Bedroom Marina Loft with Golden Gate Views";
   const slug = `marina-luxury-loft-${Date.now().toString(36)}`;
@@ -19,7 +19,7 @@ async function testPropertyCreation() {
     margin: 2,
   });
 
-  // Insert Property
+  // Insert Property with unified JSONB columns
   const [createdProperty] = await db
     .insert(properties)
     .values({
@@ -52,55 +52,49 @@ async function testPropertyCreation() {
       qrCodeSvg,
       shareUrl,
       onboardingSource: "conversational_wizard",
+      knowledgeBase: {
+        rawScrapedMarkdown: "# 250 Marina Boulevard Listing",
+        synthesizedSalesPitch: "Welcome to 250 Marina Blvd with panoramic bay views and garage parking.",
+        neighborhoodSummary: "Prime Marina location with 98 WalkScore.",
+        petPolicyDetail: "Dogs and cats welcome with deposit.",
+        parkingDetail: "1 assigned underground garage parking stall.",
+        utilitiesDetail: "Water and trash included. Tenant pays electric and WiFi.",
+        faqs: [
+          {
+            question: "Is parking included?",
+            answer: "Yes, one assigned garage parking spot with EV charging.",
+            category: "Amenities & Specs",
+          },
+        ],
+        agentTone: "warm_professional",
+        greetingMessage: "Hello! Thanks for checking out 250 Marina Blvd.",
+      },
+      negotiationRules: {
+        allowNegotiation: true,
+        targetPrice: 3450,
+        minFloorPrice: 3250,
+        maxAllowedDiscountPct: 5,
+        concessionRules: [
+          {
+            condition: "18_month_lease",
+            concession: "5% discount on monthly rent",
+            maxConcessionValue: 173,
+            requiresApproval: false,
+          },
+        ],
+        notesForAgent: "Strictly adhere to $3,250 floor price.",
+      },
     })
     .returning();
 
-  console.log(`[✓] Property Inserted (ID: ${createdProperty.id})`);
+  console.log(`[✓] Property Inserted with Unified KB & Guardrails (ID: ${createdProperty.id})`);
   console.log(`    Title: ${createdProperty.title}`);
   console.log(`    Slug: ${createdProperty.slug}`);
   console.log(`    Share URL: ${createdProperty.shareUrl}`);
+  console.log(`    KB Tone: ${createdProperty.knowledgeBase?.agentTone}`);
+  console.log(`    Floor Price: $${createdProperty.negotiationRules?.minFloorPrice}`);
 
-  // Insert Knowledge Base
-  await db.insert(propertyKnowledgeBases).values({
-    propertyId: createdProperty.id,
-    rawScrapedMarkdown: "# 250 Marina Boulevard Listing",
-    synthesizedSalesPitch: "Welcome to 250 Marina Blvd with panoramic bay views and garage parking.",
-    neighborhoodSummary: "Prime Marina location with 98 WalkScore.",
-    petPolicyDetail: "Dogs and cats welcome with deposit.",
-    parkingDetail: "1 assigned underground garage parking stall.",
-    utilitiesDetail: "Water and trash included. Tenant pays electric and WiFi.",
-    faqs: [
-      {
-        question: "Is parking included?",
-        answer: "Yes, one assigned garage parking spot with EV charging.",
-        category: "Amenities & Specs",
-      },
-    ],
-    agentTone: "warm_professional",
-    greetingMessage: "Hello! Thanks for checking out 250 Marina Blvd.",
-  });
-  console.log(`[✓] Knowledge Base Attached (Property ID: ${createdProperty.id})`);
-
-  // Insert Negotiation Matrix
-  await db.insert(negotiationMatrices).values({
-    propertyId: createdProperty.id,
-    allowNegotiation: true,
-    targetPrice: "3450.00",
-    minFloorPrice: "3250.00",
-    maxAllowedDiscountPct: "5.00",
-    concessionRules: [
-      {
-        condition: "18_month_lease",
-        concession: "5% discount on monthly rent",
-        maxConcessionValue: 173,
-        requiresApproval: false,
-      },
-    ],
-    notesForAgent: "Strictly adhere to $3,250 floor price.",
-  });
-  console.log(`[✓] Negotiation Matrix Attached (Floor Price: $3,250)`);
-
-  console.log("\nPhase 3 Verification: 100% Passed! 🚀");
+  console.log("\nSingle-Table Property Verification: 100% Passed! 🚀");
 }
 
 testPropertyCreation().catch((err) => {

@@ -106,7 +106,7 @@ export function LivePropertyInspector({
     : [];
   const currentImage = images[activeImageIdx] || images[0];
 
-  const checklistItems = buildChecklistItems(property);
+  const checklistItems = buildChecklistItems(property, knowledgeBase);
   const verifiedCount = checklistItems.filter((item) => item.isComplete).length;
   const isFullyVerified = verifiedCount === checklistItems.length;
   const additionalSpecs = buildAdditionalSpecs(property, knowledgeBase);
@@ -128,7 +128,14 @@ export function LivePropertyInspector({
     additionalSpecs.length > 0;
 
   const handleApplyChip = (field: string, value: any) => {
-    if (field === "parkingDetail" || field === "petPolicyDetail" || field === "utilitiesDetail") {
+    if (field === "washroomDetail") {
+      onUpdateKnowledgeBase({ washroomDetail: value });
+      if (property.washrooms === null || property.washrooms === undefined) {
+        onUpdateProperty({ washrooms: 0 });
+      }
+    } else if (field === "washrooms") {
+      onUpdateProperty({ washrooms: Number(value) });
+    } else if (field === "parkingDetail" || field === "petPolicyDetail" || field === "utilitiesDetail") {
       onUpdateKnowledgeBase({ [field]: value });
     } else if (field === "hoaFeeMonthly") {
       onUpdateProperty({ hoaFeeMonthly: Number(value) });
@@ -392,7 +399,7 @@ export function LivePropertyInspector({
 
         {/* Stage 1 tap-or-speak answers, retired once every core row is answered. */}
         {!isFullyVerified && onboardingStage === "core" && (
-          <CoreSpecsSuggestionBar property={property} onApplyChip={handleApplyChip} />
+          <CoreSpecsSuggestionBar property={property} knowledgeBase={knowledgeBase} onApplyChip={handleApplyChip} />
         )}
 
         {/* Location Research HUD + Suggestion Chips Bar for Extra Specs.

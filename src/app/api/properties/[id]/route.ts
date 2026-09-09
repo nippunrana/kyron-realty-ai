@@ -4,8 +4,6 @@ import { db } from "@/db";
 import {
   properties,
   inquiries,
-  propertyKnowledgeBases,
-  negotiationMatrices,
   propertyMedia,
 } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -44,19 +42,6 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized access to property." }, { status: 403 });
     }
 
-    // Fetch associated knowledge base and negotiation matrix if available
-    const [kb] = await db
-      .select()
-      .from(propertyKnowledgeBases)
-      .where(eq(propertyKnowledgeBases.propertyId, propertyId))
-      .limit(1);
-
-    const [matrix] = await db
-      .select()
-      .from(negotiationMatrices)
-      .where(eq(negotiationMatrices.propertyId, propertyId))
-      .limit(1);
-
     const mediaList = await db
       .select()
       .from(propertyMedia)
@@ -65,8 +50,8 @@ export async function GET(
     return NextResponse.json({
       success: true,
       property,
-      knowledgeBase: kb || null,
-      negotiationMatrix: matrix || null,
+      knowledgeBase: property.knowledgeBase || null,
+      negotiationMatrix: property.negotiationRules || null,
       media: mediaList || [],
     });
   } catch (error: unknown) {
@@ -111,8 +96,8 @@ export async function DELETE(
     // 1. Delete legacy inquiries which lack ON DELETE CASCADE in PostgreSQL schema
     await db.delete(inquiries).where(eq(inquiries.propertyId, propertyId));
 
-    // 2. Delete the property record (cascades to propertyMedia, propertyKnowledgeBases,
-    //    negotiationMatrices, inquiriesAndLeads, viewingAppointments; voiceSessions.propertyId set to null)
+    // 2. Delete the property record (cascades to propertyMedia,
+    //    inquiriesAndLeads, viewingAppointments; voiceSessions.propertyId set to null)
     await db.delete(properties).where(eq(properties.id, propertyId));
 
     // 3. Remove physical upload assets from public/uploads/properties/[id] if present

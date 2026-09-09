@@ -1,7 +1,7 @@
 import { Metadata } from "next";
 import { db } from "@/db";
-import { properties, propertyKnowledgeBases } from "@/db/schema";
-import { ne, desc, eq, sql } from "drizzle-orm";
+import { properties } from "@/db/schema";
+import { ne, desc } from "drizzle-orm";
 import {
   ListingsDiscoveryClient,
   type DiscoveryPropertyItem,
@@ -25,8 +25,8 @@ export default async function ListingsPage() {
         title: properties.title,
         description: properties.description,
         address: properties.address,
-        city: sql<string>`coalesce(${propertyKnowledgeBases.city}, ${properties.city})`,
-        state: sql<string>`coalesce(${propertyKnowledgeBases.state}, ${properties.state})`,
+        city: properties.city,
+        state: properties.state,
         listingType: properties.listingType,
         propertyType: properties.propertyType,
         price: properties.price,
@@ -36,13 +36,9 @@ export default async function ListingsPage() {
         coverImageUrl: properties.coverImageUrl,
         images: properties.images,
         status: properties.status,
-        kbData: propertyKnowledgeBases.kbData,
+        knowledgeBase: properties.knowledgeBase,
       })
       .from(properties)
-      .leftJoin(
-        propertyKnowledgeBases,
-        eq(properties.id, propertyKnowledgeBases.propertyId)
-      )
       .where(ne(properties.status, "draft"))
       .orderBy(desc(properties.createdAt))
       .limit(30);
@@ -51,6 +47,7 @@ export default async function ListingsPage() {
       if (r.city && r.city.trim()) {
         citiesSet.add(r.city.trim());
       }
+      const kbData = r.knowledgeBase?.kbData;
       return {
         id: r.id,
         slug: r.slug,
@@ -68,9 +65,9 @@ export default async function ListingsPage() {
         coverImageUrl: r.coverImageUrl,
         images: r.images,
         status: r.status,
-        searchTags: r.kbData?.searchTags || [],
-        transit: r.kbData?.transit || null,
-        neighborhood: r.kbData?.neighborhood || null,
+        searchTags: kbData?.searchTags || [],
+        transit: kbData?.transit || null,
+        neighborhood: kbData?.neighborhood || null,
       };
     });
   } catch (err) {
