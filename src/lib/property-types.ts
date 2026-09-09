@@ -108,10 +108,6 @@ export function getMissingTypeSlot(facts: TypeFacts): TypeSlot | null {
   return null;
 }
 
-export function isTypeVerified(facts: TypeFacts): boolean {
-  return getMissingTypeSlot(facts) === null;
-}
-
 /** "3rd floor", "Ground floor". A basement reads as such rather than as floor -1. */
 export function formatFloor(floorNumber: number): string {
   if (floorNumber < 0) return floorNumber === -1 ? "Basement" : `Basement ${Math.abs(floorNumber)}`;
