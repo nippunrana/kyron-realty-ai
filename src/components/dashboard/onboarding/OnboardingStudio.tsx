@@ -1042,53 +1042,6 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
     }));
   };
 
-  // URL Ingestion Handler
-  const handleIngestUrl = async (url: string) => {
-    setIsProcessing(true);
-    setPipelineError(null);
-    setActivePipelineStep("Crawling listing webpage via Apify Actor...");
-
-    try {
-      // Step 1: Scrape URL
-      const scrapeRes = await fetch(`${BASE_PATH}/api/onboarding/scrape`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
-      });
-
-      const scrapeJson = await scrapeRes.json();
-      if (!scrapeJson.success) {
-        throw new Error(scrapeJson.error || "The listing crawl failed.");
-      }
-      const scrapedData = scrapeJson.data;
-
-      // Step 2: Extract structured intelligence with Gemini
-      setActivePipelineStep("Synthesizing property specs, FAQs, and voice sales pitch with AI...");
-      const extractRes = await fetch(`${BASE_PATH}/api/onboarding/extract`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          url,
-          markdown: scrapedData?.markdown || "",
-          existingImages: scrapedData?.images || [],
-          currentPropertyState: data,
-        }),
-      });
-
-      const extractJson = await extractRes.json();
-      if (!extractJson.success || !extractJson.data) {
-        throw new Error(extractJson.error || "Knowledge-base synthesis failed.");
-      }
-      setData(extractJson.data);
-    } catch (err) {
-      console.error("URL Ingestion error:", err);
-      setPipelineError(err instanceof Error ? err.message : "The listing import failed.");
-    } finally {
-      setIsProcessing(false);
-      setActivePipelineStep(null);
-    }
-  };
-
   // Conversational Extraction Handler (invoked at call completion with owner dialogue)
   const handleSendMessage = async (text: string) => {
     if (!text || !text.trim()) return;
@@ -1289,7 +1242,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
             </span>
           </h1>
           <p className="text-xs text-slate-600 mt-0.5">
-            Converse naturally with Elena Vance or import a listing URL to dynamically extract property specs and deploy a 24/7 Voice Sales Agent.
+            Converse naturally with Elena Vance to dynamically extract property specs and deploy a 24/7 Voice Sales Agent.
           </p>
         </div>
 
@@ -1327,7 +1280,6 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
         {/* Left Column: Conversational Ingestion Panel (5 cols) */}
         <div className="lg:col-span-5 flex flex-col h-full min-h-0 overflow-hidden">
           <ConversationalPanel
-            onIngestUrl={handleIngestUrl}
             onSendMessage={handleSendMessage}
             onTurnExtraction={handleTurnExtraction}
             onUIAction={handleUIAction}

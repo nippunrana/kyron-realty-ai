@@ -279,7 +279,7 @@ export function PropertyListingsSection({ initialProperties }: PropertyListingsS
           </h3>
           <p className="text-xs sm:text-sm text-slate-600 max-w-md mb-6 leading-relaxed">
             {activeTab === "published"
-              ? "Launch your first property in under 60 seconds. Scrape any existing URL or talk with our voice wizard to synthesize a verified knowledge base."
+              ? "Launch your first property in under 60 seconds. Talk with our voice wizard to synthesize a verified knowledge base."
               : "You do not have any pending drafts. Start a new property onboarding session anytime to automatically save progress."}
           </p>
           <Link

@@ -6,7 +6,7 @@ import { OnboardingStudio } from "@/components/dashboard/onboarding/OnboardingSt
 
 export const metadata: Metadata = {
   title: "New Property Onboarding Studio | Kyron Realty AI",
-  description: "AI-powered property listing creation, website scraping, and Agora Voice Agent deployment.",
+  description: "AI-powered property listing creation and Agora Voice Agent deployment.",
 };
 
 export default async function NewPropertyPage({

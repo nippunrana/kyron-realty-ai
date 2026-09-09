@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import {
-  Globe,
+  Mic,
   QrCode,
   PhoneCall,
   ArrowRight,
@@ -15,13 +15,13 @@ export function ThreeStepEngine() {
     {
       step: "01",
       title: "60-Sec Onboarding Studio",
-      subtitle: "Paste any URL or talk to the ingest bot",
+      subtitle: "Talk to the ingest bot",
       description:
-        "Paste a listing URL from 99acres, MagicBricks, Housing.com, or your broker portal. Apify web crawlers extract photos, specs, and policies, while our AI synthesizes a deep Knowledge Base and Landlord Guardrail Matrix in under a minute.",
-      badge: "Apify Crawler + AI Synthesis",
-      icon: Globe,
+        "Have a short spoken conversation with our onboarding agent about your property. She verifies every core specification with you on the call, while our AI synthesizes a deep Knowledge Base and Landlord Guardrail Matrix in under a minute.",
+      badge: "Voice Intake + AI Synthesis",
+      icon: Mic,
       features: [
-        "Instant web scraper extracts all listing data",
+        "Spoken intake captures every listing detail",
         "Auto-synthesized FAQ & amenity guardrails",
         "Set target rent & hard floor pricing bounds",
       ],
@@ -71,7 +71,7 @@ export function ThreeStepEngine() {
           <span>The Autonomous Workflow</span>
         </div>
         <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900">
-          From Listing URL to 24/7 Voice Sales Agent in 3 Steps
+          From a 60-Second Call to a 24/7 Voice Sales Agent in 3 Steps
         </h2>
         <p className="mt-4 text-base text-slate-600 leading-relaxed">
           Zero complex setups or month-long onboarding. Launch an intelligent voice associate for any property before your morning coffee gets cold.

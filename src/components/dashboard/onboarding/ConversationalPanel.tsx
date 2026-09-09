@@ -3,21 +3,15 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import Image from "next/image";
 import {
-  Link2,
   Mic,
   MicOff,
   PhoneCall,
   PhoneOff,
-  Sparkles,
   User,
-  Globe,
   Loader2,
   AlertCircle,
-  Zap,
   ShieldCheck,
   Sparkle,
-  ChevronDown,
-  ChevronUp,
   ArrowDown,
 } from "lucide-react";
 import { useAgoraVoiceAgent } from "@/hooks/useAgoraVoiceAgent";
@@ -32,20 +26,18 @@ export interface VoiceControlState {
 }
 
 interface ConversationalPanelProps {
-  onIngestUrl: (url: string) => Promise<void>;
   onSendMessage: (text: string) => Promise<void>;
   onTurnExtraction?: (slidingWindow: TurnMessage[]) => void;
   onUIAction?: (action: UIAction) => void;
   onLogEvent?: (category: "AGORA" | "INTENT", title: string, details?: any) => void;
   isProcessing: boolean;
   activePipelineStep: string | null;
-  /** Failure from the crawl or synthesis pipeline, shown beside the transcript; never a silent no-op. */
+  /** Failure from the synthesis pipeline, shown beside the transcript; never a silent no-op. */
   pipelineError: string | null;
   onVoiceStateSync?: (state: VoiceControlState) => void;
 }
 
 export function ConversationalPanel({
-  onIngestUrl,
   onSendMessage,
   onTurnExtraction,
   onUIAction,
@@ -55,10 +47,8 @@ export function ConversationalPanel({
   pipelineError,
   onVoiceStateSync,
 }: ConversationalPanelProps) {
-  const [urlInput, setUrlInput] = useState("");
   const [autoScroll, setAutoScroll] = useState(true);
   const [isScrolledUp, setIsScrolledUp] = useState(false);
-  const [isUrlBarExpanded, setIsUrlBarExpanded] = useState(false);
   const transcriptContainerRef = useRef<HTMLDivElement>(null);
 
   const handleCallEnd = useCallback(
@@ -163,118 +153,9 @@ export function ConversationalPanel({
     }
   }, []);
 
-  const handleUrlSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!urlInput.trim() || isProcessing) return;
-    const url = urlInput.trim();
-    await onIngestUrl(url);
-  };
-
   return (
     <div className="flex flex-col h-full min-h-0 bg-white rounded-3xl border border-slate-200/90 shadow-xl shadow-slate-200/40 overflow-hidden text-slate-900">
-      {/* 1. TOP URL LISTING SCRAPER BAR (Collapsible during active calls) */}
-      {isCallActive && !isUrlBarExpanded ? (
-        <div className="px-4 py-2 border-b border-slate-100 bg-slate-50/70 flex items-center justify-between text-xs shrink-0">
-          <div className="flex items-center gap-2 text-slate-600">
-            <Globe className="w-3.5 h-3.5 text-blue-600" />
-            <span className="font-semibold text-[11px] text-slate-700">Import from Listing URL</span>
-            <span className="text-[10px] text-slate-400 bg-slate-200/60 px-1.5 py-0.2 rounded font-medium">
-              Apify
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setIsUrlBarExpanded(true)}
-            className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-800 transition-colors cursor-pointer"
-          >
-            <span>Expand</span>
-            <ChevronDown className="w-3 h-3" />
-          </button>
-        </div>
-      ) : (
-        <div className="p-4 border-b border-slate-100 bg-gradient-to-b from-slate-50/80 to-white shrink-0">
-          <div className="flex items-center justify-between gap-2 mb-2.5">
-            <div className="flex items-center gap-1.5">
-              <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-200/60">
-                <Globe className="w-3.5 h-3.5" />
-              </div>
-              <span className="text-xs font-bold text-slate-800">
-                Import from Listing URL
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-700 bg-blue-50/70 border border-blue-200/60 px-2 py-0.5 rounded-md">
-                <Zap className="w-3 h-3 text-blue-600" />
-                <span>Apify Crawler</span>
-              </span>
-
-              {isCallActive && (
-                <button
-                  type="button"
-                  onClick={() => setIsUrlBarExpanded(false)}
-                  className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-500 hover:text-slate-800 transition-colors cursor-pointer pl-1"
-                  title="Collapse URL Scraper"
-                >
-                  <ChevronUp className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-          </div>
-
-          <form onSubmit={handleUrlSubmit} className="flex gap-2">
-            <div className="relative flex-1">
-              <Link2 className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="url"
-                placeholder="Paste Zillow, Redfin, or brokerage link..."
-                value={urlInput}
-                onChange={(e) => setUrlInput(e.target.value)}
-                className="w-full pl-8 pr-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all shadow-2xs placeholder:text-slate-400"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={isProcessing || !urlInput.trim()}
-              className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 active:bg-black text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 shrink-0 disabled:opacity-50 cursor-pointer"
-            >
-              {isProcessing ? (
-                <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  <span className="hidden sm:inline">Ingesting...</span>
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-3.5 h-3.5 text-blue-400" />
-                  <span>Extract</span>
-                </>
-              )}
-            </button>
-          </form>
-
-          {/* Quick Test Samples */}
-          <div className="flex items-center gap-1.5 mt-2 pt-1 border-t border-slate-100/80 text-[11px]">
-            <span className="text-slate-400 font-medium shrink-0">Sample:</span>
-            <button
-              type="button"
-              onClick={() => setUrlInput("https://www.99acres.com/3-bhk-apartment-in-golf-course-road-gurugram-spid-Y82918234")}
-              className="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-600 transition-colors truncate max-w-[175px] cursor-pointer"
-            >
-              🏡 Golf Course Condo (₹95,000)
-            </button>
-            <button
-              type="button"
-              onClick={() => setUrlInput("https://www.magicbricks.com/propertyDetails/3-bhk-luxury-flat-cyber-city-gurugram-pid-48201948")}
-              className="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-600 transition-colors truncate max-w-[175px] cursor-pointer"
-            >
-              🌆 Cyber City Suite (₹2.4 Cr)
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* 2. ELENA VANCE PERSONA BAR: Compact Sticky Bar when call active, Full Card when idle */}
+      {/* 1. ELENA VANCE PERSONA BAR: Compact Sticky Bar when call active, Full Card when idle */}
       {isCallActive ? (
         <div className="px-4 py-3 border-b border-slate-100 bg-gradient-to-r from-slate-50/90 via-white to-slate-50/90 flex items-center justify-between gap-3 shrink-0 shadow-2xs">
           {/* Left: Avatar + Speaking Beacon + Identity */}
@@ -464,7 +345,7 @@ export function ConversationalPanel({
         </div>
       )}
 
-      {/* 3. SCROLLABLE DIALOGUE CONTAINER */}
+      {/* 2. SCROLLABLE DIALOGUE CONTAINER */}
       <div className="flex-1 min-h-0 flex flex-col p-4 bg-slate-50/50 overflow-hidden relative">
         <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-200/60 shrink-0">
           <div className="flex items-center gap-2">

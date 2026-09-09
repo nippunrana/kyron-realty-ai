@@ -11,7 +11,7 @@ Before writing or modifying features, consult the canonical source files and the
 - **Auth & Session System**: [docs/built-systems/auth.md](docs/built-systems/auth.md) & [src/auth.ts](src/auth.ts)
 - **Database & Schemas**: [src/db/schema.ts](src/db/schema.ts) is the only description of the schema — read it directly; rules and traps in [docs/built-systems/database.md](docs/built-systems/database.md)
 - **Voice Agent & Agora SD-RTN**: [docs/built-systems/voice-agent-and-agora.md](docs/built-systems/voice-agent-and-agora.md)
-- **Property Onboarding & Apify**: [docs/built-systems/property-onboarding-and-apify.md](docs/built-systems/property-onboarding-and-apify.md)
+- **Property Onboarding**: [docs/built-systems/property-onboarding.md](docs/built-systems/property-onboarding.md)
 - **Public Listings & Leads**: [docs/built-systems/public-listings-and-leads.md](docs/built-systems/public-listings-and-leads.md)
 - **Original Design Intent (historical)**: [docs/plan/](docs/plan/) — pre-implementation planning, frozen at authoring time. Useful for *why* the system was shaped this way. **Never treat it as current truth**: it contains copied schema and architecture snapshots that the code has since moved past.
 - **Architecture & Subpath Hosting**: [docs/built-systems/architecture-and-basepath.md](docs/built-systems/architecture-and-basepath.md)
@@ -36,7 +36,7 @@ To prevent duplicate code or assuming features that do not yet exist:
 | **Database Pool & ORM**| Built | [database.md](docs/built-systems/database.md) | `src/db/index.ts`, `src/db/schema.ts` | Drizzle ORM + PostgreSQL 17 pool connection |
 | **Design System** | Built | [design-system.md](docs/built-systems/design-system.md) | `src/app/globals.css` | Dual-pane light/midnight luxury dark system |
 | **Voice Agent / Agora Real-Time** | Built | [voice-agent-and-agora.md](docs/built-systems/voice-agent-and-agora.md) | `src/app/api/agora/`, `src/hooks/`, `src/components/voice/` | Agora Conversational AI Cloud Gateway + WebRTC client |
-| **Conversational Onboarding & Apify**| Built | [property-onboarding-and-apify.md](docs/built-systems/property-onboarding-and-apify.md) | `src/app/dashboard/properties/new`, `src/lib/apify-crawler.ts` | Split-screen studio + Apify crawler + KB synthesizer |
+| **Conversational Onboarding** | Built | [property-onboarding.md](docs/built-systems/property-onboarding.md) | `src/app/dashboard/properties/new`, `src/lib/kb-extractor.ts` | Split-screen voice studio + KB synthesizer |
 | **Public Listing & Discovery** | Built | [public-listings-and-leads.md](docs/built-systems/public-listings-and-leads.md) | `src/app/listings/`, `src/app/api/properties/search/` | Search & city discovery, QR Code generator, Voice Sales Modal, Tour booking |
 
 ---

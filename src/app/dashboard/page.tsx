@@ -9,7 +9,6 @@ import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { PropertyListingsSection, type ListingCardItem } from "@/components/dashboard/PropertyListingsSection";
 import {
   BrainCircuit,
-  TrendingUp,
   Target,
   Sparkles,
   Building2,
@@ -106,7 +105,7 @@ export default async function DashboardPage() {
         <PropertyListingsSection initialProperties={userProperties} />
 
         {/* Intelligence Platform Modules */}
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Module 1 */}
           <div className="luxury-card luxury-card-hover rounded-2xl p-6 flex flex-col justify-between border border-slate-200/80 bg-white/90">
             <div>
@@ -135,33 +134,6 @@ export default async function DashboardPage() {
           </div>
 
           {/* Module 2 */}
-          <div className="luxury-card luxury-card-hover rounded-2xl p-6 flex flex-col justify-between border border-slate-200/80 bg-white/90">
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center">
-                  <TrendingUp className="w-5 h-5" />
-                </div>
-                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-md">
-                  <Sparkles className="w-3 h-3" />
-                  <span>Apify Crawler</span>
-                </span>
-              </div>
-
-              <h2 className="text-base font-bold text-slate-900">
-                Universal URL Scraper
-              </h2>
-              <p className="mt-2 text-xs sm:text-sm text-slate-600 leading-relaxed">
-                Extract specs, photo galleries, and amenities from any landlord or broker URL in under 30 seconds.
-              </p>
-            </div>
-
-            <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs font-medium text-slate-500">
-              <span>Parse Accuracy: <strong className="text-slate-800 font-semibold">99.8%</strong></span>
-              <span className="text-indigo-600 font-semibold">Active</span>
-            </div>
-          </div>
-
-          {/* Module 3 */}
           <div className="luxury-card luxury-card-hover rounded-2xl p-6 flex flex-col justify-between border border-slate-200/80 bg-white/90">
             <div>
               <div className="flex items-center justify-between mb-4">

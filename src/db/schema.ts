@@ -54,7 +54,7 @@ export const properties = pgTable("properties", {
   // Automated Valuation & Ingestion Source
   aiValuationEstimate: numeric("ai_valuation_estimate", { precision: 12, scale: 2 }),
   aiGrowthScore: integer("ai_growth_score"),
-  onboardingSource: text("onboarding_source").default("conversational_wizard"), // 'apify_url' | 'voice_chat' | 'manual'
+  onboardingSource: text("onboarding_source").default("conversational_wizard"), // 'voice_chat' | 'manual'
   sourceUrl: text("source_url"),
   
   createdAt: timestamp("created_at").defaultNow().notNull(),

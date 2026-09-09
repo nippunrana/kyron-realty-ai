@@ -15,7 +15,7 @@
  *   HTTP entry point  `src/app/api/onboarding/enrich-location/route.ts`
  *   UI                `src/components/dashboard/onboarding/hyper-local/`
  *   Live corrections  `src/lib/turn-extractor.ts` patches this record mid-call.
- *   Rules             `docs/built-systems/property-onboarding-and-apify.md`
+ *   Rules             `docs/built-systems/property-onboarding.md`
  *
  * Env: GEMINI_API_KEY (required), GOOGLE_MAPS_API_KEY (distances; absent = no distances).
  */

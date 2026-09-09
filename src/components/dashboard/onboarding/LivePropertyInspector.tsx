@@ -280,7 +280,7 @@ export function LivePropertyInspector({
             <p className="text-xs text-slate-500 mt-1 max-w-sm leading-relaxed">
               {verifiedCount > 0 || additionalSpecs.length > 0
                 ? "Parameters are dynamically populating in real time as Elena Vance listens."
-                : "Speak with Elena Vance on the left or paste a listing URL to automatically extract property specs in real time."}
+                : "Speak with Elena Vance on the left to automatically extract property specs in real time."}
             </p>
 
             <div className="mt-3 flex items-center gap-2">
