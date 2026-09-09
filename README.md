@@ -8,7 +8,6 @@
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-v4-38bdf8?style=flat-square&logo=tailwindcss)](https://tailwindcss.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-336791?style=flat-square&logo=postgresql)](https://www.postgresql.org/)
 [![Drizzle ORM](https://img.shields.io/badge/Drizzle-ORM-C5F74F?style=flat-square&logo=drizzle)](https://orm.drizzle.team/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 
 <br/>
 
@@ -234,7 +233,7 @@ The application is deployed with Next.js standalone mode under the subpath prefi
 
 ## 📄 License
 
-Distributed under the MIT License. See [LICENSE](LICENSE) for details.
+This repository does not include a license file yet.
 
 ---
 
