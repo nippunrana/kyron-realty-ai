@@ -220,7 +220,7 @@ VOICE DELIVERY GUIDELINES:
       kbRecord?.greetingMessage ||
       `Hello! Thanks for your interest in ${propertyTitle}. Are you looking to move in this month?`;
 
-    // If pre-compiled EA script from Gemini 3.8 Flash exists on the knowledge base, use it directly
+    // A synthesized agent script stored on the knowledge base takes precedence over the assembled prompt.
     if (kbRecord?.eaScript && typeof kbRecord.eaScript === "string" && kbRecord.eaScript.trim().length > 80) {
       systemPrompt = kbRecord.eaScript.trim();
     } else {
@@ -228,24 +228,24 @@ VOICE DELIVERY GUIDELINES:
         .map((f: any) => `Q: ${f.question}\nA: ${f.answer}`)
         .join("\n\n");
 
-    const concessionRules: Array<{ condition: string; concession: string }> =
-      matrixRecord?.concessionRules?.length ? matrixRecord.concessionRules : demo ? [...demo.concessionRules] : [];
-    const concessionRulesText = concessionRules
-      .map((r) => `- Condition: ${r.condition} -> Concession: ${r.concession}`)
-      .join("\n");
+      const concessionRules: Array<{ condition: string; concession: string }> =
+        matrixRecord?.concessionRules?.length ? matrixRecord.concessionRules : demo ? [...demo.concessionRules] : [];
+      const concessionRulesText = concessionRules
+        .map((r) => `- Condition: ${r.condition} -> Concession: ${r.concession}`)
+        .join("\n");
 
-    const contactEmail = ownerUserRecord?.email || "";
-    const listing = propertyRecord || demo;
-    const NOT_SPECIFIED = "Not specified in the verified listing";
-    const spec = (value: unknown, suffix = "") =>
-      value === null || value === undefined || value === "" ? NOT_SPECIFIED : `${value}${suffix}`;
-    const detail = (value?: string | null) => (value && value.trim() ? value : NOT_SPECIFIED);
-    const fullAddress = [listing?.address, listing?.city, listing?.state].filter(Boolean).join(", ");
-    const isRental = listing?.listingType === "rent";
-    const priceLine =
-      targetPrice > 0 ? `₹${targetPrice.toLocaleString("en-IN")}${isRental ? "/month" : ""}` : `${NOT_SPECIFIED} - never quote a price`;
+      const contactEmail = ownerUserRecord?.email || "";
+      const listing = propertyRecord || demo;
+      const NOT_SPECIFIED = "Not specified in the verified listing";
+      const spec = (value: unknown, suffix = "") =>
+        value === null || value === undefined || value === "" ? NOT_SPECIFIED : `${value}${suffix}`;
+      const detail = (value?: string | null) => (value && value.trim() ? value : NOT_SPECIFIED);
+      const fullAddress = [listing?.address, listing?.city, listing?.state].filter(Boolean).join(", ");
+      const isRental = listing?.listingType === "rent";
+      const priceLine =
+        targetPrice > 0 ? `₹${targetPrice.toLocaleString("en-IN")}${isRental ? "/month" : ""}` : `${NOT_SPECIFIED} - never quote a price`;
 
-    systemPrompt = `
+      systemPrompt = `
 You are 'Sarah', a senior leasing advisor and sales specialist representing: ${propertyTitle}.
 Your goal is to converse naturally with prospective buyers/renters over Agora real-time voice, answer questions truthfully using the provided property knowledge base, negotiate within strict owner concession boundaries, and book viewing walkthroughs.
 
