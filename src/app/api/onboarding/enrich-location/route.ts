@@ -10,17 +10,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const {
-      address,
-      city,
-      state,
-      price,
-      listingType,
-      bedrooms,
-      bathrooms,
-      sqft,
-      propertyType,
-    } = body || {};
+    const { address, city, state } = body || {};
 
     if (!address || typeof address !== "string" || address.trim().length < 3) {
       return NextResponse.json(
@@ -33,12 +23,6 @@ export async function POST(req: NextRequest) {
       address: address.trim(),
       city: city?.trim(),
       state: state?.trim(),
-      price: price ? Number(price) : undefined,
-      listingType: listingType || "rent",
-      bedrooms: bedrooms ? Number(bedrooms) : undefined,
-      bathrooms: bathrooms ? Number(bathrooms) : undefined,
-      sqft: sqft ? Number(sqft) : undefined,
-      propertyType: propertyType || undefined,
     });
 
     return NextResponse.json({

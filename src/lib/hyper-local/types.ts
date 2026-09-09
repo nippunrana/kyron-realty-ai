@@ -5,12 +5,6 @@ export interface HyperLocalEnrichmentInput {
   address: string;
   city?: string;
   state?: string;
-  price?: number;
-  listingType?: string;
-  bedrooms?: number;
-  bathrooms?: number;
-  sqft?: number;
-  propertyType?: string;
 }
 
 export interface HyperLocalEnrichmentResult {
