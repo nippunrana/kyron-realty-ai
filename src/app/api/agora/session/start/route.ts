@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
     const sessionUser = session?.user;
 
     const body = await req.json();
-    const { channelName, propertySlug, propertyId, userUid } = body || {};
+    const { propertySlug, propertyId } = body || {};
     const callerType: CallerType =
       body?.callerType === "owner_onboarding" ? "owner_onboarding" : "buyer_inquiry";
 
@@ -19,21 +19,20 @@ export async function POST(req: NextRequest) {
     }
 
     // Identity comes from the session only; the request body carries none.
+    // The channel name and caller UID are assigned here, never taken from the body.
     const ownerName = sessionUser?.name ?? null;
     const ownerEmail = sessionUser?.email ?? null;
     const userId = sessionUser?.id ?? null;
 
     const resolvedChannelName =
-      channelName ||
-      (callerType === "owner_onboarding"
+      callerType === "owner_onboarding"
         ? `onboard-owner-${Date.now().toString(36)}`
-        : `listing-${propertySlug || "call"}-${Date.now().toString(36)}`);
+        : `listing-${propertySlug || "call"}-${Date.now().toString(36)}`;
 
     const sessionResult = await startAgoraAgentSession({
       channelName: resolvedChannelName,
       propertySlug,
       propertyId,
-      userUid: Number(userUid) || 1001,
       callerType,
       ownerName,
       ownerEmail,
