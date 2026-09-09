@@ -12,8 +12,38 @@ interface ListingPageProps {
 }
 
 // One query per request: generateMetadata and the page both read this row.
+// Public columns only: the row is serialized into the client component's props,
+// so upload_token, owner_id and negotiation_rules are never selected here.
 const getPropertyBySlug = cache(async (slug: string) => {
-  const [property] = await db.select().from(properties).where(eq(properties.slug, slug)).limit(1);
+  const [property] = await db
+    .select({
+      id: properties.id,
+      slug: properties.slug,
+      status: properties.status,
+      title: properties.title,
+      description: properties.description,
+      address: properties.address,
+      unitNumber: properties.unitNumber,
+      city: properties.city,
+      state: properties.state,
+      zipCode: properties.zipCode,
+      listingType: properties.listingType,
+      propertyType: properties.propertyType,
+      price: properties.price,
+      bedrooms: properties.bedrooms,
+      bathrooms: properties.bathrooms,
+      sqft: properties.sqft,
+      availableDate: properties.availableDate,
+      coverImageUrl: properties.coverImageUrl,
+      images: properties.images,
+      amenities: properties.amenities,
+      qrCodeSvg: properties.qrCodeSvg,
+      shareUrl: properties.shareUrl,
+      knowledgeBase: properties.knowledgeBase,
+    })
+    .from(properties)
+    .where(eq(properties.slug, slug))
+    .limit(1);
   return property ?? null;
 });
 
@@ -59,8 +89,16 @@ export default async function PublicListingPage({ params }: ListingPageProps) {
     notFound();
   }
 
-  // 2. Knowledge Base is stored directly on property
-  const knowledgeBase = property.knowledgeBase;
+  // 2. Buyer-facing knowledge only. The agent script, tone, greeting, contact
+  // email and hyper-local data stay server-side.
+  const { knowledgeBase: kb, ...publicProperty } = property;
+  const knowledgeBase = {
+    synthesizedSalesPitch: kb?.synthesizedSalesPitch ?? null,
+    faqs: kb?.faqs ?? [],
+    petPolicyDetail: kb?.petPolicyDetail ?? null,
+    parkingDetail: kb?.parkingDetail ?? null,
+    utilitiesDetail: kb?.utilitiesDetail ?? null,
+  };
 
   // 3. Fetch Media
   const media = await db
@@ -72,7 +110,7 @@ export default async function PublicListingPage({ params }: ListingPageProps) {
 
   return (
     <PublicListingClient
-      property={property}
+      property={publicProperty}
       knowledgeBase={knowledgeBase}
       media={media}
       shareUrl={shareUrl}

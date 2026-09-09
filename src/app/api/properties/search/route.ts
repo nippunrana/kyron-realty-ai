@@ -106,7 +106,6 @@ export async function GET(req: NextRequest) {
         images: row.images,
         status: row.status,
         createdAt: row.createdAt,
-        eaScript: kb?.eaScript || null,
         searchTags: kbData?.searchTags || [],
         transit: kbData?.transit || null,
         neighborhood: kbData?.neighborhood || null,
