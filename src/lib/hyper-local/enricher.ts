@@ -88,7 +88,6 @@ export async function enrichPropertyLocationWithAI(
 
   return {
     kbData: buildKbData(structured.parsed, research, nearbyDistances),
-    eaScript: "",
     modelUsed,
     grounded: research.grounded,
     mapsQueryCount: research.queries.length,

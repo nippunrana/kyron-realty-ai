@@ -9,12 +9,6 @@ export interface HyperLocalEnrichmentInput {
 
 export interface HyperLocalEnrichmentResult {
   kbData: HyperLocalKbData;
-  /**
-   * Retained so the studio and publish payload keep compiling. The buyer agent's script is
-   * no longer compiled here: onboarding researches the area, it does not author Sarah's prompt.
-   * An empty value makes `agora-agent-client` assemble the prompt from the knowledge base row.
-   */
-  eaScript: string;
   modelUsed: string;
   /** False when the Maps tool did not fire, i.e. the content is unverified model recall. */
   grounded: boolean;

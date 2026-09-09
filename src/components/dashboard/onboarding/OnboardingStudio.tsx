@@ -158,8 +158,6 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [hyperLocalData, setHyperLocalData] = useState<HyperLocalKbData | null>(null);
   const hyperLocalDataRef = useRef<HyperLocalKbData | null>(null);
-  const [, setEaScript] = useState<string | null>(null);
-  const eaScriptRef = useRef<string | null>(null);
   const [isEnrichingLocation, setIsEnrichingLocation] = useState(false);
   const [enrichmentError, setEnrichmentError] = useState<string | null>(null);
   const isEnrichingLocationRef = useRef(false);
@@ -455,8 +453,6 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
           if (usable || isFinalAttempt) {
             setHyperLocalData(json.data.kbData);
             hyperLocalDataRef.current = json.data.kbData;
-            setEaScript(json.data.eaScript);
-            eaScriptRef.current = json.data.eaScript;
           }
 
           addTelemetryLog(
@@ -1175,7 +1171,6 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
             contactEmail: newKb.contactEmail || prev.knowledgeBase.contactEmail || "",
             unknownFallbackPolicy: newKb.unknownFallbackPolicy || prev.knowledgeBase.unknownFallbackPolicy,
             kbData: hyperLocalDataRef.current || prev.knowledgeBase.kbData,
-            eaScript: eaScriptRef.current || prev.knowledgeBase.eaScript,
           },
           negotiationMatrix: {
             ...prev.negotiationMatrix,
@@ -1212,7 +1207,6 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
             listingType: data.property.listingType,
             price: data.property.price,
             kbData: hyperLocalDataRef.current || data.knowledgeBase.kbData,
-            eaScript: eaScriptRef.current || data.knowledgeBase.eaScript,
           },
           negotiationMatrix: data.negotiationMatrix,
           draftId: draftIdRef.current,
