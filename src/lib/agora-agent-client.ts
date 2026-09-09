@@ -286,26 +286,7 @@ ${contactEmail ? `5. If asked for direct owner or leasing office contact, provid
     }
   }
 
-  // 4. Register Voice Session in Database (agoraSessionId is filled with the remote agent id after join)
-  let voiceSessionRowId: number | null = null;
-  try {
-    const callerIdentifier = userId || (ownerEmail ? `user-${ownerEmail}` : `user-${userUid}`);
-    const [sess] = await db
-      .insert(voiceSessions)
-      .values({
-        propertyId: propertyRecord?.id || null,
-        channelName,
-        callerType,
-        callerIdentifier,
-        status: "active",
-      })
-      .returning({ id: voiceSessions.id });
-    voiceSessionRowId = sess?.id ?? null;
-  } catch (dbErr) {
-    console.warn("[Agora Voice Session] DB insert warning:", dbErr);
-  }
-
-  // 5. Call Agora Conversational AI Cloud Gateway REST API (v2)
+  // 4. Call Agora Conversational AI Cloud Gateway REST API (v2)
   const authHeader = buildAgoraCloudAuthHeader();
   if (!authHeader) {
     throw new Error(
@@ -313,7 +294,7 @@ ${contactEmail ? `5. If asked for direct owner or leasing office contact, provid
     );
   }
 
-  // 6. Configure LLM brain (Google Gemini or OpenAI)
+  // 5. Configure LLM brain (Google Gemini or OpenAI)
   const geminiApiKey = getGeminiApiKey();
   const openaiApiKey = (process.env.OPENAI_API_KEY || "").trim();
 
@@ -359,6 +340,26 @@ ${contactEmail ? `5. If asked for direct owner or leasing office contact, provid
     throw new Error(
       "Missing LLM API key in .env. Please configure GEMINI_API_KEY or OPENAI_API_KEY for the Conversational AI Agent."
     );
+  }
+
+  // 6. Register Voice Session in Database, now that credentials are known to exist
+  //    (agoraSessionId is filled with the remote agent id after join)
+  let voiceSessionRowId: number | null = null;
+  try {
+    const callerIdentifier = userId || (ownerEmail ? `user-${ownerEmail}` : `user-${userUid}`);
+    const [sess] = await db
+      .insert(voiceSessions)
+      .values({
+        propertyId: propertyRecord?.id || null,
+        channelName,
+        callerType,
+        callerIdentifier,
+        status: "active",
+      })
+      .returning({ id: voiceSessions.id });
+    voiceSessionRowId = sess?.id ?? null;
+  } catch (dbErr) {
+    console.warn("[Agora Voice Session] DB insert warning:", dbErr);
   }
 
   // 7. Configure ASR & TTS
