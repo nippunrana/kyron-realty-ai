@@ -10,11 +10,11 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { markdown, conversationText, url, existingImages, currentPropertyState } = body || {};
+    const { markdown, conversationText, existingImages, currentPropertyState } = body || {};
 
-    if (!markdown && !conversationText && !url) {
+    if (!markdown && !conversationText) {
       return NextResponse.json(
-        { error: "At least one input source (markdown, conversationText, or url) is required." },
+        { error: "At least one input source (markdown or conversationText) is required." },
         { status: 400 }
       );
     }
@@ -22,7 +22,6 @@ export async function POST(req: NextRequest) {
     const extraction = await extractPropertyKnowledgeBase({
       markdown,
       conversationText,
-      url,
       existingImages,
       currentPropertyState,
     });

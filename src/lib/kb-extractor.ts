@@ -86,7 +86,6 @@ export interface ExtractedPropertyPayload {
 export interface ExtractInput {
   markdown?: string;
   conversationText?: string;
-  url?: string;
   existingImages?: string[];
   currentPropertyState?: Partial<ExtractedPropertyPayload>;
 }
@@ -111,7 +110,6 @@ export async function extractPropertyKnowledgeBase(
   const currentKb = input.currentPropertyState?.knowledgeBase;
 
   const contentToAnalyze = [
-    input.url ? `Source Listing URL: ${input.url}` : "",
     input.conversationText ? `Owner Interview Notes & Full Dialogue:\n${input.conversationText}` : "",
     input.markdown ? `Listing Content & Markdown:\n${input.markdown}` : "",
     current?.address
