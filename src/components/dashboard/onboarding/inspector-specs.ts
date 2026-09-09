@@ -12,11 +12,11 @@ import {
 } from "lucide-react";
 import type { ExtractedPropertyPayload } from "@/lib/kb-extractor";
 import {
-  describeMissingTypeSlot,
   describePropertyType,
+  formatCompositeAddress,
   FURNISHING_LABELS,
-  getMissingTypeSlot,
   isCommercial,
+  isPropertyType,
   type FurnishingStatus,
 } from "@/lib/property-types";
 import type { ChecklistItemData } from "./VerificationChecklist";
@@ -83,9 +83,8 @@ export function getCoreSpecRows(property: Property): readonly CoreSpecKey[] {
 export function getCoreSpecStatus(property: Property): Record<CoreSpecKey, boolean> {
   return {
     listingType: property.listingType === "rent" || property.listingType === "sale",
-    // The type row also carries the fact that type makes mandatory: a floor for a flat,
-    // storeys for a house, and the rent's scope on a multi-storey house let for rent.
-    propertyType: getMissingTypeSlot(property) === null,
+    // Property type verifies as soon as a valid property type is selected/stated.
+    propertyType: isPropertyType(property.propertyType),
     address: Boolean(property.address && property.address.trim().length > 3),
     price: Number(property.price) > 0,
     bedrooms: Number(property.bedrooms) > 0 || isStudioListing(property),
@@ -106,7 +105,6 @@ export function areCoreSpecsVerified(property: Property): boolean {
 export function buildChecklistItems(property: Property): ChecklistItemData[] {
   const status = getCoreSpecStatus(property);
   const commercial = isCommercial(property.propertyType);
-  const missingTypeSlot = getMissingTypeSlot(property);
 
   const items: Record<CoreSpecKey, ChecklistItemData> = {
     listingType: {
@@ -123,9 +121,7 @@ export function buildChecklistItems(property: Property): ChecklistItemData[] {
     propertyType: {
       id: "property_type",
       label: "Property Type",
-      sublabel: missingTypeSlot
-        ? describeMissingTypeSlot(missingTypeSlot)
-        : "Flat, house, or commercial space",
+      sublabel: "Flat, house, or commercial space",
       isComplete: status.propertyType,
       valueDisplay: describePropertyType(property),
     },
@@ -135,7 +131,7 @@ export function buildChecklistItems(property: Property): ChecklistItemData[] {
       sublabel: "Street, City, State",
       isComplete: status.address,
       valueDisplay: status.address
-        ? `${property.address}${property.city ? `, ${property.city}` : ""}`
+        ? formatCompositeAddress(property)
         : null,
     },
     price: {

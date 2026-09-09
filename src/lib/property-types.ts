@@ -120,23 +120,39 @@ export function formatFloor(floorNumber: number): string {
   return `${floorNumber}${suffix} floor`;
 }
 
-/** The type row's value as the owner reads it: "Flat / Apartment · 3rd floor". */
+/** The type row's value as the owner reads it: "Office Space", "Flat / Apartment". */
 export function describePropertyType(facts: TypeFacts): string | null {
-  const { propertyType, floorNumber, storeys, rentScope } = facts;
+  const { propertyType } = facts;
   if (!isPropertyType(propertyType)) return null;
+  return PROPERTY_TYPE_LABELS[propertyType];
+}
 
-  const parts = [PROPERTY_TYPE_LABELS[propertyType]];
+export interface AddressFacts {
+  address?: string | null;
+  unitNumber?: string | null;
+  floorNumber?: number | null;
+  city?: string | null;
+  state?: string | null;
+  zipCode?: string | null;
+}
 
-  if (FLOOR_TYPES.includes(propertyType) && floorNumber !== null && floorNumber !== undefined) {
-    parts.push(formatFloor(floorNumber));
+/** Formats the composite address with unit, floor, street, and city: "Unit 121, 2nd floor, Sector 7, Faridabad". */
+export function formatCompositeAddress(facts: AddressFacts): string | null {
+  const parts: string[] = [];
+  if (facts.unitNumber && facts.unitNumber.trim().length > 0) {
+    const u = facts.unitNumber.trim();
+    parts.push(u.toLowerCase().startsWith("unit") || u.startsWith("#") ? u : `Unit ${u}`);
   }
-
-  if (STOREY_TYPES.includes(propertyType) && storeys && storeys > 0) {
-    parts.push(storeys === 1 ? "Single storey" : `${storeys} storeys`);
-    if (rentScope) parts.push(RENT_SCOPE_LABELS[rentScope as Exclude<RentScope, "">]);
+  if (facts.floorNumber !== null && facts.floorNumber !== undefined) {
+    parts.push(formatFloor(facts.floorNumber));
   }
-
-  return parts.join(" · ");
+  if (facts.address && facts.address.trim().length > 0) {
+    parts.push(facts.address.trim());
+  }
+  if (facts.city && facts.city.trim().length > 0) {
+    parts.push(facts.city.trim());
+  }
+  return parts.length > 0 ? parts.join(", ") : null;
 }
 
 /** What the type row still needs, phrased for the checklist's pending line. */

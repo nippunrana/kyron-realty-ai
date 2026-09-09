@@ -43,6 +43,7 @@ export interface TurnSpecUpdates {
   bathrooms?: number;
   sqft?: number;
   address?: string;
+  unitNumber?: string;
   city?: string;
   state?: string;
   zipCode?: string;
@@ -115,6 +116,7 @@ CURRENT VERIFIED STATE:
 - washrooms: ${currentPropertyState?.washrooms ?? "pending"}
 - furnishingStatus: ${currentPropertyState?.furnishingStatus || "pending"}
 - address: ${currentPropertyState?.address || "pending"}
+- unitNumber: ${currentPropertyState?.unitNumber || "pending"}
 - price: ${currentPropertyState?.price ? `₹${currentPropertyState.price}` : "pending"}
 - bedrooms: ${currentPropertyState?.bedrooms !== undefined && currentPropertyState?.bedrooms !== null ? currentPropertyState.bedrooms : "pending"}
 - bathrooms: ${currentPropertyState?.bathrooms !== undefined && currentPropertyState?.bathrooms !== null ? currentPropertyState.bathrooms : "pending"}
@@ -143,10 +145,13 @@ MANDATORY EXTRACTION WORKFLOW:
      "house", "kothi", "independent house", "duplex" -> "independent_house"; "villa", "bungalow" -> "villa";
      "office", "office space", "commercial office" -> "office"; "shop", "retail", "retail unit" -> "shop_retail";
      "showroom" -> "showroom"; "warehouse", "godown", "industrial shed" -> "warehouse".
+   - unitNumber: unit, suite, shop, flat, office, or building number (e.g. "121", "Flat 402", "Suite 300", "Office 121").
+     If the owner says "It's 121" or "Number 121" or "Unit 121", populate unitNumber: "121".
+     CRITICAL: unitNumber is NOT a floor number!
    - floorNumber: which floor the unit is on, for a flat, builder floor, office, shop or showroom.
-     Ground floor = 0, basement = -1, "third floor" = 3.
-     CRITICAL: A unit or flat number NEVER establishes a floor. "Flat 402" does NOT mean floorNumber 4 - return null
-     unless the owner actually said which floor.
+     Ground floor = 0, basement = -1, "second floor" = 2, "third floor" = 3.
+     CRITICAL: A unit or flat number NEVER establishes a floor. "Flat 402" or "121" does NOT mean floorNumber 4 or 1 - return null
+     unless the owner actually said which floor it is on (e.g. "second floor", "ground floor").
    - storeys: how many storeys an independent house, villa or warehouse has ("single storey" = 1, "double storey",
      "two floors", "G+1", "duplex" = 2, "G+2" = 3), or null.
    - rentScope: for a RENT listing on a multi-storey house only - "whole_property" if the rent covers the entire
@@ -248,6 +253,7 @@ ${formattedDialogue}
                 bathrooms: { type: "number", nullable: true },
                 sqft: { type: "number", nullable: true },
                 address: { type: "string", nullable: true },
+                unitNumber: { type: "string", nullable: true },
                 city: { type: "string", nullable: true },
                 state: { type: "string", nullable: true },
                 zipCode: { type: "string", nullable: true },
@@ -373,6 +379,8 @@ ${formattedDialogue}
     }
     const cleanAddr = cleanString(rawCore.address);
     if (cleanAddr) updates.address = cleanAddr;
+    const cleanUnit = cleanString(rawCore.unitNumber);
+    if (cleanUnit) updates.unitNumber = cleanUnit;
     const cleanCity = cleanString(rawCore.city);
     if (cleanCity) updates.city = cleanCity;
     const cleanState = cleanString(rawCore.state);

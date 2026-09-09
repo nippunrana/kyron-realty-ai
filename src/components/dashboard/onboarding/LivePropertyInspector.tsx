@@ -22,7 +22,8 @@ import type { ExtractedPropertyPayload } from "@/lib/kb-extractor";
 import type { PillLabels } from "@/lib/turn-extractor";
 import { VerificationChecklist } from "./VerificationChecklist";
 import { buildAdditionalSpecs, buildChecklistItems } from "./inspector-specs";
-import { formatPropertyTypeLabel, isCommercial } from "@/lib/property-types";
+import { formatCompositeAddress, formatPropertyTypeLabel, isCommercial } from "@/lib/property-types";
+import { buildDefaultTitle } from "@/lib/listing-helpers";
 import { ExtraSpecsSuggestionBar } from "./ExtraSpecsSuggestionBar";
 import { CoreSpecsSuggestionBar } from "./CoreSpecsSuggestionBar";
 import { HyperLocalSearchHUD } from "./hyper-local/HyperLocalSearchHUD";
@@ -109,6 +110,15 @@ export function LivePropertyInspector({
   const verifiedCount = checklistItems.filter((item) => item.isComplete).length;
   const isFullyVerified = verifiedCount === checklistItems.length;
   const additionalSpecs = buildAdditionalSpecs(property, knowledgeBase);
+  const compositeAddress = formatCompositeAddress(property);
+  const displayTitle =
+    property.title && property.title.trim().length > 0
+      ? property.title
+      : property.address && property.address.trim().length > 0
+      ? buildDefaultTitle(property.address, property.bedrooms, property.listingType, property.propertyType)
+      : verifiedCount > 0 || additionalSpecs.length > 0
+      ? "Discovered Listing in Progress"
+      : "Awaiting property details...";
   const showHyperLocalHUD = isEnrichingLocation || Boolean(hyperLocalData) || Boolean(enrichmentError);
   const showSuggestionBar =
     isFullyVerified ||
@@ -265,41 +275,66 @@ export function LivePropertyInspector({
               <div className="flex items-center gap-1.5 text-xs text-slate-200 mb-0.5">
                 <MapPin className="w-3.5 h-3.5 text-blue-400 shrink-0" />
                 <span className="truncate">
-                  {property.address
-                    ? `${property.address}, ${property.city || ""} ${property.state || ""} ${property.zipCode || ""}`
-                    : "Address pending extraction"}
+                  {compositeAddress || "Address pending extraction"}
                 </span>
               </div>
               <h3 className="text-base sm:text-lg font-extrabold tracking-tight leading-snug line-clamp-1">
-                {property.title || "Discovered Property"}
+                {displayTitle}
               </h3>
             </div>
           </div>
         ) : (
           /* Architectural Blueprint State */
-          <div className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 aspect-16/9 border border-dashed border-slate-200 flex flex-col items-center justify-center p-6 text-center shadow-xs">
-            <div className="w-12 h-12 rounded-2xl bg-white border border-slate-200 shadow-xs flex items-center justify-center text-blue-600 mb-2.5">
-              <Building2 className="w-6 h-6 stroke-[1.5]" />
+          <div className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 aspect-16/9 border border-dashed border-slate-200 flex flex-col items-center justify-center p-5 text-center shadow-xs">
+            {/* Live Detected Badges */}
+            {(property.listingType || property.propertyType || (property.price && Number(property.price) > 0)) && (
+              <div className="flex flex-wrap items-center justify-center gap-1.5 mb-2 animate-in fade-in zoom-in-95 duration-150">
+                {property.listingType && (
+                  <span className="px-2 py-0.5 rounded-md bg-slate-900 text-white text-[10px] font-bold uppercase tracking-wider">
+                    {property.listingType === "rent" ? "For Rent" : "For Sale"}
+                  </span>
+                )}
+                {property.propertyType && (
+                  <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px] font-bold uppercase tracking-wider border border-emerald-200">
+                    {formatPropertyTypeLabel(property.propertyType)}
+                  </span>
+                )}
+                {property.price && Number(property.price) > 0 && (
+                  <span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 text-[10px] font-bold border border-blue-200">
+                    ₹{Number(property.price).toLocaleString("en-IN")}{property.listingType === "rent" ? "/mo" : ""}
+                  </span>
+                )}
+              </div>
+            )}
+
+            <div className="w-11 h-11 rounded-2xl bg-white border border-slate-200 shadow-xs flex items-center justify-center text-blue-600 mb-2">
+              <Building2 className="w-5 h-5 stroke-[1.5]" />
             </div>
 
-            <h3 className="text-sm font-extrabold tracking-tight text-slate-900">
-              {verifiedCount > 0 || additionalSpecs.length > 0
-                ? `${property.title || "Discovered Listing in Progress"}`
-                : "Awaiting property details..."}
+            <h3 className="text-sm font-extrabold tracking-tight text-slate-900 line-clamp-1 max-w-sm px-2">
+              {displayTitle}
             </h3>
-            <p className="text-xs text-slate-500 mt-1 max-w-sm leading-relaxed">
-              {verifiedCount > 0 || additionalSpecs.length > 0
-                ? "Parameters are dynamically populating in real time as Elena Vance listens."
-                : "Speak with Elena Vance on the left to automatically extract property specs in real time."}
-            </p>
 
-            <div className="mt-3 flex items-center gap-2">
+            {compositeAddress ? (
+              <div className="flex items-center justify-center gap-1 text-xs text-slate-600 mt-1 max-w-sm px-2">
+                <MapPin className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                <span className="truncate">{compositeAddress}</span>
+              </div>
+            ) : (
+              <p className="text-xs text-slate-500 mt-1 max-w-sm leading-relaxed px-2">
+                {verifiedCount > 0 || additionalSpecs.length > 0
+                  ? "Parameters are dynamically populating in real time as Elena Vance listens."
+                  : "Speak with Elena Vance on the left to automatically extract property specs in real time."}
+              </p>
+            )}
+
+            <div className="mt-2.5 flex items-center gap-2">
               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/90 border border-slate-200 text-slate-600 text-[11px] font-semibold shadow-2xs">
                 <Clock className="w-3 h-3 text-blue-600" />
                 <span>Live Extraction Stream</span>
               </span>
               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 text-[11px] font-semibold">
-                <span>{verifiedCount}/6 Attributes Verified</span>
+                <span>{verifiedCount}/{checklistItems.length} Attributes Verified</span>
               </span>
             </div>
           </div>
@@ -609,7 +644,7 @@ export function LivePropertyInspector({
             <>
               <Lock className="w-3.5 h-3.5 text-slate-400" />
               <span className="text-slate-500">
-                Complete 6 verification attributes to deploy ({verifiedCount}/6 verified)
+                Complete {checklistItems.length} verification attributes to deploy ({verifiedCount}/{checklistItems.length} verified)
               </span>
             </>
           )}

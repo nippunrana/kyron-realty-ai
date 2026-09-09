@@ -5,6 +5,7 @@ import type { ExtractedPropertyPayload } from "@/lib/kb-extractor";
 import { getCoreSpecRows, getCoreSpecStatus, isStudioListing } from "../inspector-specs";
 import {
   describePropertyType,
+  formatCompositeAddress,
   FURNISHING_LABELS,
   isCommercial,
   type FurnishingStatus,
@@ -29,8 +30,7 @@ export function CoreSpecsSection({ property }: CoreSpecsSectionProps) {
   const isStudio = isStudioListing(property);
   const commercial = isCommercial(property.propertyType);
 
-  const fullAddress =
-    [property.address, property.city, property.state].filter(Boolean).join(", ") || PENDING;
+  const fullAddress = formatCompositeAddress(property) || PENDING;
 
   const price =
     Number(property.price) > 0
