@@ -13,8 +13,11 @@ import {
   ShieldCheck,
   Sparkle,
   ArrowDown,
+  Mail,
+  UserCheck,
 } from "lucide-react";
 import { useAgoraVoiceAgent } from "@/hooks/useAgoraVoiceAgent";
+import type { EntryStage } from "./entry-choreography";
 import type { UIAction, VoiceMessage } from "@/hooks/voice-agent-types";
 import type { TurnMessage } from "@/lib/turn-extractor";
 import { BASE_PATH } from "@/lib/base-path";
@@ -35,6 +38,12 @@ interface ConversationalPanelProps {
   /** Failure from the synthesis pipeline, shown beside the transcript; never a silent no-op. */
   pipelineError: string | null;
   onVoiceStateSync?: (state: VoiceControlState) => void;
+  /** Which entry stage the studio is in; the panel never unmounts across them. */
+  entryStage: EntryStage;
+  /** Advances the studio to `focused`. Called only once the microphone is actually granted. */
+  onMicGranted: () => void;
+  ownerName?: string;
+  ownerEmail?: string;
 }
 
 export function ConversationalPanel({
@@ -46,9 +55,15 @@ export function ConversationalPanel({
   activePipelineStep,
   pipelineError,
   onVoiceStateSync,
+  entryStage,
+  onMicGranted,
+  ownerName,
+  ownerEmail,
 }: ConversationalPanelProps) {
   const [autoScroll, setAutoScroll] = useState(true);
   const [isScrolledUp, setIsScrolledUp] = useState(false);
+  const [micError, setMicError] = useState<string | null>(null);
+  const [isRequestingMic, setIsRequestingMic] = useState(false);
   const transcriptContainerRef = useRef<HTMLDivElement>(null);
 
   const handleCallEnd = useCallback(
@@ -114,6 +129,36 @@ export function ConversationalPanel({
       toggleMute,
     });
   }, [isCallActive, isMuted, toggleMute, onVoiceStateSync]);
+
+  /**
+   * Acquire the microphone before `startCall`, not during it. Agora asks for the mic at
+   * step 4 of its connect sequence - after `/api/agora/session/start` has already created
+   * a billed session - so a denial used to cost a session and the browser prompt landed
+   * somewhere in the middle of the connect. Asking here makes the prompt immediate and
+   * keeps a refused mic free. The tracks are stopped straight away; Agora opens its own.
+   */
+  const handleStart = useCallback(async () => {
+    if (isRequestingMic) return;
+    setMicError(null);
+    setIsRequestingMic(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((track) => track.stop());
+      onMicGranted();
+      startCall(undefined, undefined, "owner_onboarding");
+    } catch (err) {
+      const name = err instanceof DOMException ? err.name : "";
+      setMicError(
+        name === "NotAllowedError" || name === "SecurityError"
+          ? "Microphone access was blocked. Allow it in your browser's address bar, then press Start again."
+          : name === "NotFoundError"
+          ? "No microphone was found. Connect one and press Start again."
+          : "Could not open the microphone. Check your system sound settings and press Start again."
+      );
+    } finally {
+      setIsRequestingMic(false);
+    }
+  }, [isRequestingMic, onMicGranted, startCall]);
 
   const isProgrammaticScrollRef = useRef(false);
 
@@ -260,8 +305,15 @@ export function ConversationalPanel({
           </div>
         </div>
       ) : (
-        /* Full Welcoming Persona Card when call is idle */
-        <div className="p-5 flex flex-col items-center text-center border-b border-slate-100 bg-gradient-to-b from-white via-slate-50/40 to-white relative shrink-0">
+        /* Full Welcoming Persona Card when call is idle. On the intro card this block is
+           the whole panel, so it - not the wrapper - has to be what scrolls on a short
+           viewport: the panel root clips, so a wrapper scrollbar would never engage and
+           the Start button would sit under the fold with no way to reach it. */
+        <div
+          className={`p-5 flex flex-col items-center text-center border-b border-slate-100 bg-gradient-to-b from-white via-slate-50/40 to-white relative ${
+            entryStage === "intro" ? "min-h-0 overflow-y-auto" : "shrink-0"
+          }`}
+        >
           <div className="relative mb-3.5">
             <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-3xl overflow-hidden p-1 bg-gradient-to-tr from-slate-200 to-slate-300 shadow-xs">
               <div className="w-full h-full rounded-[22px] overflow-hidden bg-slate-100 relative">
@@ -309,44 +361,61 @@ export function ConversationalPanel({
             </div>
           </div>
 
-          <div className="w-full mt-4">
-            <div className="w-full p-3 rounded-2xl border bg-slate-50 border-slate-200 text-slate-700 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="flex items-center gap-1 h-5 shrink-0 px-1">
-                  {[20, 20, 20, 20, 20, 20, 20, 20].map((h, i) => (
-                    <div
-                      key={i}
-                      className="w-1 rounded-full bg-slate-300"
-                      style={{ height: `${h}%` }}
-                    />
-                  ))}
-                </div>
-
-                <div className="text-left truncate">
-                  <span className="text-xs font-bold block leading-tight truncate">
-                    Elena is ready to listen
-                  </span>
-                  <span className="text-[10px] block text-slate-500">
-                    Click connect to begin voice onboarding
-                  </span>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => startCall(undefined, undefined, "owner_onboarding")}
-                className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs font-bold transition-all shadow-sm shadow-blue-600/25 flex items-center gap-1.5 cursor-pointer shrink-0"
-              >
-                <PhoneCall className="w-3.5 h-3.5" />
-                <span>Connect</span>
-              </button>
-            </div>
+          {/* Who Elena will be talking to, read straight off the signed-in account. */}
+          <div className="w-full mt-4 p-3 rounded-2xl bg-slate-50/80 border border-slate-200 text-left">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 flex items-center gap-1">
+              <UserCheck className="w-3 h-3 text-blue-600" />
+              <span>Listing as</span>
+            </span>
+            <p className="text-sm font-extrabold text-slate-900 truncate mt-1">
+              {ownerName || "Property Owner"}
+            </p>
+            {ownerEmail && (
+              <p className="text-[11px] font-semibold text-slate-500 truncate flex items-center gap-1">
+                <Mail className="w-3 h-3 text-slate-400 shrink-0" />
+                <span className="truncate">{ownerEmail}</span>
+              </p>
+            )}
           </div>
+
+          {micError && (
+            <div className="w-full mt-2.5 p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-left flex items-start gap-2">
+              <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-[11px] font-semibold text-amber-900 leading-snug">{micError}</p>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={handleStart}
+            disabled={isRequestingMic}
+            className="w-full mt-3 py-3 px-4 rounded-2xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-extrabold text-sm shadow-md shadow-blue-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-wait"
+          >
+            {isRequestingMic ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Waiting for microphone...</span>
+              </>
+            ) : (
+              <>
+                <PhoneCall className="w-4 h-4" />
+                <span>{micError ? "Try again" : "Start"}</span>
+              </>
+            )}
+          </button>
+
+          <p className="text-[10px] text-slate-400 mt-2 leading-snug">
+            Your browser will ask for microphone access.
+          </p>
         </div>
       )}
 
-      {/* 2. SCROLLABLE DIALOGUE CONTAINER */}
-      <div className="flex-1 min-h-0 flex flex-col p-4 bg-slate-50/50 overflow-hidden relative">
+      {/* 2. SCROLLABLE DIALOGUE CONTAINER (hidden behind the intro card - nothing to show yet) */}
+      <div
+        className={`flex-1 min-h-0 flex-col p-4 bg-slate-50/50 overflow-hidden relative ${
+          entryStage === "intro" ? "hidden" : "flex"
+        }`}
+      >
         <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-200/60 shrink-0">
           <div className="flex items-center gap-2">
             <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">

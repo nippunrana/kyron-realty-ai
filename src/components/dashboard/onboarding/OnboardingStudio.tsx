@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect, useSyncExternalStore } from "react";
+import { useState, useRef, useCallback, useEffect, useLayoutEffect, useSyncExternalStore } from "react";
 import { ConversationalPanel, type VoiceControlState } from "./ConversationalPanel";
 import { LivePropertyInspector } from "./LivePropertyInspector";
 import { PublishSuccessModal } from "./PublishSuccessModal";
@@ -9,6 +9,16 @@ import { ImageUploadModal } from "./ImageUploadModal";
 import type { HyperLocalKbData } from "@/db/schema";
 import { TelemetryHUD, type TelemetryLogEvent } from "./TelemetryHUD";
 import { areCoreSpecsVerified, getCoreSpecStatus } from "./inspector-specs";
+import {
+  captureEntryLayout,
+  fadeBackdrop,
+  playEntryLayout,
+  FLIP_ATTR,
+  INSPECTOR_STAGE_CLASSES,
+  PANEL_STAGE_CLASSES,
+  type EntryStage,
+  type EntryLayoutSnapshot,
+} from "./entry-choreography";
 import type { UIAction } from "@/hooks/voice-agent-types";
 import type { ExtractedPropertyPayload } from "@/lib/kb-extractor";
 import type { TurnMessage, PillLabels } from "@/lib/turn-extractor";
@@ -169,6 +179,42 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
   const [qrCodeSvg, setQrCodeSvg] = useState("");
   const draftIdRef = useRef<number | null>(initialDraftId || null);
   const [voiceControl, setVoiceControl] = useState<VoiceControlState | null>(null);
+
+  const [entryStage, setEntryStage] = useState<EntryStage>("intro");
+  const entryStageRef = useRef<EntryStage>("intro");
+  const entryLayoutRef = useRef<EntryLayoutSnapshot | null>(null);
+  const backdropRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * The old geometry has to be measured before React commits the new one, so every stage
+   * change goes through here rather than calling `setEntryStage` directly.
+   */
+  const advanceEntryStage = useCallback((next: EntryStage) => {
+    if (entryStageRef.current === next) return;
+    entryLayoutRef.current = captureEntryLayout();
+    entryStageRef.current = next;
+    setEntryStage(next);
+  }, []);
+
+  useLayoutEffect(() => {
+    playEntryLayout(entryLayoutRef.current, entryStage);
+    entryLayoutRef.current = null;
+    fadeBackdrop(backdropRef.current, entryStage !== "split");
+  }, [entryStage]);
+
+  /**
+   * The inspector arrives when the first turn extraction settles - the honest edge for
+   * "Gemini has looked at the answer". `isTurnSyncing` is cleared in a `finally`, so a
+   * timeout or a failed extraction reveals the inspector too; the pane is never stranded
+   * off-screen waiting for a result that is not coming.
+   */
+  const wasTurnSyncingRef = useRef(false);
+  useEffect(() => {
+    if (wasTurnSyncingRef.current && !isTurnSyncing && entryStageRef.current === "focused") {
+      advanceEntryStage("split");
+    }
+    wasTurnSyncingRef.current = isTurnSyncing;
+  }, [isTurnSyncing, advanceEntryStage]);
 
   const handleVoiceStateSync = useCallback((state: VoiceControlState) => {
     setVoiceControl(state);
@@ -1290,11 +1336,29 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
         </div>
       </div>
 
+      {/* Dimmed studio behind the intro card; lifts as the split layout takes over. */}
+      <div
+        ref={backdropRef}
+        aria-hidden="true"
+        className={`fixed inset-0 z-40 bg-slate-950/50 backdrop-blur-sm ${
+          entryStage === "split" ? "pointer-events-none" : ""
+        }`}
+      />
+
       {/* Split-Screen 2-Column Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 flex-1 min-h-0 overflow-hidden">
-        {/* Left Column: Conversational Ingestion Panel (5 cols) */}
-        <div className="lg:col-span-5 flex flex-col h-full min-h-0 overflow-hidden">
+        {/* Left Column: Conversational Ingestion Panel. Never unmounts - it holds the RTC client. */}
+        <div {...{ [FLIP_ATTR]: "panel" }} className={PANEL_STAGE_CLASSES[entryStage]}>
           <ConversationalPanel
+            entryStage={entryStage}
+            onMicGranted={() => {
+              // Only the opening Start grows the card. Disconnecting mid-interview brings
+              // the idle card back inside the split layout, and reconnecting from there
+              // must not fly the panel back to the centre of the screen.
+              if (entryStageRef.current === "intro") advanceEntryStage("focused");
+            }}
+            ownerName={user?.name || ""}
+            ownerEmail={user?.email || ""}
             onSendMessage={handleSendMessage}
             onTurnExtraction={handleTurnExtraction}
             onUIAction={handleUIAction}
@@ -1306,8 +1370,10 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
           />
         </div>
 
-        {/* Right Column: Live Real-Time Property Inspector (7 cols) */}
-        <div className="lg:col-span-7 flex flex-col h-full min-h-0 overflow-hidden">
+        {/* Right Column: Live Property Inspector. Absent until the first extraction lands,
+            so the pane never appears pre-filled with fields nobody has spoken to yet. */}
+        {entryStage === "split" && (
+        <div {...{ [FLIP_ATTR]: "inspector" }} className={INSPECTOR_STAGE_CLASSES}>
           <LivePropertyInspector
             data={data}
             ownerName={user?.name || ""}
@@ -1336,6 +1402,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
             maxEnrichmentAttempts={MAX_ENRICHMENT_ATTEMPTS}
           />
         </div>
+        )}
       </div>
 
       {/* 1. Core Specs Review Modal (Stage 2: all core specs verified) */}
