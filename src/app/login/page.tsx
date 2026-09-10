@@ -477,9 +477,9 @@ function LoginFormContent() {
           <span>256-bit SSL Encrypted & SOC-2 Compliant</span>
         </div>
         <div className="flex items-center gap-3">
-          <Link href="/" className="hover:text-slate-800 transition-colors">Privacy</Link>
+          <Link href="/privacy" className="hover:text-slate-800 transition-colors">Privacy</Link>
           <span>•</span>
-          <Link href="/" className="hover:text-slate-800 transition-colors">Terms</Link>
+          <Link href="/terms" className="hover:text-slate-800 transition-colors">Terms</Link>
         </div>
       </div>
     </div>

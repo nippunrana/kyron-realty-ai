@@ -38,6 +38,7 @@ To prevent duplicate code or assuming features that do not yet exist:
 | **Voice Agent / Agora Real-Time** | Built | [voice-agent-and-agora.md](docs/built-systems/voice-agent-and-agora.md) | `src/app/api/agora/`, `src/hooks/`, `src/components/voice/` | Agora Conversational AI Cloud Gateway + WebRTC client |
 | **Conversational Onboarding** | Built | [property-onboarding.md](docs/built-systems/property-onboarding.md) | `src/app/dashboard/properties/new`, `src/lib/kb-extractor.ts` | Split-screen voice studio + KB synthesizer |
 | **Public Listing & Discovery** | Built | [public-listings-and-leads.md](docs/built-systems/public-listings-and-leads.md) | `src/app/listings/`, `src/app/api/properties/search/` | Search & city discovery, QR Code generator, Voice Sales Modal, Tour booking |
+| **Legal Pages** | Built | [auth.md](docs/built-systems/auth.md) | `src/app/privacy/`, `src/app/terms/`, `src/components/legal/` | Public, unauthenticated by requirement — Google OAuth verification reads them |
 
 ---
 

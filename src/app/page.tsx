@@ -140,6 +140,12 @@ export default function Home() {
               <Radio className="w-3 h-3 text-emerald-600" />
               Agora SD-RTN Conversational AI
             </span>
+            <Link href="/privacy" className="hover:text-blue-700 transition-colors">
+              Privacy Policy
+            </Link>
+            <Link href="/terms" className="hover:text-blue-700 transition-colors">
+              Terms of Service
+            </Link>
             <span>&copy; {new Date().getFullYear()} Kyron Realty AI.</span>
           </div>
         </div>
