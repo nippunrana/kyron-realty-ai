@@ -169,7 +169,7 @@ export function ConversationalPanel({
             >
               <div className="w-full h-full rounded-[14px] overflow-hidden bg-slate-100 relative">
                 <Image
-                  src={`${BASE_PATH}/images/elena-vance-agent.jpg`}
+                  src={`${BASE_PATH}/images/elena-vance-agent.webp`}
                   alt="Elena Vance"
                   fill
                   sizes="44px"
@@ -266,7 +266,7 @@ export function ConversationalPanel({
             <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-3xl overflow-hidden p-1 bg-gradient-to-tr from-slate-200 to-slate-300 shadow-xs">
               <div className="w-full h-full rounded-[22px] overflow-hidden bg-slate-100 relative">
                 <Image
-                  src={`${BASE_PATH}/images/elena-vance-agent.jpg`}
+                  src={`${BASE_PATH}/images/elena-vance-agent.webp`}
                   alt="Elena Vance - Principal AI Listing Specialist"
                   fill
                   sizes="112px"
