@@ -11,6 +11,7 @@ import { and, eq } from "drizzle-orm";
 import { computeFloorPrice } from "./listing-helpers";
 import { DEMO_LISTING, DEMO_LISTING_SLUG } from "./demo-listing";
 import { getGeminiApiKey } from "./gemini";
+import { fetchAgoraAgentDetails } from "./agora-telemetry";
 import type { CallerType } from "@/hooks/voice-agent-types";
 
 export interface StartAgentSessionParams {
@@ -641,10 +642,25 @@ export async function stopAgoraAgentSession(sessionId: string, channelName: stri
     }
   }
 
-  const endedAt = new Date();
-  const durationSeconds = row.startedAt
+  let endedAt = new Date();
+  let durationSeconds = row.startedAt
     ? Math.max(0, Math.round((endedAt.getTime() - new Date(row.startedAt).getTime()) / 1000))
     : 0;
+
+  // Query Agora Cloud Gateway for ground-truth duration
+  if (appId && authHeader && sessionId) {
+    try {
+      const agentDetails = await fetchAgoraAgentDetails(sessionId);
+      if (agentDetails?.durationSeconds && agentDetails.durationSeconds > 0) {
+        durationSeconds = agentDetails.durationSeconds;
+        if (agentDetails.stop_ts) {
+          endedAt = new Date(agentDetails.stop_ts * 1000);
+        }
+      }
+    } catch (e) {
+      console.warn("[Agora Gateway] Telemetry fetch warning on stop:", e);
+    }
+  }
 
   await db
     .update(voiceSessions)

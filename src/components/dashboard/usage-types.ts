@@ -12,12 +12,15 @@ export interface SessionHistoryItem {
   startedAt: string; // ISO string
   formattedDate: string; // e.g. "Sep 10, 7:43 PM"
   status: string;
+  isAgoraVerified?: boolean;
 }
 
 export interface DashboardUsageStats {
   totalConvoMinutes: number;
   convoMinutesFormatted: string;
   convoFreeTierLimit: number; // 300
+  convoMinutesRemaining: number; // e.g. 280
+  convoOverageMinutes: number; // e.g. 0
   convoPercentage: number;
   totalVoiceSessions: number;
   onboardingSessionsCount: number;

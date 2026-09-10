@@ -72,28 +72,48 @@ export function DashboardUsageWidget({ stats, sessions }: DashboardUsageWidgetPr
               </div>
             </div>
 
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-2xl font-extrabold text-slate-900 tracking-tight font-mono">
-                {stats.convoMinutesFormatted}
-              </span>
-              <span className="text-xs text-slate-500 font-medium">
-                / {stats.convoFreeTierLimit} min
-              </span>
+            <div className="flex items-baseline justify-between gap-1.5 flex-wrap">
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-2xl font-extrabold text-slate-900 tracking-tight font-mono">
+                  {stats.convoMinutesFormatted}
+                </span>
+                <span className="text-xs text-slate-500 font-medium">
+                  / {stats.convoFreeTierLimit} min
+                </span>
+              </div>
+
+              {/* Dynamic Free-Trial / Post-Trial Status Badge */}
+              {stats.totalConvoMinutes <= stats.convoFreeTierLimit ? (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-semibold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  <span>{stats.convoMinutesRemaining} min left in trial</span>
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 text-[11px] font-semibold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                  <span>+{stats.convoOverageMinutes} min post-trial ($0.10/min)</span>
+                </span>
+              )}
             </div>
 
             {/* Mini Progress Bar */}
             <div className="mt-3 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
               <div
-                className="bg-purple-600 h-full rounded-full transition-all duration-500"
-                style={{ width: `${Math.max(stats.convoPercentage, 2)}%` }}
+                className={`h-full rounded-full transition-all duration-500 ${
+                  stats.totalConvoMinutes > stats.convoFreeTierLimit ? "bg-amber-500" : "bg-purple-600"
+                }`}
+                style={{ width: `${Math.min(100, Math.max(stats.convoPercentage, 2))}%` }}
               />
             </div>
           </div>
 
           <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
-            <span className="text-slate-500 font-medium">300 min/mo free</span>
+            <span className="text-slate-500 font-medium flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+              <span>Agora SD-RTN Synced</span>
+            </span>
             <span className="px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 font-semibold border border-purple-100 text-[10px]">
-              $0.10/min post-tier
+              {stats.totalConvoMinutes > stats.convoFreeTierLimit ? "$0.10/min billed" : "300 min/mo free"}
             </span>
           </div>
         </div>

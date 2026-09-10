@@ -9,6 +9,7 @@ import {
   Sparkles,
   Copy,
   Check,
+  CheckCircle2,
 } from "lucide-react";
 import type { SessionHistoryItem } from "./usage-types";
 
@@ -235,9 +236,20 @@ export function SessionHistoryDrawer({
 
                   {/* Col 3: Duration */}
                   <div className="col-span-2 text-right font-mono">
-                    <span className="font-bold text-slate-100 block">
-                      {sess.durationFormatted}
-                    </span>
+                    <div className="flex items-center justify-end gap-1">
+                      {sess.isAgoraVerified && (
+                        <span
+                          title="Duration verified by Agora Cloud Gateway"
+                          className="inline-flex items-center gap-0.5 px-1 py-0.2 rounded bg-blue-950/80 text-blue-400 border border-blue-800/40 text-[9px] font-sans font-semibold tracking-tight"
+                        >
+                          <CheckCircle2 className="w-2.5 h-2.5 text-blue-400" />
+                          <span>Agora</span>
+                        </span>
+                      )}
+                      <span className="font-bold text-slate-100 block">
+                        {sess.durationFormatted}
+                      </span>
+                    </div>
                     <span className="text-[10px] text-slate-500 block">
                       {sess.durationMinutes}m
                     </span>

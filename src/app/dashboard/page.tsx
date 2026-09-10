@@ -9,6 +9,7 @@ import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { PropertyListingsSection, type ListingCardItem } from "@/components/dashboard/PropertyListingsSection";
 import { DashboardUsageWidget } from "@/components/dashboard/DashboardUsageWidget";
 import type { DashboardUsageStats, SessionHistoryItem } from "@/components/dashboard/usage-types";
+import { backfillUnsyncedSessions } from "@/lib/agora-telemetry";
 import {
   BrainCircuit,
   Target,
@@ -63,6 +64,13 @@ export default async function DashboardPage() {
       .orderBy(desc(properties.createdAt));
   } catch (err) {
     console.error("Error fetching properties for dashboard:", err);
+  }
+
+  // Auto-sync any unbackfilled sessions with Agora Cloud Gateway
+  try {
+    await backfillUnsyncedSessions();
+  } catch (syncErr) {
+    console.warn("[Agora Telemetry] Backfill check warning:", syncErr);
   }
 
   // Fetch Voice Sessions associated with the user or their properties
@@ -132,6 +140,7 @@ export default async function DashboardPage() {
       startedAt: startedDate.toISOString(),
       formattedDate,
       status: sess.status || "completed",
+      isAgoraVerified: Boolean(sess.agoraSessionId && (durSec > 0 || sess.status === "completed")),
     };
   });
 
@@ -140,6 +149,8 @@ export default async function DashboardPage() {
   const totalConvoMinutes = Number((totalDurationSeconds / 60).toFixed(1));
   const convoFreeTierLimit = 300;
   const convoPercentage = Math.min(100, Math.round((totalConvoMinutes / convoFreeTierLimit) * 100));
+  const convoMinutesRemaining = Math.max(0, Number((convoFreeTierLimit - totalConvoMinutes).toFixed(1)));
+  const convoOverageMinutes = Math.max(0, Number((totalConvoMinutes - convoFreeTierLimit).toFixed(1)));
 
   let totalRoutesElements = 0;
   let totalGroundingQueries = 0;
@@ -161,6 +172,8 @@ export default async function DashboardPage() {
     totalConvoMinutes,
     convoMinutesFormatted: totalConvoMinutes.toString(),
     convoFreeTierLimit,
+    convoMinutesRemaining,
+    convoOverageMinutes,
     convoPercentage,
     totalVoiceSessions: userSessions.length,
     onboardingSessionsCount: userSessions.filter((s) => s.callerType === "owner_onboarding").length,
