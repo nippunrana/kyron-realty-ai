@@ -1,14 +1,17 @@
 /**
  * Pins Elena's scripted lines to the screen action they fire. Run with `npm run test:intents`
- * before rewording a line in `src/lib/agora-agent-client.ts`: each line is also asserted to
- * still exist there verbatim, so a reworded prompt cannot pass against a stale copy here.
+ * before rewording a line in `src/lib/elena-prompt.ts`: each line is also asserted to still
+ * exist in the rendered prompt, so a reworded prompt cannot pass against a stale copy here.
  */
-import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
+import { buildOwnerOnboardingPrompt } from "../lib/elena-prompt.ts";
 import { detectAssistantModalIntent, detectUserModalIntent, stripUITags } from "./voice-intents.ts";
 
-const promptSource = readFileSync(new URL("../lib/agora-agent-client.ts", import.meta.url), "utf8");
+const { systemPrompt: promptSource } = buildOwnerOnboardingPrompt({
+  ownerName: "Richa Luthra",
+  ownerEmail: "owner@example.com",
+});
 
 const LINES = {
   openCore:
