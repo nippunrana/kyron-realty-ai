@@ -373,10 +373,28 @@ ${contactEmail ? `5. If asked for direct owner or leasing office contact, provid
         asr: asrConfig,
         llm: llmConfig,
         tts: ttsConfig,
-        vad: {
-          mode: "auto",
-          prefix_padding_ms: 300,
-          silence_duration_ms: 1000,
+        // Barge-in gating. A cough or a filler word is ~100-350ms of voice energy and used to
+        // stop the agent mid-sentence. speaking_interrupt_duration_ms is the only knob that
+        // applies solely while the agent is talking, so raising it suppresses those without
+        // making the caller hold a long syllable to start a turn once the agent is idle.
+        turn_detection: {
+          mode: "default",
+          config: {
+            start_of_speech: {
+              mode: "vad",
+              vad_config: {
+                interrupt_duration_ms: 160,
+                speaking_interrupt_duration_ms: 800,
+                prefix_padding_ms: 300,
+              },
+            },
+            end_of_speech: {
+              mode: "vad",
+              vad_config: {
+                silence_duration_ms: 1000,
+              },
+            },
+          },
         },
         advanced_features: {
           enable_rtm: true,
