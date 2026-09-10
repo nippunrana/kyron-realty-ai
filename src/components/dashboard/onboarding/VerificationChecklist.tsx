@@ -1,6 +1,16 @@
 "use client";
 
+import { useRef } from "react";
 import { CheckCircle2, Sparkles } from "lucide-react";
+import {
+  diffSnapshot,
+  flashRows,
+  popIcons,
+  prefersReducedMotion,
+  queryByKey,
+  tintValues,
+  useGSAP,
+} from "./spec-reveal";
 
 export interface ChecklistItemData {
   id: string;
@@ -22,6 +32,37 @@ export function VerificationChecklist({
   const total = items.length;
   const isFullyVerified = total > 0 && verifiedCount === total;
   const pct = total > 0 ? Math.round((verifiedCount / total) * 100) : 0;
+
+  const gridRef = useRef<HTMLDivElement>(null);
+  const snapshotRef = useRef<Record<string, string> | null>(null);
+  // Signature rather than `items` itself: the array identity changes on every render.
+  const signature = items
+    .map((item) => `${item.id}=${item.isComplete ? 1 : 0}:${item.valueDisplay ?? ""}`)
+    .join("|");
+
+  useGSAP(
+    () => {
+      const snapshot = Object.fromEntries(
+        items.map((item) => [item.id, `${item.isComplete ? 1 : 0}:${item.valueDisplay ?? ""}`])
+      );
+      const previous = snapshotRef.current;
+      const diff = diffSnapshot(snapshotRef, snapshot);
+      if (!diff || prefersReducedMotion()) return;
+
+      const touched = [...diff.added, ...diff.changed];
+      const verified = touched.filter((id) => items.find((item) => item.id === id)?.isComplete);
+      if (!verified.length) return;
+
+      // A correction to an already-verified row lights up, but only a row that just
+      // crossed into verified earns the checkmark pop.
+      const newlyVerified = verified.filter((id) => !previous?.[id]?.startsWith("1:"));
+
+      flashRows(queryByKey(gridRef.current, "data-spec-row", verified));
+      popIcons(queryByKey(gridRef.current, "data-spec-icon", newlyVerified));
+      tintValues(queryByKey(gridRef.current, "data-spec-value", verified));
+    },
+    { dependencies: [signature], scope: gridRef }
+  );
 
   return (
     <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-50 via-white to-blue-50/20 border border-slate-200/90 shadow-xs">
@@ -90,11 +131,14 @@ export function VerificationChecklist({
       </div>
 
       {/* Core Checklist Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+      <div ref={gridRef} className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         {items.map((item, idx) => (
           <div
             key={item.id}
-            className={`p-2.5 rounded-xl border transition-all duration-300 flex items-start gap-2.5 ${
+            data-spec-row={item.id}
+            /* Not transition-all: box-shadow belongs to the reveal tween, and a CSS
+               transition on it restarts every frame and never reaches the glow. */
+            className={`p-2.5 rounded-xl border transition-[background-color,border-color,opacity] duration-300 flex items-start gap-2.5 ${
               item.isComplete
                 ? "bg-white border-emerald-200/90 shadow-2xs"
                 : "bg-slate-50/60 border-slate-200/60 opacity-80"
@@ -103,7 +147,10 @@ export function VerificationChecklist({
             {/* Status Icon */}
             <div className="mt-0.5 shrink-0">
               {item.isComplete ? (
-                <div className="w-4 h-4 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 animate-in zoom-in-50 duration-200">
+                <div
+                  data-spec-icon={item.id}
+                  className="w-4 h-4 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600"
+                >
                   <CheckCircle2 className="w-4 h-4" />
                 </div>
               ) : (
@@ -132,7 +179,7 @@ export function VerificationChecklist({
 
               <div className="mt-0.5 text-[11px] truncate">
                 {item.isComplete && item.valueDisplay ? (
-                  <span className="font-semibold text-slate-900">
+                  <span data-spec-value={item.id} className="font-semibold text-slate-900">
                     {item.valueDisplay}
                   </span>
                 ) : (

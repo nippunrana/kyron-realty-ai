@@ -20,6 +20,15 @@ import type { ExtractedPropertyPayload } from "@/lib/kb-extractor";
 import type { PillLabels } from "@/lib/turn-extractor";
 import { VerificationChecklist } from "./VerificationChecklist";
 import { buildAdditionalSpecs, buildChecklistItems } from "./inspector-specs";
+import {
+  diffSnapshot,
+  flashRows,
+  prefersReducedMotion,
+  queryByKey,
+  revealCards,
+  tintValues,
+  useGSAP,
+} from "./spec-reveal";
 import { formatCompositeAddress, formatPropertyTypeLabel, isCommercial } from "@/lib/property-types";
 import { buildDefaultTitle } from "@/lib/listing-helpers";
 import { ExtraSpecsSuggestionBar } from "./ExtraSpecsSuggestionBar";
@@ -71,6 +80,8 @@ export function LivePropertyInspector({
   const [activeImageIdx, setActiveImageIdx] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const suggestionBarSectionRef = useRef<HTMLDivElement>(null);
+  const additionalSpecsGridRef = useRef<HTMLDivElement>(null);
+  const additionalSpecsSnapshotRef = useRef<Record<string, string> | null>(null);
 
   // Smoothly bring Additional Specs into focus when progressing past core specs
   useEffect(() => {
@@ -107,6 +118,25 @@ export function LivePropertyInspector({
   const verifiedCount = checklistItems.filter((item) => item.isComplete).length;
   const isFullyVerified = verifiedCount === checklistItems.length;
   const additionalSpecs = buildAdditionalSpecs(property, knowledgeBase);
+  // Signature rather than the array itself: it is rebuilt on every render.
+  const additionalSpecsSignature = additionalSpecs
+    .map((spec) => `${spec.id}=${spec.value}`)
+    .join("|");
+
+  // A newly extracted spec drops in; a re-stated one flashes. Both tell the owner Elena landed it.
+  useGSAP(
+    () => {
+      const snapshot = Object.fromEntries(additionalSpecs.map((spec) => [spec.id, spec.value]));
+      const diff = diffSnapshot(additionalSpecsSnapshotRef, snapshot);
+      if (!diff || prefersReducedMotion()) return;
+
+      revealCards(queryByKey(additionalSpecsGridRef.current, "data-extra-spec", diff.added));
+      flashRows(queryByKey(additionalSpecsGridRef.current, "data-extra-spec", diff.changed));
+      tintValues(queryByKey(additionalSpecsGridRef.current, "data-extra-value", diff.changed));
+    },
+    { dependencies: [additionalSpecsSignature], scope: additionalSpecsGridRef }
+  );
+
   const compositeAddress = formatCompositeAddress(property);
   const displayTitle =
     property.title && property.title.trim().length > 0
@@ -405,13 +435,14 @@ export function LivePropertyInspector({
             </div>
           ) : (
             /* Dynamic Parameter Cards Grid */
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div ref={additionalSpecsGridRef} className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               {additionalSpecs.map((spec) => {
                 const Icon = spec.icon;
                 return (
                   <div
                     key={spec.id}
-                    className="p-3 rounded-2xl bg-gradient-to-br from-white to-slate-50 border border-slate-200 shadow-2xs flex items-center justify-between gap-3 animate-in fade-in zoom-in-95 duration-200"
+                    data-extra-spec={spec.id}
+                    className="p-3 rounded-2xl bg-gradient-to-br from-white to-slate-50 border border-slate-200 shadow-2xs flex items-center justify-between gap-3"
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
                       <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
@@ -421,7 +452,10 @@ export function LivePropertyInspector({
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
                           {spec.label}
                         </span>
-                        <span className="text-xs font-extrabold text-slate-900 truncate block">
+                        <span
+                          data-extra-value={spec.id}
+                          className="text-xs font-extrabold text-slate-900 truncate block"
+                        >
                           {spec.value}
                         </span>
                       </div>
