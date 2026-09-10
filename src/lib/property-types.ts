@@ -1,12 +1,8 @@
 /**
- * The one definition of what kind of place a listing is, and which follow-up fact
- * that kind of place makes mandatory.
+ * The one definition of what kind of place a listing is: the type vocabulary, the labels
+ * a reader sees, and the helpers that classify and format them.
  *
- * A flat has a floor; a house has storeys; a two-storey house offered for rent has to
- * say whether the rent buys the whole building or one floor of it. Those are not extra
- * questions the owner is asked out of nowhere - they are the second half of the type
- * itself, which is why they live here beside the vocabulary rather than as free-standing
- * core specs.
+ * Which specs a listing is judged on lives in `inspector-specs.ts`, not here.
  */
 
 export const RESIDENTIAL_TYPES = [
@@ -39,22 +35,11 @@ export const PROPERTY_TYPE_LABELS: Record<Exclude<PropertyType, "">, string> = {
   warehouse: "Warehouse / Godown",
 };
 
-export const RENT_SCOPE_LABELS: Record<Exclude<RentScope, "">, string> = {
-  whole_property: "Whole property",
-  single_floor: "One floor only",
-};
-
 export const FURNISHING_LABELS: Record<Exclude<FurnishingStatus, "">, string> = {
   bare_shell: "Bare shell",
   semi_furnished: "Semi-furnished",
   fully_furnished: "Fully furnished",
 };
-
-/** Types that sit on a floor of a larger building: the owner must say which floor. */
-const FLOOR_TYPES: PropertyType[] = ["apartment", "builder_floor", "office", "shop_retail", "showroom"];
-
-/** Types that are their own building: the owner must say how many storeys it has. */
-const STOREY_TYPES: PropertyType[] = ["independent_house", "villa", "warehouse"];
 
 export function isPropertyType(value: unknown): value is Exclude<PropertyType, ""> {
   return (
@@ -80,32 +65,6 @@ export interface TypeFacts {
   floorNumber?: number | null;
   storeys?: number | null;
   rentScope?: RentScope;
-}
-
-export type TypeSlot = "type" | "floor" | "storeys" | "rentScope";
-
-/**
- * The next thing still unknown about the property's type, or null when the type row is
- * fully answered. Elena asks for exactly this and nothing else, so a flat is never asked
- * about storeys and a seller is never asked which floor the rent covers.
- */
-export function getMissingTypeSlot(facts: TypeFacts): TypeSlot | null {
-  const { propertyType, listingType, floorNumber, storeys, rentScope } = facts;
-
-  if (!isPropertyType(propertyType)) return "type";
-
-  if (FLOOR_TYPES.includes(propertyType)) {
-    return floorNumber === null || floorNumber === undefined ? "floor" : null;
-  }
-
-  if (STOREY_TYPES.includes(propertyType)) {
-    if (!storeys || storeys < 1) return "storeys";
-    // Only a multi-storey building offered for rent leaves the rent figure ambiguous.
-    if (storeys >= 2 && listingType === "rent" && !rentScope) return "rentScope";
-    return null;
-  }
-
-  return null;
 }
 
 /** "3rd floor", "Ground floor". A basement reads as such rather than as floor -1. */
