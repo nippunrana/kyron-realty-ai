@@ -171,6 +171,9 @@ async function refreshAccessToken(row: GoogleAccount): Promise<string | null> {
  * Returns null — never throws — whenever the owner cannot be scheduled against: no
  * Google account, scopes declined, access revoked, or Google unreachable. Callers must
  * branch on null and carry on without scheduling.
+ *
+ * Scheduling itself is Roadmap, so this has no caller yet. Keep the tag until one exists.
+ * @public
  */
 export async function getOwnerCalendarAccess(
   userId: string
