@@ -7,6 +7,11 @@ import { users, accounts, sessions, verificationTokens } from "@/db/schema";
 import { verifyPassword } from "@/lib/auth-passwords";
 import { eq } from "drizzle-orm";
 import { getGoogleOAuthConfig } from "@/lib/google-oauth";
+import {
+  CALENDAR_SCOPES,
+  ensureKyronCalendar,
+  persistGoogleTokens,
+} from "@/lib/google-calendar";
 import { AUTH_BASE_PATH } from "@/lib/base-path";
 
 const googleOAuth = getGoogleOAuthConfig();
@@ -37,6 +42,17 @@ export const { handlers, auth } = NextAuth({
             clientId: googleOAuth.clientId,
             clientSecret: googleOAuth.clientSecret,
             allowDangerousEmailAccountLinking: true,
+            authorization: {
+              params: {
+                scope: ["openid", "email", "profile", ...CALENDAR_SCOPES].join(" "),
+                // Without offline access Google issues no refresh token, and the owner's
+                // calendar becomes unreachable an hour after they close the tab.
+                access_type: "offline",
+                // Forces Google to re-issue a refresh token on every grant, so a login
+                // can always repair a link we lost. Costs a consent screen each time.
+                prompt: "consent",
+              },
+            },
           }),
         ]
       : []),
@@ -105,6 +121,29 @@ export const { handlers, auth } = NextAuth({
         session.user.id = (token.id as string) || (token.sub as string);
       }
       return session;
+    },
+  },
+  events: {
+    /**
+     * Attach the owner's Google Calendar. Runs after the adapter has written the account
+     * row, and only for Google sign-ins — credentials users fall straight through and
+     * stay calendar-less by design.
+     *
+     * Tokens are persisted to `accounts` and never placed on the JWT, which is a cookie.
+     * Nothing in here may fail a login: a Google or database hiccup means the owner has
+     * no calendar this session, not that they cannot sign in.
+     */
+    async signIn({ account }) {
+      if (account?.provider !== "google") return;
+
+      try {
+        await persistGoogleTokens(account);
+        if (account.access_token) {
+          await ensureKyronCalendar(account.providerAccountId, account.access_token);
+        }
+      } catch (error) {
+        console.error("Google Calendar link failed during sign-in:", error);
+      }
     },
   },
 });

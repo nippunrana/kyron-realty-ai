@@ -317,6 +317,13 @@ export const accounts = pgTable(
     scope: text("scope"),
     id_token: text("id_token"),
     session_state: text("session_state"),
+    /**
+     * Google calendar this app created for the owner under `calendar.app.created`.
+     * Null means no calendar yet: either the account is not Google, or the owner
+     * declined the calendar scopes. Callers must treat null as "no scheduling", never
+     * as an error. See src/lib/google-calendar.ts.
+     */
+    calendarId: text("calendar_id"),
   },
   (account) => [
     primaryKey({

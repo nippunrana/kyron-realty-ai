@@ -9,6 +9,7 @@ Kyron Realty AI is a modern real estate intelligence platform integrating AI cap
 Before writing or modifying features, consult the canonical source files and their dedicated system docs:
 - **Design System & UI Tokens**: [docs/built-systems/design-system.md](docs/built-systems/design-system.md) & [src/app/globals.css](src/app/globals.css)
 - **Auth & Session System**: [docs/built-systems/auth.md](docs/built-systems/auth.md) & [src/auth.ts](src/auth.ts)
+- **Google Calendar Link**: [docs/built-systems/google-calendar.md](docs/built-systems/google-calendar.md) & [src/lib/google-calendar.ts](src/lib/google-calendar.ts)
 - **Database & Schemas**: [src/db/schema.ts](src/db/schema.ts) is the only description of the schema — read it directly; rules and traps in [docs/built-systems/database.md](docs/built-systems/database.md)
 - **Voice Agent & Agora SD-RTN**: [docs/built-systems/voice-agent-and-agora.md](docs/built-systems/voice-agent-and-agora.md)
 - **Property Onboarding**: [docs/built-systems/property-onboarding.md](docs/built-systems/property-onboarding.md)
@@ -38,6 +39,7 @@ To prevent duplicate code or assuming features that do not yet exist:
 | **Voice Agent / Agora Real-Time** | Built | [voice-agent-and-agora.md](docs/built-systems/voice-agent-and-agora.md) | `src/app/api/agora/`, `src/hooks/`, `src/components/voice/` | Agora Conversational AI Cloud Gateway + WebRTC client |
 | **Conversational Onboarding** | Built | [property-onboarding.md](docs/built-systems/property-onboarding.md) | `src/app/dashboard/properties/new`, `src/lib/kb-extractor.ts` | Split-screen voice studio + KB synthesizer |
 | **Public Listing & Discovery** | Built | [public-listings-and-leads.md](docs/built-systems/public-listings-and-leads.md) | `src/app/listings/`, `src/app/api/properties/search/` | Search & city discovery, QR Code generator, Voice Sales Modal, Tour booking |
+| **Google Calendar Link** | Built | [google-calendar.md](docs/built-systems/google-calendar.md) | `src/lib/google-calendar.ts`, `src/auth.ts` | Google-sign-in-only; absence is silent, never an error. Scheduling itself is Roadmap |
 | **Legal Pages** | Built | [auth.md](docs/built-systems/auth.md) | `src/app/privacy/`, `src/app/terms/`, `src/components/legal/` | Public, unauthenticated by requirement — Google OAuth verification reads them |
 
 ---
