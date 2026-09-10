@@ -8,7 +8,7 @@ import {
 } from "./listing-helpers";
 import { getGeminiApiKey, computeGeminiCost, type GeminiUsage } from "./gemini";
 import type { HyperLocalKbData } from "@/db/schema";
-import type { FurnishingStatus, PropertyType, RentScope } from "./property-types";
+import type { FurnishingStatus, PropertyCategory, PropertyType, RentScope } from "./property-types";
 
 export interface ExtractedPropertyPayload {
   property: {
@@ -51,6 +51,13 @@ export interface ExtractedPropertyPayload {
     parkingDetail: string;
     utilitiesDetail: string;
     washroomDetail?: string;
+    /**
+     * Residential or commercial, as the owner said it, before they have narrowed it to
+     * one of the eight property types. A intake hint only: it decides which core-spec
+     * rows the checklist shows while `propertyType` is still unstated, and is ignored the
+     * moment a real type lands. It is never a substitute for the type and never fills it in.
+     */
+    propertyCategory?: PropertyCategory;
     applicationProcess: string;
     contactEmail?: string;
     pillLabels?: {

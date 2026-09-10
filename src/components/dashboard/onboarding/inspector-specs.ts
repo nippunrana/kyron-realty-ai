@@ -68,8 +68,24 @@ const COMMERCIAL_ROWS = [
 
 export type CoreSpecKey = (typeof RESIDENTIAL_ROWS)[number] | (typeof COMMERCIAL_ROWS)[number];
 
-export function getCoreSpecRows(property: Property): readonly CoreSpecKey[] {
-  return isCommercial(property.propertyType) ? COMMERCIAL_ROWS : RESIDENTIAL_ROWS;
+/**
+ * Which seven rows this listing is judged on.
+ *
+ * The property type decides it whenever there is one. Before that, the owner has usually
+ * already said "commercial" without narrowing it to office/shop/showroom/warehouse, and an
+ * unstated type reads as residential - so the checklist would offer an office owner
+ * Bedrooms and Bathrooms and then swap the rows underneath them a turn later. The spoken
+ * category covers exactly that gap and is ignored the moment a real type arrives; it can
+ * never contradict one.
+ */
+export function getCoreSpecRows(
+  property: Property,
+  knowledgeBase?: Partial<KnowledgeBase>
+): readonly CoreSpecKey[] {
+  if (isPropertyType(property.propertyType)) {
+    return isCommercial(property.propertyType) ? COMMERCIAL_ROWS : RESIDENTIAL_ROWS;
+  }
+  return knowledgeBase?.propertyCategory === "commercial" ? COMMERCIAL_ROWS : RESIDENTIAL_ROWS;
 }
 
 /**
@@ -106,7 +122,7 @@ export function areCoreSpecsVerified(
   knowledgeBase?: Partial<KnowledgeBase>
 ): boolean {
   const status = getCoreSpecStatus(property, knowledgeBase);
-  return getCoreSpecRows(property).every((key) => status[key]);
+  return getCoreSpecRows(property, knowledgeBase).every((key) => status[key]);
 }
 
 /** The seven core attributes the deploy button waits on, with their display values. */
@@ -115,7 +131,8 @@ export function buildChecklistItems(
   knowledgeBase?: Partial<KnowledgeBase>
 ): ChecklistItemData[] {
   const status = getCoreSpecStatus(property, knowledgeBase);
-  const commercial = isCommercial(property.propertyType);
+  const rows = getCoreSpecRows(property, knowledgeBase);
+  const commercial = rows === COMMERCIAL_ROWS;
 
   const items: Record<CoreSpecKey, ChecklistItemData> = {
     listingType: {
@@ -205,7 +222,7 @@ export function buildChecklistItems(
     },
   };
 
-  return getCoreSpecRows(property).map((key) => items[key]);
+  return rows.map((key) => items[key]);
 }
 
 /** Secondary attributes revealed only once they are actually present in the draft. */

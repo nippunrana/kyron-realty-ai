@@ -832,6 +832,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
         const updates = json.data.updates;
         const {
           contactEmail,
+          propertyCategory,
           parkingDetail,
           petPolicyDetail,
           utilitiesDetail,
@@ -903,6 +904,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
         candidateKb = {
           ...dataRef.current.knowledgeBase,
           ...(contactEmail ? { contactEmail } : {}),
+          ...(propertyCategory ? { propertyCategory } : {}),
           ...(parkingDetail ? { parkingDetail } : {}),
           ...(petPolicyDetail ? { petPolicyDetail } : {}),
           ...(utilitiesDetail ? { utilitiesDetail } : {}),
@@ -913,7 +915,8 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
           const updatedKb = {
             ...prev.knowledgeBase,
             ...(contactEmail ? { contactEmail } : {}),
-            ...(parkingDetail ? { parkingDetail } : {}),
+            ...(propertyCategory ? { propertyCategory } : {}),
+          ...(parkingDetail ? { parkingDetail } : {}),
             ...(petPolicyDetail ? { petPolicyDetail } : {}),
             ...(utilitiesDetail ? { utilitiesDetail } : {}),
             ...(washroomDetail ? { washroomDetail } : {}),

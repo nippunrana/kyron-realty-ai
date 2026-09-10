@@ -7,7 +7,6 @@ import {
   describePropertyType,
   formatCompositeAddress,
   FURNISHING_LABELS,
-  isCommercial,
   type FurnishingStatus,
 } from "@/lib/property-types";
 
@@ -26,10 +25,11 @@ interface CoreSpecsSectionProps {
 export function CoreSpecsSection({ property, knowledgeBase }: CoreSpecsSectionProps) {
   const isRent = property.listingType === "rent";
   const status = getCoreSpecStatus(property, knowledgeBase);
-  const rows = getCoreSpecRows(property);
+  const rows = getCoreSpecRows(property, knowledgeBase);
   const checkedCount = rows.filter((key) => status[key]).length;
   const isStudio = isStudioListing(property);
-  const commercial = isCommercial(property.propertyType);
+  // Same decision the checklist made, so the card can never disagree with it.
+  const commercial = rows.includes("washrooms");
 
   const fullAddress = formatCompositeAddress(property) || PENDING;
 

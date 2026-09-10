@@ -3,9 +3,11 @@ import type { ExtractedPropertyPayload } from "./kb-extractor";
 import { getGeminiApiKey, computeGeminiCost, type GeminiUsage } from "./gemini";
 import {
   COMMERCIAL_TYPES,
+  getPropertyCategory,
   isPropertyType,
   RESIDENTIAL_TYPES,
   type FurnishingStatus,
+  type PropertyCategory,
   type PropertyType,
   type RentScope,
 } from "./property-types";
@@ -32,6 +34,7 @@ export interface ExtractTurnInput {
 export interface TurnSpecUpdates {
   listingType?: "rent" | "sale";
   propertyType?: PropertyType;
+  propertyCategory?: PropertyCategory;
   floorNumber?: number;
   storeys?: number;
   rentScope?: RentScope;
@@ -110,6 +113,7 @@ export async function extractTurnSpecs(
 CURRENT VERIFIED STATE:
 - listingType: ${currentPropertyState?.listingType || "pending"}
 - propertyType: ${currentPropertyState?.propertyType || "pending"}
+- propertyCategory: ${currentKnowledgeBase?.propertyCategory || "pending"}
 - floorNumber: ${currentPropertyState?.floorNumber ?? "pending"}
 - storeys: ${currentPropertyState?.storeys ?? "pending"}
 - rentScope: ${currentPropertyState?.rentScope || "pending"}
@@ -139,7 +143,14 @@ MANDATORY EXTRACTION WORKFLOW:
 2. Evaluate 'coreSpecs':
    - listingType: "rent" or "sale" (or null if unknown).
      CRITICAL POLICY: If listingType in CURRENT VERIFIED STATE is already "rent" or "sale", it is PERMANENTLY LOCKED and cannot be changed!
+   - propertyCategory: "residential" or "commercial", or null. Set this the moment the owner says which
+     kind of place it is, EVEN IF they have not narrowed it to a specific type yet - "it's commercial",
+     "a business space", "for my shop" -> "commercial"; "residential", "somewhere to live", "a home" -> "residential".
+     Also set it whenever propertyType is known, to match that type.
+     It records only what the owner actually said; it NEVER lets you infer propertyType (see below).
    - propertyType: what kind of place it is, or null. NEVER guess this - "apartment" is not a safe default.
+     A propertyCategory is NOT a propertyType: "commercial" does not mean office, and "residential" does not
+     mean flat. Leave propertyType null until the owner names the actual kind of place.
      Map the owner's own words: "flat", "apartment", "2BHK flat", "society flat" -> "apartment";
      "builder floor", "independent floor", "ground floor of a builder floor" -> "builder_floor";
      "house", "kothi", "independent house", "duplex" -> "independent_house"; "villa", "bungalow" -> "villa";
@@ -239,6 +250,11 @@ ${formattedDialogue}
                 propertyType: {
                   type: "string",
                   enum: [...RESIDENTIAL_TYPES, ...COMMERCIAL_TYPES],
+                  nullable: true,
+                },
+                propertyCategory: {
+                  type: "string",
+                  enum: ["residential", "commercial"],
                   nullable: true,
                 },
                 floorNumber: { type: "number", nullable: true },
@@ -341,6 +357,14 @@ ${formattedDialogue}
     // "flat" for "builder floor" must be able to fix it.
     if (isPropertyType(rawCore.propertyType)) {
       updates.propertyType = rawCore.propertyType;
+    }
+    // A stated category, kept only until a real type supersedes it. Deriving it from the
+    // type whenever one is known keeps the two from ever disagreeing on screen.
+    const derivedCategory = getPropertyCategory(updates.propertyType ?? "");
+    if (derivedCategory) {
+      updates.propertyCategory = derivedCategory;
+    } else if (rawCore.propertyCategory === "residential" || rawCore.propertyCategory === "commercial") {
+      updates.propertyCategory = rawCore.propertyCategory;
     }
     // Ground floor is 0 and a basement is negative, so truthiness would silently drop both.
     if (
