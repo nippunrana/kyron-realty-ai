@@ -340,15 +340,26 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
                 }, 50);
               }
             } else if (!isUser && spokenText.length > 0) {
-              // Assistant speech confirming modal action (strictly deduplicated per turn)
+              // Assistant screen action: its [UI:] tag, or the spoken-language fallback (strictly deduplicated per turn)
               const intent = detectAssistantModalIntent(spokenText);
               if (intent) {
                 const turnId = item.turn_id !== undefined ? String(item.turn_id) : spokenText.slice(0, 40).toLowerCase();
-                const intentKey = `assistant_${turnId}_${intent}`;
+                // Proof the tag survived transport, logged once per turn on its own key: the same sentence
+                // may arrive first without its tag (filtered during TTS playback) and already have
+                // dispatched the action, so the dispatch log alone cannot show whether tags work.
+                if (intent.source === "tag") {
+                  const tagKey = `assistant_${turnId}_tag`;
+                  if (!processedAssistantTurnIntentsRef.current.has(tagKey)) {
+                    processedAssistantTurnIntentsRef.current.add(tagKey);
+                    onLogEventRef.current?.("INTENT", `Tag observed in transcript: ${intent.action}`, { text: spokenText });
+                  }
+                }
+                const intentKey = `assistant_${turnId}_${intent.action}`;
                 if (!processedAssistantTurnIntentsRef.current.has(intentKey)) {
                   processedAssistantTurnIntentsRef.current.add(intentKey);
-                  onLogEventRef.current?.("INTENT", `Detected Assistant Intent: ${intent}`, { text: spokenText });
-                  onUIActionRef.current?.(intent);
+                  const via = intent.source === "tag" ? "tag" : intent.action === "end_call" ? "sign-off" : "spoken-language pattern";
+                  onLogEventRef.current?.("INTENT", `Detected Assistant Intent: ${intent.action} (${via})`, { text: spokenText });
+                  onUIActionRef.current?.(intent.action);
                 }
               }
             }

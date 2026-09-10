@@ -1,4 +1,5 @@
 import type { VoiceMessage } from "./voice-agent-types";
+import { stripUITags } from "./voice-intents";
 
 export const formatTimestamp = (ms?: number) =>
   new Date(ms ?? Date.now()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -14,18 +15,24 @@ export function isUserTranscriptionItem(item: any, localUids: string[]): boolean
   );
 }
 
+/**
+ * Maps toolkit transcription items to chat messages. Screen-control tags are stripped here,
+ * so the owner's transcript, the turn extractor's window and end-of-call synthesis all see
+ * clean speech; intent detection reads the raw items before this step.
+ */
 export function mapTranscriptionsToMessages(
   transcriptions: any[],
   isUser: (item: any) => boolean
 ): VoiceMessage[] {
   return transcriptions
-    .filter((item: any) => (item.text || "").trim().length > 0)
-    .map((item: any, idx: number) => {
+    .map((item: any) => ({ item, text: stripUITags((item.text || "").trim()) }))
+    .filter(({ text }) => text.length > 0)
+    .map(({ item, text }, idx: number) => {
       const fromUser = isUser(item);
       return {
         id: `turn-${item.turn_id ?? idx}-${fromUser ? "user" : "agent"}`,
         role: fromUser ? "user" : "assistant",
-        text: (item.text || "").trim(),
+        text,
         timestamp: formatTimestamp(item._time || undefined),
       };
     });
