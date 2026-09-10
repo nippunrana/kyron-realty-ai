@@ -25,6 +25,13 @@ const ASSISTANT_OPEN_FINAL =
 const ASSISTANT_OPEN_GENERIC =
   /(pull|bring|open|show|display).*(card|modal|pop[- ]?up|review|specs).*(screen|for you|back up|take a look|right now)/i;
 const ASSISTANT_CLOSE = /(close|closed|hide|dismiss|minimiz).*(card|modal|pop[- ]?up|review)/i;
+/**
+ * Elena's sign-off on an off-topic call. Deliberately narrow: it needs her stating she
+ * cannot continue AND naming her role, so an ordinary sentence about ending or wrapping
+ * up cannot hang up a working call.
+ */
+const ASSISTANT_END_CALL =
+  /(cannot|can not|can't|won't be able to|unable to)\s+(continue|carry on|keep going with)[\s\S]{0,60}(chat|call|conversation|session)[\s\S]{0,120}(property listing agent|listing agent|listing specialist)/i;
 
 /** Verbal review-card commands from the owner: open wins over close/approve. */
 export function detectUserModalIntent(text: string): UIAction | null {
@@ -39,6 +46,8 @@ export function detectUserModalIntent(text: string): UIAction | null {
 
 /** The agent narrating that it opened or closed the review card. */
 export function detectAssistantModalIntent(text: string): UIAction | null {
+  // Terminal, so it is tested first: a sign-off that also mentions a card must still hang up.
+  if (ASSISTANT_END_CALL.test(text)) return "end_call";
   if (ASSISTANT_CLOSE.test(text)) return "close_review_modal";
   if (ASSISTANT_OPEN_CORE.test(text)) return "open_core_modal";
   if (ASSISTANT_OPEN_HYPER_LOCAL.test(text)) return "open_hyper_local";

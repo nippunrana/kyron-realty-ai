@@ -26,6 +26,8 @@ export interface VoiceControlState {
   isCallActive: boolean;
   isMuted: boolean;
   toggleMute: () => void;
+  /** Lets the studio hang up itself when the conduct guardrail trips. */
+  endCall: () => Promise<void>;
 }
 
 interface ConversationalPanelProps {
@@ -44,6 +46,8 @@ interface ConversationalPanelProps {
   onMicGranted: () => void;
   ownerName?: string;
   ownerEmail?: string;
+  /** Why the last call was hung up, when the studio ended it rather than the owner. */
+  conductNotice?: string | null;
 }
 
 export function ConversationalPanel({
@@ -59,6 +63,7 @@ export function ConversationalPanel({
   onMicGranted,
   ownerName,
   ownerEmail,
+  conductNotice,
 }: ConversationalPanelProps) {
   const [autoScroll, setAutoScroll] = useState(true);
   const [isScrolledUp, setIsScrolledUp] = useState(false);
@@ -127,8 +132,9 @@ export function ConversationalPanel({
       isCallActive,
       isMuted,
       toggleMute,
+      endCall,
     });
-  }, [isCallActive, isMuted, toggleMute, onVoiceStateSync]);
+  }, [isCallActive, isMuted, toggleMute, endCall, onVoiceStateSync]);
 
   /**
    * Acquire the microphone before `startCall`, not during it. Agora asks for the mic at
@@ -381,6 +387,13 @@ export function ConversationalPanel({
               </p>
             )}
           </div>
+
+          {conductNotice && !micError && (
+            <div className="w-full mt-2.5 p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-left flex items-start gap-2">
+              <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5" />
+              <p className="text-[11px] font-semibold text-rose-900 leading-snug">{conductNotice}</p>
+            </div>
+          )}
 
           {micError && (
             <div className="w-full mt-2.5 p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-left flex items-start gap-2">

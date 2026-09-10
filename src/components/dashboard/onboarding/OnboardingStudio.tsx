@@ -112,6 +112,20 @@ function isUsableHyperLocalResult(data: HyperLocalKbData | null): boolean {
   );
 }
 
+/**
+ * Off-topic turns tolerated before the studio hangs up. Elena warns on the first two from
+ * her own judgment; this count is the authority on when the third has arrived, because it
+ * lives here rather than in a conversation the caller is actively trying to derail.
+ * Strikes do not decay: an owner who ignores two explicit warnings has had fair notice.
+ */
+const MAX_OFF_TOPIC_STRIKES = 3;
+
+const CONDUCT_NOTICE =
+  "This call was ended because the conversation moved away from listing the property. You can start again whenever you're ready.";
+
+/** Long enough for a spoken sign-off to land, short enough to stop a caller talking on. */
+const CONDUCT_HANGUP_GRACE_MS = 4000;
+
 const HUD_STORAGE_KEY = "kyron_telemetry_hud_open";
 let hudListeners: Array<() => void> = [];
 
@@ -180,6 +194,11 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
   const draftIdRef = useRef<number | null>(initialDraftId || null);
   const [voiceControl, setVoiceControl] = useState<VoiceControlState | null>(null);
 
+  const offTopicStrikesRef = useRef(0);
+  const conductTerminatedRef = useRef(false);
+  const conductHangupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [conductNotice, setConductNotice] = useState<string | null>(null);
+
   const [entryStage, setEntryStage] = useState<EntryStage>("intro");
   const entryStageRef = useRef<EntryStage>("intro");
   const entryLayoutRef = useRef<EntryLayoutSnapshot | null>(null);
@@ -216,7 +235,9 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
     wasTurnSyncingRef.current = isTurnSyncing;
   }, [isTurnSyncing, advanceEntryStage]);
 
+  const voiceControlRef = useRef<VoiceControlState | null>(null);
   const handleVoiceStateSync = useCallback((state: VoiceControlState) => {
+    voiceControlRef.current = state;
     setVoiceControl(state);
   }, []);
 
@@ -261,6 +282,42 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
     },
     []
   );
+
+  /**
+   * Hangs up. `immediate` is Elena having just said her sign-off out loud; otherwise this is
+   * the backstop firing on the strike count alone, and it waits a beat so a sign-off she is
+   * still speaking can finish. Either way it latches, so the end-of-call synthesis is skipped
+   * - spending a Gemini call summarising a transcript we are rejecting is the exact waste the
+   * guardrail exists to stop.
+   */
+  const terminateForConduct = useCallback((immediate: boolean, reason: string) => {
+    if (conductTerminatedRef.current) return;
+    conductTerminatedRef.current = true;
+    setConductNotice(CONDUCT_NOTICE);
+    addTelemetryLog(
+      "INTENT",
+      `Conduct guardrail: ending call (${reason})`,
+      { strikes: offTopicStrikesRef.current, immediate },
+      undefined,
+      "warn"
+    );
+
+    const hangUp = () => {
+      conductHangupTimerRef.current = null;
+      voiceControlRef.current?.endCall().catch(() => {});
+    };
+
+    if (immediate) hangUp();
+    else conductHangupTimerRef.current = setTimeout(hangUp, CONDUCT_HANGUP_GRACE_MS);
+  }, [addTelemetryLog]);
+
+  useEffect(
+    () => () => {
+      if (conductHangupTimerRef.current) clearTimeout(conductHangupTimerRef.current);
+    },
+    []
+  );
+
 
   // Resume / populate existing draft listing if initialDraftId is provided
   useEffect(() => {
@@ -693,6 +750,11 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
         isTurnSyncing: isTurnSyncingRef.current,
       });
 
+      if (action === "end_call") {
+        terminateForConduct(true, "Elena delivered the closing line");
+        return;
+      }
+
       if (action === "open_core_modal") {
         if (onboardingStageRef.current === "core") {
           if (!isTurnSyncingRef.current || areCoreSpecsVerified(dataRef.current.property, dataRef.current.knowledgeBase)) {
@@ -767,7 +829,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
         }
       }
     },
-    [handleConfirmCoreSpecs, openFullReview, handleOpenPhotoUpload, confirmFullReview, addTelemetryLog, setFinalGate]
+    [handleConfirmCoreSpecs, openFullReview, handleOpenPhotoUpload, confirmFullReview, addTelemetryLog, setFinalGate, terminateForConduct]
   );
 
   // Trailing Conflating Queue: In-flight Gemini extractions run to completion
@@ -979,6 +1041,24 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
       }
 
       // Handle modal action intent returned by turn extractor
+      // The authoritative strike count. Elena delivers the first two warnings from her own
+      // reading of the turn; this decides when the third has arrived, so a caller who talks
+      // her out of counting still gets hung up on.
+      if (json.success && json.data?.conduct?.offTopic === true) {
+        offTopicStrikesRef.current += 1;
+        const strikes = offTopicStrikesRef.current;
+        addTelemetryLog(
+          "INTENT",
+          `Off-topic turn ${strikes}/${MAX_OFF_TOPIC_STRIKES}`,
+          json.data.conduct.reason || null,
+          undefined,
+          strikes >= MAX_OFF_TOPIC_STRIKES ? "error" : "warn"
+        );
+        if (strikes >= MAX_OFF_TOPIC_STRIKES) {
+          terminateForConduct(false, `${strikes} off-topic turns`);
+        }
+      }
+
       if (json.success && json.data?.modalAction) {
         const action = json.data.modalAction;
         if (action === "open_core") {
@@ -1106,6 +1186,16 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
   // Conversational Extraction Handler (invoked at call completion with owner dialogue)
   const handleSendMessage = async (text: string) => {
     if (!text || !text.trim()) return;
+    if (conductTerminatedRef.current) {
+      addTelemetryLog(
+        "INTENT",
+        "Skipped end-of-call synthesis (call ended by the conduct guardrail)",
+        null,
+        undefined,
+        "warn"
+      );
+      return;
+    }
 
     const startTime = Date.now();
     addTelemetryLog("DISCONNECT-SYNTHESIS", "Initiated end-of-call full transcript synthesis", {
@@ -1354,7 +1444,12 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
         <div {...{ [FLIP_ATTR]: "panel" }} className={PANEL_STAGE_CLASSES[entryStage]}>
           <ConversationalPanel
             entryStage={entryStage}
+            conductNotice={conductNotice}
             onMicGranted={() => {
+              // Every call starts clean: strikes and the hang-up latch are per call.
+              offTopicStrikesRef.current = 0;
+              conductTerminatedRef.current = false;
+              setConductNotice(null);
               // Only the opening Start grows the card. Disconnecting mid-interview brings
               // the idle card back inside the split layout, and reconnecting from there
               // must not fly the panel back to the centre of the screen.
