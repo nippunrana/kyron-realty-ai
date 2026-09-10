@@ -43,9 +43,18 @@ Canonical source: **`src/lib/google-calendar.ts`**. Wired into sign-in by `src/a
 
 ## Traps
 
-- `prompt: "consent"` in `src/auth.ts` shows the Google consent screen on *every* Google
-  login. That is deliberate: it guarantees a refresh token even when a previous one was
-  lost or expired. Relaxing it trades that guarantee for a quieter login.
-- While the Google Cloud OAuth app is in **Testing**, refresh tokens expire after 7 days
-  and only listed test users can consent. Calendar access will appear to work and then
-  silently stop. Publishing the app is what fixes it, not code.
+- **Never add `prompt: "consent"` back to the Google provider.** It was removed on
+  2026-09-10 because it is redundant: Google already shows the consent screen by itself
+  whenever the request asks for a scope the user has not yet granted this client, and that
+  grant is what issues the refresh token. On repeat logins Google returns no refresh token,
+  and `persistGoogleTokens` deliberately keeps the stored one — that pair is what makes
+  repeat logins silent. Forcing consent globally would tax every owner, every login, to
+  cover a state that Google's own behaviour already repairs.
+- **A stuck link is repaired per-account, never globally.** The one state Google will not
+  fix on its own is "both scopes present in `scope` but `refresh_token` null" — Google sees
+  nothing new to ask for, so it skips consent and returns no refresh token. The remedy is a
+  one-shot re-consent for that owner, not a global prompt. No such repair path is built
+  today; the link simply reads as absent, which is the designed contract.
+- **Refresh tokens do not expire on a timer.** The OAuth app is published, so a stored
+  refresh token stays valid until the owner revokes access or six months pass with no use.
+  Access tokens last about an hour and are refreshed automatically.

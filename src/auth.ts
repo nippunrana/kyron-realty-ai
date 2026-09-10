@@ -48,9 +48,6 @@ export const { handlers, auth } = NextAuth({
                 // Without offline access Google issues no refresh token, and the owner's
                 // calendar becomes unreachable an hour after they close the tab.
                 access_type: "offline",
-                // Forces Google to re-issue a refresh token on every grant, so a login
-                // can always repair a link we lost. Costs a consent screen each time.
-                prompt: "consent",
               },
             },
           }),
