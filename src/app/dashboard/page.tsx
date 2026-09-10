@@ -10,6 +10,7 @@ import { PropertyListingsSection, type ListingCardItem } from "@/components/dash
 import { DashboardUsageWidget } from "@/components/dashboard/DashboardUsageWidget";
 import type { DashboardUsageStats, SessionHistoryItem } from "@/components/dashboard/usage-types";
 import { backfillUnsyncedSessions } from "@/lib/agora-telemetry";
+import { calculateSessionCostBreakdown, USD_TO_INR } from "@/lib/cost-calculator";
 import {
   BrainCircuit,
   Target,
@@ -108,12 +109,14 @@ export default async function DashboardPage() {
     const durationFormatted = `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
 
     let mapsSummary: string | null = null;
+    let sessRoutesElements = 0;
+    let sessGroundingQueries = 0;
     if (prop?.knowledgeBase?.kbData) {
       const kbData = prop.knowledgeBase.kbData;
-      const elemCount = (kbData.nearbyDistances?.length || 0) * 2;
-      const queryCount = kbData.grounded ? 4 : 0;
-      if (elemCount > 0 || queryCount > 0) {
-        mapsSummary = `${elemCount} elem • ${queryCount} queries`;
+      sessRoutesElements = (kbData.nearbyDistances?.length || 0) * 2;
+      sessGroundingQueries = kbData.grounded ? 4 : 0;
+      if (sessRoutesElements > 0 || sessGroundingQueries > 0) {
+        mapsSummary = `${sessRoutesElements} elem • ${sessGroundingQueries} queries`;
       }
     }
 
@@ -125,6 +128,13 @@ export default async function DashboardPage() {
       minute: "2-digit",
       timeZone: "UTC",
     }).format(startedDate) + " UTC";
+
+    const costBreakdown = calculateSessionCostBreakdown({
+      durationSeconds: durSec,
+      routesElements: sessRoutesElements,
+      groundingQueries: sessGroundingQueries,
+      callerType: sess.callerType,
+    });
 
     return {
       id: sess.id,
@@ -141,6 +151,9 @@ export default async function DashboardPage() {
       formattedDate,
       status: sess.status || "completed",
       isAgoraVerified: Boolean(sess.agoraSessionId && (durSec > 0 || sess.status === "completed")),
+      costBreakdown,
+      routesElements: sessRoutesElements,
+      groundingQueries: sessGroundingQueries,
     };
   });
 
@@ -168,6 +181,21 @@ export default async function DashboardPage() {
   const overageMinutes = Math.max(0, totalConvoMinutes - convoFreeTierLimit);
   const estimatedSpendUsd = Number((overageMinutes * 0.10).toFixed(2));
 
+  // Aggregate commercial spend across all sessions (zero-free-tier view)
+  const aggregateCommercial = recentSessions.reduce(
+    (acc, s) => {
+      const b = s.costBreakdown;
+      if (!b) return acc;
+      acc.voice += b.voiceCostUsd;
+      acc.routes += b.routesCostUsd;
+      acc.maps += b.mapsCostUsd;
+      acc.ai += b.aiCostUsd;
+      acc.total += b.totalCostUsd;
+      return acc;
+    },
+    { voice: 0, routes: 0, maps: 0, ai: 0, total: 0 }
+  );
+
   const usageStats: DashboardUsageStats = {
     totalConvoMinutes,
     convoMinutesFormatted: totalConvoMinutes.toString(),
@@ -186,6 +214,12 @@ export default async function DashboardPage() {
     isFreeTierActive: overageMinutes === 0,
     draftsCount: userProperties.filter((p) => p.status === "draft").length,
     publishedCount: userProperties.filter((p) => p.status !== "draft").length,
+    totalCommercialSpendUsd: Number(aggregateCommercial.total.toFixed(4)),
+    totalCommercialSpendInr: Number((aggregateCommercial.total * USD_TO_INR).toFixed(2)),
+    voiceSpendUsd: Number(aggregateCommercial.voice.toFixed(4)),
+    routesSpendUsd: Number(aggregateCommercial.routes.toFixed(4)),
+    mapsSpendUsd: Number(aggregateCommercial.maps.toFixed(4)),
+    aiSpendUsd: Number(aggregateCommercial.ai.toFixed(4)),
   };
 
   return (

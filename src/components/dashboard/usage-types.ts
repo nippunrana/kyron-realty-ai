@@ -1,3 +1,16 @@
+export interface SessionCostBreakdown {
+  voiceCostUsd: number;
+  routesCostUsd: number;
+  mapsCostUsd: number;
+  aiCostUsd: number;
+  totalCostUsd: number;
+  voiceCostInr: number;
+  routesCostInr: number;
+  mapsCostInr: number;
+  aiCostInr: number;
+  totalCostInr: number;
+}
+
 export interface SessionHistoryItem {
   id: number;
   propertyId: number | null;
@@ -13,6 +26,9 @@ export interface SessionHistoryItem {
   formattedDate: string; // e.g. "Sep 10, 7:43 PM"
   status: string;
   isAgoraVerified?: boolean;
+  costBreakdown?: SessionCostBreakdown;
+  routesElements?: number;
+  groundingQueries?: number;
 }
 
 export interface DashboardUsageStats {
@@ -33,4 +49,11 @@ export interface DashboardUsageStats {
   isFreeTierActive: boolean;
   draftsCount: number;
   publishedCount: number;
+  // Commercial spend metrics (raw, zero-free-tier)
+  totalCommercialSpendUsd: number;
+  totalCommercialSpendInr: number;
+  voiceSpendUsd: number;
+  routesSpendUsd: number;
+  mapsSpendUsd: number;
+  aiSpendUsd: number;
 }

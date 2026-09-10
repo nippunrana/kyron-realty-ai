@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   PhoneCall,
   Sparkles,
@@ -9,6 +9,8 @@ import {
   History,
   Navigation,
   Bot,
+  ToggleLeft,
+  ToggleRight,
 } from "lucide-react";
 import type { DashboardUsageStats, SessionHistoryItem } from "./usage-types";
 import { SessionHistoryDrawer } from "./SessionHistoryDrawer";
@@ -18,8 +20,31 @@ interface DashboardUsageWidgetProps {
   sessions: SessionHistoryItem[];
 }
 
+const PREF_KEY = "kyron_cost_mode_pref";
+
 export function DashboardUsageWidget({ stats, sessions }: DashboardUsageWidgetProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [commercialMode, setCommercialMode] = useState(false);
+
+  // Restore user preference from localStorage after hydration
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(PREF_KEY);
+      if (stored === "commercial") setCommercialMode(true);
+    } catch {
+      // localStorage unavailable (SSR edge case) — ignore
+    }
+  }, []);
+
+  const handleToggle = () => {
+    const next = !commercialMode;
+    setCommercialMode(next);
+    try {
+      localStorage.setItem(PREF_KEY, next ? "commercial" : "free");
+    } catch {
+      // ignore
+    }
+  };
 
   return (
     <section className="mb-8">
@@ -31,11 +56,18 @@ export function DashboardUsageWidget({ stats, sessions }: DashboardUsageWidgetPr
           </div>
           <div>
             <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
-              <span>AI Credit & Telemetry Usage</span>
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-semibold">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Free Tier Active
-              </span>
+              <span>AI Credit &amp; Telemetry Usage</span>
+              {commercialMode ? (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-50 border border-orange-200 text-orange-700 text-[11px] font-semibold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+                  Raw Commercial Cost
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-semibold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Free Tier Active
+                </span>
+              )}
             </h2>
             <p className="text-xs text-slate-500">
               Live consumption tracking across Agora Voice AI, Google Routes, and Gemini Maps Grounding
@@ -43,19 +75,42 @@ export function DashboardUsageWidget({ stats, sessions }: DashboardUsageWidgetPr
           </div>
         </div>
 
-        {/* View Session History Button */}
-        <button
-          type="button"
-          onClick={() => setDrawerOpen(true)}
-          className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 border border-slate-200 shadow-xs hover:border-slate-300 transition-all text-xs font-semibold cursor-pointer group shrink-0"
-        >
-          <History className="w-3.5 h-3.5 text-slate-500 group-hover:text-blue-600 transition-colors" />
-          <span>View Session History</span>
-          <span className="px-2 py-0.5 rounded-full bg-slate-100 group-hover:bg-blue-50 text-slate-600 group-hover:text-blue-700 text-[10px] font-bold border border-slate-200/80 transition-colors">
-            {sessions.length}
-          </span>
-          <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Free Tier Toggle */}
+          <button
+            type="button"
+            id="cost-mode-toggle"
+            onClick={handleToggle}
+            title={commercialMode ? "Switch to Free Tier view" : "Show raw commercial cost (no free tier)"}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
+              commercialMode
+                ? "bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100"
+                : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-800"
+            }`}
+          >
+            {commercialMode ? (
+              <ToggleRight className="w-4 h-4" />
+            ) : (
+              <ToggleLeft className="w-4 h-4" />
+            )}
+            <span>{commercialMode ? "Free Tier Off" : "Free Tier On"}</span>
+          </button>
+
+          {/* View Session History Button */}
+          <button
+            type="button"
+            id="view-session-history-btn"
+            onClick={() => setDrawerOpen(true)}
+            className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 border border-slate-200 shadow-xs hover:border-slate-300 transition-all text-xs font-semibold cursor-pointer group"
+          >
+            <History className="w-3.5 h-3.5 text-slate-500 group-hover:text-blue-600 transition-colors" />
+            <span>View Session History</span>
+            <span className="px-2 py-0.5 rounded-full bg-slate-100 group-hover:bg-blue-50 text-slate-600 group-hover:text-blue-700 text-[10px] font-bold border border-slate-200/80 transition-colors">
+              {sessions.length}
+            </span>
+            <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+          </button>
+        </div>
       </div>
 
       {/* 4 Usage Cards Grid */}
@@ -72,39 +127,61 @@ export function DashboardUsageWidget({ stats, sessions }: DashboardUsageWidgetPr
               </div>
             </div>
 
-            <div className="flex items-baseline justify-between gap-1.5 flex-wrap">
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-2xl font-extrabold text-slate-900 tracking-tight font-mono">
-                  {stats.convoMinutesFormatted}
-                </span>
-                <span className="text-xs text-slate-500 font-medium">
-                  / {stats.convoFreeTierLimit} min
-                </span>
-              </div>
-
-              {/* Dynamic Free-Trial / Post-Trial Status Badge */}
-              {stats.totalConvoMinutes <= stats.convoFreeTierLimit ? (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-semibold">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  <span>{stats.convoMinutesRemaining} min left in trial</span>
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 text-[11px] font-semibold">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                  <span>+{stats.convoOverageMinutes} min post-trial ($0.10/min)</span>
-                </span>
-              )}
-            </div>
-
-            {/* Mini Progress Bar */}
-            <div className="mt-3 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all duration-500 ${
-                  stats.totalConvoMinutes > stats.convoFreeTierLimit ? "bg-amber-500" : "bg-purple-600"
-                }`}
-                style={{ width: `${Math.min(100, Math.max(stats.convoPercentage, 2))}%` }}
-              />
-            </div>
+            {commercialMode ? (
+              <>
+                <div className="flex items-baseline gap-1.5 flex-wrap">
+                  <span className="text-2xl font-extrabold text-slate-900 tracking-tight font-mono">
+                    ${stats.voiceSpendUsd.toFixed(2)}
+                  </span>
+                  <span className="text-xs text-slate-500 font-medium">
+                    voice spend
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  ≈ ₹{(stats.voiceSpendUsd * 86).toFixed(2)} • {stats.totalConvoMinutes} min used
+                </p>
+                {/* Mini Progress Bar */}
+                <div className="mt-3 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-orange-500 transition-all duration-500"
+                    style={{ width: `${Math.min(100, Math.max(stats.convoPercentage, 2))}%` }}
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-baseline justify-between gap-1.5 flex-wrap">
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-2xl font-extrabold text-slate-900 tracking-tight font-mono">
+                      {stats.convoMinutesFormatted}
+                    </span>
+                    <span className="text-xs text-slate-500 font-medium">
+                      / {stats.convoFreeTierLimit} min
+                    </span>
+                  </div>
+                  {stats.totalConvoMinutes <= stats.convoFreeTierLimit ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-semibold">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      <span>{stats.convoMinutesRemaining} min left in trial</span>
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 text-[11px] font-semibold">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                      <span>+{stats.convoOverageMinutes} min post-trial ($0.10/min)</span>
+                    </span>
+                  )}
+                </div>
+                {/* Mini Progress Bar */}
+                <div className="mt-3 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      stats.totalConvoMinutes > stats.convoFreeTierLimit ? "bg-amber-500" : "bg-purple-600"
+                    }`}
+                    style={{ width: `${Math.min(100, Math.max(stats.convoPercentage, 2))}%` }}
+                  />
+                </div>
+              </>
+            )}
           </div>
 
           <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
@@ -113,7 +190,7 @@ export function DashboardUsageWidget({ stats, sessions }: DashboardUsageWidgetPr
               <span>Agora SD-RTN Synced</span>
             </span>
             <span className="px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 font-semibold border border-purple-100 text-[10px]">
-              {stats.totalConvoMinutes > stats.convoFreeTierLimit ? "$0.10/min billed" : "300 min/mo free"}
+              {commercialMode ? "Raw Rate ($0.10/min)" : stats.totalConvoMinutes > stats.convoFreeTierLimit ? "$0.10/min billed" : "300 min/mo free"}
             </span>
           </div>
         </div>
@@ -123,40 +200,64 @@ export function DashboardUsageWidget({ stats, sessions }: DashboardUsageWidgetPr
           <div>
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                Maps & Routes Matrix
+                Maps &amp; Routes Matrix
               </span>
               <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center">
                 <Navigation className="w-4 h-4" />
               </div>
             </div>
 
-            <div className="flex items-baseline gap-2">
-              <div className="flex items-baseline gap-1">
-                <span className="text-2xl font-extrabold text-slate-900 tracking-tight font-mono">
-                  {stats.totalRoutesElements}
-                </span>
-                <span className="text-xs text-slate-500 font-medium">elem</span>
-              </div>
-              <span className="text-slate-300 font-light">•</span>
-              <div className="flex items-baseline gap-1">
-                <span className="text-2xl font-extrabold text-slate-900 tracking-tight font-mono">
-                  {stats.totalGroundingQueries}
-                </span>
-                <span className="text-xs text-slate-500 font-medium">queries</span>
-              </div>
-            </div>
-
-            <p className="text-xs text-slate-500 mt-2 line-clamp-1">
-              {stats.totalRoutesElements > 0 || stats.totalGroundingQueries > 0
-                ? `${stats.publishedCount + stats.draftsCount} properties enriched`
-                : "Awaiting first property onboarding"}
-            </p>
+            {commercialMode ? (
+              <>
+                <div className="flex items-baseline gap-1.5 flex-wrap">
+                  <span className="text-2xl font-extrabold text-slate-900 tracking-tight font-mono">
+                    ${(stats.routesSpendUsd + stats.mapsSpendUsd).toFixed(2)}
+                  </span>
+                  <span className="text-xs text-slate-500 font-medium">combined</span>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  ≈ ₹{((stats.routesSpendUsd + stats.mapsSpendUsd) * 86).toFixed(2)} • Routes + Maps Grounding
+                </p>
+                <div className="flex items-center gap-2 mt-2 text-[11px] text-slate-500">
+                  <span>Routes: ${stats.routesSpendUsd.toFixed(3)}</span>
+                  <span className="text-slate-300">•</span>
+                  <span>Maps: ${stats.mapsSpendUsd.toFixed(3)}</span>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-baseline gap-2">
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-2xl font-extrabold text-slate-900 tracking-tight font-mono">
+                      {stats.totalRoutesElements}
+                    </span>
+                    <span className="text-xs text-slate-500 font-medium">elem</span>
+                  </div>
+                  <span className="text-slate-300 font-light">•</span>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-2xl font-extrabold text-slate-900 tracking-tight font-mono">
+                      {stats.totalGroundingQueries}
+                    </span>
+                    <span className="text-xs text-slate-500 font-medium">queries</span>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-500 mt-2 line-clamp-1">
+                  {stats.totalRoutesElements > 0 || stats.totalGroundingQueries > 0
+                    ? `${stats.publishedCount + stats.draftsCount} properties enriched`
+                    : "Awaiting first property onboarding"}
+                </p>
+              </>
+            )}
           </div>
 
           <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
             <span className="text-slate-500 font-medium">70k Routes • 5k Maps</span>
-            <span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 font-semibold border border-amber-100 text-[10px]">
-              Free Tier
+            <span className={`px-1.5 py-0.5 rounded font-semibold border text-[10px] ${
+              commercialMode
+                ? "bg-orange-50 text-orange-700 border-orange-100"
+                : "bg-amber-50 text-amber-700 border-amber-100"
+            }`}>
+              {commercialMode ? "Actual Cost" : "Free Tier"}
             </span>
           </div>
         </div>
@@ -214,34 +315,63 @@ export function DashboardUsageWidget({ stats, sessions }: DashboardUsageWidgetPr
           <div>
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                Spend & Credit Status
+                Spend &amp; Credit Status
               </span>
               <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center">
                 <ShieldCheck className="w-4 h-4" />
               </div>
             </div>
 
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-2xl font-extrabold text-slate-900 tracking-tight font-mono">
-                ${stats.estimatedSpendUsd.toFixed(2)}
-              </span>
-              <span className="text-xs text-slate-500 font-medium">
-                incurred spend
-              </span>
-            </div>
-
-            <div className="flex items-center gap-1.5 mt-2.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-xs font-semibold text-emerald-700">
-                100% Free Tier Covered
-              </span>
-            </div>
+            {commercialMode ? (
+              <>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-2xl font-extrabold text-slate-900 tracking-tight font-mono">
+                    ${stats.totalCommercialSpendUsd.toFixed(2)}
+                  </span>
+                  <span className="text-xs text-slate-500 font-medium">
+                    total cost
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  ≈ ₹{stats.totalCommercialSpendInr.toFixed(2)} across all services
+                </p>
+                <div className="flex items-center gap-1.5 mt-2.5">
+                  <span className="w-2 h-2 rounded-full bg-orange-500" />
+                  <span className="text-xs font-semibold text-orange-700">
+                    Zero Free Tier Applied
+                  </span>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-2xl font-extrabold text-slate-900 tracking-tight font-mono">
+                    ${stats.estimatedSpendUsd.toFixed(2)}
+                  </span>
+                  <span className="text-xs text-slate-500 font-medium">
+                    incurred spend
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 mt-2.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-xs font-semibold text-emerald-700">
+                    100% Free Tier Covered
+                  </span>
+                </div>
+              </>
+            )}
           </div>
 
           <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
-            <span className="text-slate-500 font-medium">No overage charges</span>
-            <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-semibold border border-emerald-100 text-[10px]">
-              Active
+            <span className="text-slate-500 font-medium">
+              {commercialMode ? "Actual commercial rates" : "No overage charges"}
+            </span>
+            <span className={`px-1.5 py-0.5 rounded font-semibold border text-[10px] ${
+              commercialMode
+                ? "bg-orange-50 text-orange-700 border-orange-100"
+                : "bg-emerald-50 text-emerald-700 border-emerald-100"
+            }`}>
+              {commercialMode ? "Actual Cost (Zero Free Tier)" : "Active"}
             </span>
           </div>
         </div>
@@ -252,6 +382,9 @@ export function DashboardUsageWidget({ stats, sessions }: DashboardUsageWidgetPr
         isOpen={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         sessions={sessions}
+        commercialMode={commercialMode}
+        totalCommercialSpendUsd={stats.totalCommercialSpendUsd}
+        totalCommercialSpendInr={stats.totalCommercialSpendInr}
       />
     </section>
   );
