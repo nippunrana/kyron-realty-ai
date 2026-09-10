@@ -86,12 +86,24 @@ export async function enrichPropertyLocationWithAI(
     research.outputTokens + structured.outputTokens
   );
 
+  const targetCount = structured.targets?.length || 0;
+  const routeMatrixCalls = nearbyDistances !== null && targetCount > 0 ? 2 : 0;
+  const routeMatrixElements = routeMatrixCalls * targetCount;
+
+  const mapsUsage = {
+    groundingQueries: research.queries.length,
+    routeMatrixCalls,
+    routeMatrixElements,
+    freeTierQuota: "70k elements/mo free (India)",
+  };
+
   return {
     kbData: buildKbData(structured.parsed, research, nearbyDistances),
     modelUsed,
     grounded: research.grounded,
     mapsQueryCount: research.queries.length,
     distancesMeasured: nearbyDistances !== null,
+    mapsUsage,
     usage,
     latencyMs,
   };

@@ -247,7 +247,23 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
     candidateTokens: 0,
     totalTokens: 0,
     totalCostUsd: 0,
+    agoraDurationSeconds: 0,
+    mapsGroundingQueries: 0,
+    routesMatrixElements: 0,
+    routesApiRequests: 0,
   });
+
+  // Track live Agora Conversational AI duration while call is active
+  useEffect(() => {
+    if (!voiceControl?.isCallActive) return;
+    const timer = setInterval(() => {
+      setSessionUsage((prev) => ({
+        ...prev,
+        agoraDurationSeconds: (prev.agoraDurationSeconds || 0) + 1,
+      }));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [voiceControl?.isCallActive]);
   const isHudOpen = useSyncExternalStore(subscribeHud, getHudSnapshot, getHudServerSnapshot);
 
   const toggleHud = () => {
@@ -558,6 +574,37 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
             hyperLocalDataRef.current = json.data.kbData;
           }
 
+          // Capture Google Maps usage telemetry if present
+          if (json.data.mapsUsage) {
+            setSessionUsage((prev) => ({
+              ...prev,
+              mapsGroundingQueries: prev.mapsGroundingQueries + (json.data.mapsUsage.groundingQueries || 0),
+              routesMatrixElements: prev.routesMatrixElements + (json.data.mapsUsage.routeMatrixElements || 0),
+              routesApiRequests: prev.routesApiRequests + (json.data.mapsUsage.routeMatrixCalls || 0),
+            }));
+
+            addTelemetryLog(
+              "MAPS",
+              `Google Maps: ${json.data.mapsUsage.groundingQueries} grounding queries (5k pool) • ${json.data.mapsUsage.routeMatrixElements} matrix elements (70k pool)`,
+              {
+                mapsGrounding: {
+                  queriesExecuted: json.data.mapsUsage.groundingQueries,
+                  deductedFrom: "Gemini Google Maps Grounding (5,000 free search queries/month)",
+                  billingRateAfterFreeTier: "$14.00 per 1,000 search queries",
+                },
+                routesMatrixApi: {
+                  httpCallsMade: json.data.mapsUsage.routeMatrixCalls,
+                  elementsCalculated: json.data.mapsUsage.routeMatrixElements,
+                  calculation: `${json.data.mapsUsage.routeMatrixCalls > 0 ? json.data.mapsUsage.routeMatrixElements / json.data.mapsUsage.routeMatrixCalls : 0} places × ${json.data.mapsUsage.routeMatrixCalls} modes (WALK + DRIVE)`,
+                  deductedFrom: "Google Routes Compute Route Matrix Essentials (70,000 free elements/month in India)",
+                  billingRateAfterFreeTier: "Discounted India rate (~₹0.12 - ₹0.15 per element)",
+                },
+              },
+              undefined,
+              "success"
+            );
+          }
+
           addTelemetryLog(
             "AI-ENRICH",
             usable
@@ -570,6 +617,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
               grounded: json.data.grounded,
               distancesMeasured: json.data.distancesMeasured,
               placesMeasured: json.data.kbData.nearbyDistances?.length || 0,
+              mapsUsage: json.data.mapsUsage,
             },
             json.data.latencyMs,
             usable ? "success" : "warn"
@@ -879,6 +927,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
       const usage = json.data?.usage || json.usage;
       if (usage) {
         setSessionUsage((prev) => ({
+          ...prev,
           promptTokens: prev.promptTokens + (usage.promptTokens || 0),
           candidateTokens: prev.candidateTokens + (usage.candidateTokens || 0),
           totalTokens: prev.totalTokens + (usage.totalTokens || 0),
@@ -1228,6 +1277,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
       const synthUsage = json.data?.usage || json.usage;
       if (synthUsage) {
         setSessionUsage((prev) => ({
+          ...prev,
           promptTokens: prev.promptTokens + (synthUsage.promptTokens || 0),
           candidateTokens: prev.candidateTokens + (synthUsage.candidateTokens || 0),
           totalTokens: prev.totalTokens + (synthUsage.totalTokens || 0),
@@ -1617,6 +1667,10 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
             candidateTokens: 0,
             totalTokens: 0,
             totalCostUsd: 0,
+            agoraDurationSeconds: 0,
+            mapsGroundingQueries: 0,
+            routesMatrixElements: 0,
+            routesApiRequests: 0,
           });
         }}
         syncStatus={{
@@ -1624,6 +1678,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
           pendingFinalModalOpen: isFinalGateLatched,
           onboardingStage,
           availableDate: data.property.availableDate,
+          isCallConnected: Boolean(voiceControl?.isCallActive),
           sessionUsage,
         }}
       />

@@ -7,6 +7,13 @@ export interface HyperLocalEnrichmentInput {
   state?: string;
 }
 
+export interface MapsUsageTelemetry {
+  groundingQueries: number;
+  routeMatrixCalls: number;
+  routeMatrixElements: number;
+  freeTierQuota: string;
+}
+
 export interface HyperLocalEnrichmentResult {
   kbData: HyperLocalKbData;
   modelUsed: string;
@@ -15,6 +22,7 @@ export interface HyperLocalEnrichmentResult {
   mapsQueryCount: number;
   /** False when Routes API was unconfigured or unreachable; distances are then absent. */
   distancesMeasured: boolean;
+  mapsUsage?: MapsUsageTelemetry;
   usage?: GeminiUsage;
   latencyMs: number;
 }

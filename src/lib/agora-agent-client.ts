@@ -588,7 +588,7 @@ ${contactEmail ? `5. If asked for direct owner or leasing office contact, provid
  */
 export async function stopAgoraAgentSession(sessionId: string, channelName: string) {
   const [row] = await db
-    .select({ id: voiceSessions.id })
+    .select({ id: voiceSessions.id, startedAt: voiceSessions.startedAt })
     .from(voiceSessions)
     .where(and(eq(voiceSessions.agoraSessionId, sessionId), eq(voiceSessions.channelName, channelName)))
     .limit(1);
@@ -613,10 +613,15 @@ export async function stopAgoraAgentSession(sessionId: string, channelName: stri
     }
   }
 
+  const endedAt = new Date();
+  const durationSeconds = row.startedAt
+    ? Math.max(0, Math.round((endedAt.getTime() - new Date(row.startedAt).getTime()) / 1000))
+    : 0;
+
   await db
     .update(voiceSessions)
-    .set({ status: "completed", endedAt: new Date() })
+    .set({ status: "completed", endedAt, durationSeconds })
     .where(eq(voiceSessions.id, row.id));
 
-  return { success: true, sessionId, channelName };
+  return { success: true, sessionId, channelName, durationSeconds };
 }
