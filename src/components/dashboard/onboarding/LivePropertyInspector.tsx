@@ -23,7 +23,6 @@ import { buildAdditionalSpecs, buildChecklistItems } from "./inspector-specs";
 import { formatCompositeAddress, formatPropertyTypeLabel, isCommercial } from "@/lib/property-types";
 import { buildDefaultTitle } from "@/lib/listing-helpers";
 import { ExtraSpecsSuggestionBar } from "./ExtraSpecsSuggestionBar";
-import { CoreSpecsSuggestionBar } from "./CoreSpecsSuggestionBar";
 import { HyperLocalSearchHUD } from "./hyper-local/HyperLocalSearchHUD";
 import type { HyperLocalKbData } from "@/db/schema";
 
@@ -340,10 +339,6 @@ export function LivePropertyInspector({
         {/* Dynamic Core Verification Checklist */}
         <VerificationChecklist items={checklistItems} verifiedCount={verifiedCount} />
 
-        {/* Stage 1 tap-or-speak answers, retired once every core row is answered. */}
-        {!isFullyVerified && onboardingStage === "core" && (
-          <CoreSpecsSuggestionBar property={property} knowledgeBase={knowledgeBase} onApplyChip={handleApplyChip} />
-        )}
 
         {/* Location Research HUD + Suggestion Chips Bar for Extra Specs.
             Both share the scroll anchor so the HUD is never parked just above the fold. */}
