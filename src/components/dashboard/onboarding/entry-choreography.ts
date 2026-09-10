@@ -27,14 +27,22 @@ export type EntryStage = "intro" | "focused" | "split";
 export const FLIP_ATTR = "data-entry-flip";
 
 export const PANEL_STAGE_CLASSES: Record<EntryStage, string> = {
-  // `h-fit`, never a fixed height: the microphone-denied state adds a warning block above
-  // the button, and at a fixed 27rem the panel's `overflow-hidden` clipped "Try again",
-  // the only way out of a denial. `h-auto` is not the same thing here - with `inset-0` it
-  // stretches the card to the full viewport instead of shrinking it to its content.
+  /**
+   * Centred with a half-offset translate, never `inset-0` + `m-auto`, and the intro card
+   * carries no height at all so its height is plain `auto`.
+   *
+   * `inset-0` with a content-driven height is over-constrained, and it made the card's
+   * height depend on its content while the panel root's `h-full` made the content depend
+   * on the card's height. Chrome and Edge break that circle by treating the percentage as
+   * `auto`; Safari resolves it to 0, collapsing the whole card to a 2px line - its
+   * borders - with the persona block squeezed to its 41px of padding. Real Safari only:
+   * Playwright's WebKit build resolves it the way Chrome does and never reproduced it.
+   * `ConversationalPanel` drops `h-full` on the intro card for the same reason.
+   */
   intro:
-    "fixed inset-0 z-50 m-auto w-[min(100%-2rem,24rem)] h-fit max-h-[calc(100dvh-2rem)] flex flex-col min-h-0",
+    "fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[min(100%-2rem,24rem)] max-h-[calc(100dvh-2rem)] flex flex-col min-h-0",
   focused:
-    "fixed inset-0 z-50 m-auto w-[min(100%-2rem,48rem)] h-[min(84vh,42rem)] flex flex-col min-h-0",
+    "fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[min(100%-2rem,48rem)] h-[min(84vh,42rem)] flex flex-col min-h-0",
   split: "lg:col-span-5 flex flex-col h-full min-h-0 overflow-hidden",
 };
 
@@ -114,6 +122,10 @@ export function playEntryLayout(
   panel.style.bottom = "auto";
   panel.style.zIndex = "50";
 
+  // `x: 0, y: 0` writes an inline transform that overrides the stage classes' centring
+  // translate for the duration. Both rects were measured with that translate applied, so
+  // pinning to them lands the card exactly where the classes put it once `clearProps`
+  // hands the transform back at the end.
   gsap.set(panel, {
     left: from.left,
     top: from.top,

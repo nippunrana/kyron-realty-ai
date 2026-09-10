@@ -199,7 +199,15 @@ export function ConversationalPanel({
   }, []);
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-white rounded-3xl border border-slate-200/90 shadow-xl shadow-slate-200/40 overflow-hidden text-slate-900">
+    /* `h-auto` on the intro card, never `h-full`: the intro wrapper is sized by its
+       content, so asking for 100% of it is circular and Safari resolves that to 0. As a
+       shrinkable flex item it still collapses and lets the persona block scroll when a
+       short viewport clamps the wrapper's max-height. */
+    <div
+      className={`flex flex-col min-h-0 bg-white rounded-3xl border border-slate-200/90 shadow-xl shadow-slate-200/40 overflow-hidden text-slate-900 ${
+        entryStage === "intro" ? "h-auto" : "h-full"
+      }`}
+    >
       {/* 1. ELENA VANCE PERSONA BAR: Compact Sticky Bar when call active, Full Card when idle */}
       {isCallActive ? (
         <div className="px-4 py-3 border-b border-slate-100 bg-gradient-to-r from-slate-50/90 via-white to-slate-50/90 flex items-center justify-between gap-3 shrink-0 shadow-2xs">
