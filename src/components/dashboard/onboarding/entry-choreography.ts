@@ -28,22 +28,32 @@ export const FLIP_ATTR = "data-entry-flip";
 
 export const PANEL_STAGE_CLASSES: Record<EntryStage, string> = {
   /**
-   * Centred with a half-offset translate, never `inset-0` + `m-auto`, and the intro card
-   * carries no height at all so its height is plain `auto`.
+   * Centring is the same full-screen flex container every other modal in this studio uses
+   * (`ReviewSpecsModal`, `ImageUploadModal`), and the card inside is an ordinary flow
+   * child. Two earlier schemes failed:
    *
-   * `inset-0` with a content-driven height is over-constrained, and it made the card's
-   * height depend on its content while the panel root's `h-full` made the content depend
-   * on the card's height. Chrome and Edge break that circle by treating the percentage as
-   * `auto`; Safari resolves it to 0, collapsing the whole card to a 2px line - its
-   * borders - with the persona block squeezed to its 41px of padding. Real Safari only:
-   * Playwright's WebKit build resolves it the way Chrome does and never reproduced it.
-   * `ConversationalPanel` drops `h-full` on the intro card for the same reason.
+   * `inset-0` + `m-auto` + a content-driven height is over-constrained, and it made the
+   * card's height depend on its content while the panel root's `h-full` made the content
+   * depend on the card's height. Chrome and Edge break that circle by treating the
+   * percentage as `auto`; Safari resolves it to 0 and the card collapsed to a 2px line -
+   * its borders - with the persona block squeezed to its 41px of padding. Real Safari
+   * only: Playwright's WebKit resolves it the way Chrome does and never reproduced it.
+   *
+   * Centring with `-translate-x-1/2` instead put a transform on the class, which compounds
+   * with the inline transform the flight writes rather than being overridden by it -
+   * measured, the card set off from the wrong position and swung 128px off the left edge.
+   * Nothing in these class strings may carry a transform.
    */
-  intro:
-    "fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[min(100%-2rem,24rem)] max-h-[calc(100dvh-2rem)] flex flex-col min-h-0",
-  focused:
-    "fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[min(100%-2rem,48rem)] h-[min(84vh,42rem)] flex flex-col min-h-0",
+  intro: "fixed inset-0 z-50 flex items-center justify-center p-4",
+  focused: "fixed inset-0 z-50 flex items-center justify-center p-4",
   split: "lg:col-span-5 flex flex-col h-full min-h-0 overflow-hidden",
+};
+
+/** Sizing for the panel root - the card itself, and the element the flight animates. */
+export const PANEL_CARD_CLASSES: Record<EntryStage, string> = {
+  intro: "w-full max-w-sm h-auto max-h-full",
+  focused: "w-full max-w-3xl h-[min(84vh,42rem)] max-h-full",
+  split: "w-full h-full",
 };
 
 export const INSPECTOR_STAGE_CLASSES =
@@ -53,17 +63,22 @@ export interface EntryLayoutSnapshot {
   panel: DOMRect;
 }
 
-const panelEl = () =>
-  document.querySelector<HTMLElement>(`[${FLIP_ATTR}="panel"]`) ?? null;
+/**
+ * The tracked wrapper is a full-screen centring container at `intro` and `focused`, so the
+ * thing that actually moves is the card inside it.
+ */
+const cardEl = () =>
+  document.querySelector<HTMLElement>(`[${FLIP_ATTR}="panel"]`)
+    ?.firstElementChild as HTMLElement | null ?? null;
 
 /**
  * Records the card's geometry. Must run *before* React commits the stage change, so
  * callers capture here and replay from a layout effect.
  */
 export function captureEntryLayout(): EntryLayoutSnapshot | null {
-  const panel = panelEl();
-  if (!panel) return null;
-  return { panel: panel.getBoundingClientRect() };
+  const card = cardEl();
+  if (!card) return null;
+  return { panel: card.getBoundingClientRect() };
 }
 
 /**
@@ -74,7 +89,7 @@ export function captureEntryLayout(): EntryLayoutSnapshot | null {
  * keeps its background and border throughout.
  */
 function fadePanelInterior() {
-  const inner = panelEl()?.firstElementChild;
+  const inner = cardEl();
   if (!inner) return;
   gsap.fromTo(
     Array.from(inner.children),
@@ -96,7 +111,7 @@ export function playEntryLayout(
   snapshot: EntryLayoutSnapshot | null,
   stage: EntryStage
 ) {
-  const panel = panelEl();
+  const panel = cardEl();
   if (!panel || !snapshot) return;
 
   const from = snapshot.panel;
@@ -122,10 +137,6 @@ export function playEntryLayout(
   panel.style.bottom = "auto";
   panel.style.zIndex = "50";
 
-  // `x: 0, y: 0` writes an inline transform that overrides the stage classes' centring
-  // translate for the duration. Both rects were measured with that translate applied, so
-  // pinning to them lands the card exactly where the classes put it once `clearProps`
-  // hands the transform back at the end.
   gsap.set(panel, {
     left: from.left,
     top: from.top,

@@ -17,7 +17,7 @@ import {
   UserCheck,
 } from "lucide-react";
 import { useAgoraVoiceAgent } from "@/hooks/useAgoraVoiceAgent";
-import type { EntryStage } from "./entry-choreography";
+import { PANEL_CARD_CLASSES, type EntryStage } from "./entry-choreography";
 import type { UIAction, VoiceMessage } from "@/hooks/voice-agent-types";
 import type { TurnMessage } from "@/lib/turn-extractor";
 import { BASE_PATH } from "@/lib/base-path";
@@ -199,14 +199,10 @@ export function ConversationalPanel({
   }, []);
 
   return (
-    /* `h-auto` on the intro card, never `h-full`: the intro wrapper is sized by its
-       content, so asking for 100% of it is circular and Safari resolves that to 0. As a
-       shrinkable flex item it still collapses and lets the persona block scroll when a
-       short viewport clamps the wrapper's max-height. */
+    /* This is the card the entry choreography measures and flies; its per-stage size comes
+       from PANEL_CARD_CLASSES, never from `h-full` against a content-sized parent. */
     <div
-      className={`flex flex-col min-h-0 bg-white rounded-3xl border border-slate-200/90 shadow-xl shadow-slate-200/40 overflow-hidden text-slate-900 ${
-        entryStage === "intro" ? "h-auto" : "h-full"
-      }`}
+      className={`flex flex-col min-h-0 bg-white rounded-3xl border border-slate-200/90 shadow-xl shadow-slate-200/40 overflow-hidden text-slate-900 ${PANEL_CARD_CLASSES[entryStage]}`}
     >
       {/* 1. ELENA VANCE PERSONA BAR: Compact Sticky Bar when call active, Full Card when idle */}
       {isCallActive ? (
