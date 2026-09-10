@@ -55,6 +55,21 @@ Canonical source: **`src/lib/google-calendar.ts`**. Wired into sign-in by `src/a
   nothing new to ask for, so it skips consent and returns no refresh token. The remedy is a
   one-shot re-consent for that owner, not a global prompt. No such repair path is built
   today; the link simply reads as absent, which is the designed contract.
+- **Always send an explicit `timeZone` alongside every event `dateTime`.** A bare
+  `dateTime` is interpreted in the calendar's own zone, so a missing `timeZone` is a silent
+  5.5-hour shift, not an error. Calendars are now created stamped with
+  `DEFAULT_CALENDAR_TIME_ZONE`, but never rely on that — an event must carry its own zone.
+  `scripts/test-calendar-booking.ts` asserts the wall-clock time survives the round trip;
+  run it after touching any scheduling code.
+- **Never widen the scopes to discover the owner's time zone.** Decided 2026-09-10: the
+  zone stays hardcoded to IST rather than read from Google. Confirmed against a live
+  account that Google will not surrender it under our grant — the OIDC profile carries no
+  `zoneinfo` claim, `users/me/settings/timezone` is 403, and `calendar.app.created` cannot
+  read the primary calendar (404). The only route is `calendar.settings.readonly`, a
+  sensitive scope that breaks the "these permissions and no others" promise in
+  `src/app/privacy/page.tsx` and re-opens Google verification — rejected as not worth that
+  cost. To serve owners outside India, capture the browser's zone at sign-in instead;
+  do not revisit the scope.
 - **Refresh tokens do not expire on a timer.** The OAuth app is published, so a stored
   refresh token stays valid until the owner revokes access or six months pass with no use.
   Access tokens last about an hour and are refreshed automatically.

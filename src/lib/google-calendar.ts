@@ -29,6 +29,17 @@ export const CALENDAR_SCOPES = [
 /** Must stay character-for-character identical to the name promised in src/app/privacy/page.tsx. */
 export const KYRON_CALENDAR_NAME = "Kyron Real Estate AI";
 
+/**
+ * Time zone stamped on every calendar this app creates, and on every event written to one.
+ *
+ * Hardcoded because Google will not tell us the owner's own zone under our scopes: the
+ * OIDC profile carries no `zoneinfo` claim, `users/me/settings/timezone` returns 403, and
+ * `calendar.app.created` cannot read the primary calendar (404) — all confirmed against a
+ * live account on 2026-09-10. Every owner is in India today. Serving another region means
+ * capturing the browser's zone at sign-in, not widening the Google scopes.
+ */
+export const DEFAULT_CALENDAR_TIME_ZONE = "Asia/Kolkata";
+
 type GoogleAccount = typeof accounts.$inferSelect;
 
 const googleAccount = (providerAccountId: string) =>
@@ -96,7 +107,11 @@ export async function ensureKyronCalendar(
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ summary: KYRON_CALENDAR_NAME }),
+    body: JSON.stringify({
+      summary: KYRON_CALENDAR_NAME,
+      // Omitting this makes Google default the calendar to UTC.
+      timeZone: DEFAULT_CALENDAR_TIME_ZONE,
+    }),
   });
 
   if (!response.ok) {
