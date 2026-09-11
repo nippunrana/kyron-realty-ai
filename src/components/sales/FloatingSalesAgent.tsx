@@ -1,10 +1,12 @@
 "use client";
 
-import { useMemo, useState, useCallback, useEffect } from "react";
+import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
 import { BASE_PATH } from "@/lib/base-path";
 import { useAgoraVoiceAgent } from "@/hooks/useAgoraVoiceAgent";
+import { GsapSearchHub, type SearchHubProperty } from "./GsapSearchHub";
+import { parseSearchTag } from "@/hooks/voice-intents";
 import {
   Mic,
   MicOff,
@@ -48,6 +50,14 @@ function getPageContext(pathname: string): PageContextInfo {
   return { pageTitle: "Home Showcase" };
 }
 
+interface PropertySearchParams {
+  city?: string;
+  petFriendly?: boolean;
+  bedrooms?: number;
+  query?: string;
+  userSpeech?: string;
+}
+
 export function FloatingSalesAgent() {
   const pathname = usePathname() || "/";
   const router = useRouter();
@@ -66,17 +76,132 @@ export function FloatingSalesAgent() {
   const context = useMemo(() => getPageContext(pathname), [pathname]);
   const avatarUrl = `${BASE_PATH}/images/sarah-sales-agent.jpg`;
 
+  // Search Hub states
+  const [isSearchHubOpen, setIsSearchHubOpen] = useState(false);
+  const [isSearchingProperties, setIsSearchingProperties] = useState(false);
+  const [activeSearchCity, setActiveSearchCity] = useState<string | null>(null);
+  const [isPetFriendlyFilter, setIsPetFriendlyFilter] = useState(false);
+  const [searchResults, setSearchResults] = useState<SearchHubProperty[]>([]);
+  const [availableCities, setAvailableCities] = useState<string[]>([]);
+  const processedSearchTurnsRef = useRef<Set<string>>(new Set());
+  const triggerSearchRef = useRef<((params: PropertySearchParams) => Promise<void>) | null>(null);
+
   const {
     callState,
     isCallActive,
     isMuted,
     isAgentSpeaking,
     audioFrequencies,
+    transcript,
     errorMessage,
     startCall,
     toggleMute,
     endCall,
-  } = useAgoraVoiceAgent();
+    sendTextMessage,
+  } = useAgoraVoiceAgent({
+    onAgentTurnComplete: (currentTranscript) => {
+      const recent = currentTranscript.slice(-3);
+      for (const msg of recent) {
+        if (!msg.text || processedSearchTurnsRef.current.has(msg.id)) continue;
+        const tag = parseSearchTag(msg.text);
+        if (tag && tag.city) {
+          processedSearchTurnsRef.current.add(msg.id);
+          triggerSearchRef.current?.({
+            city: tag.city,
+            petFriendly: tag.pets,
+            bedrooms: tag.bedrooms,
+            query: tag.query,
+          });
+          break;
+        }
+      }
+    },
+    onUIAction: (action) => {
+      if (action === "open_search_hub") {
+        setIsSearchHubOpen(true);
+      } else if (action === "close_search_hub") {
+        setIsSearchHubOpen(false);
+      }
+    },
+  });
+
+  const executePropertySearch = useCallback(
+    async (params: PropertySearchParams) => {
+      setIsSearchingProperties(true);
+      setIsSearchHubOpen(true);
+
+      try {
+        const speech =
+          params.userSpeech ||
+          params.query ||
+          `${params.petFriendly ? "pet-friendly " : ""}properties in ${params.city || ""}`;
+
+        const res = await fetch(`${BASE_PATH}/api/properties/sales-search`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userSpeech: speech,
+            transcriptHistory: transcript.slice(-6).map((m) => ({ role: m.role, text: m.text })),
+          }),
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          if (data.availableCities) setAvailableCities(data.availableCities);
+
+          if (data.missingCity) {
+            setActiveSearchCity(null);
+          } else {
+            const city = data.criteria?.city || params.city || null;
+            setActiveSearchCity(city);
+            setIsPetFriendlyFilter(Boolean(data.criteria?.petFriendly ?? params.petFriendly));
+            setSearchResults(data.properties || []);
+
+            // Re-sync back to Sarah over Agora RTM so she announces findings
+            if (isCallActive && data.properties) {
+              const count = data.properties.length;
+              const titles = (data.properties as SearchHubProperty[])
+                .map((p) => p.title)
+                .slice(0, 2)
+                .join(", ");
+              const cue = `[SEARCH_RESULT:city=${city || ""},count=${count},titles=${titles}]`;
+              sendTextMessage(cue);
+            }
+          }
+        }
+      } catch (err) {
+        console.error("[SalesAgent] Search execution failed:", err);
+      } finally {
+        setIsSearchingProperties(false);
+      }
+    },
+    [transcript, isCallActive, sendTextMessage]
+  );
+
+  useEffect(() => {
+    triggerSearchRef.current = executePropertySearch;
+  });
+
+  // Real-time transcript listener for rapid tag extraction while Sarah is speaking
+  useEffect(() => {
+    if (!transcript || transcript.length === 0) return;
+    const latest = transcript[transcript.length - 1];
+    if (!latest || !latest.text || processedSearchTurnsRef.current.has(latest.id)) return;
+
+    const tag = parseSearchTag(latest.text);
+    if (tag && tag.city) {
+      processedSearchTurnsRef.current.add(latest.id);
+      const searchParams: PropertySearchParams = {
+        city: tag.city,
+        petFriendly: tag.pets,
+        bedrooms: tag.bedrooms,
+        query: tag.query,
+      };
+      setTimeout(() => {
+        executePropertySearch(searchParams);
+      }, 0);
+    }
+  }, [transcript, executePropertySearch]);
 
   const isDashboardRoute = pathname.startsWith("/dashboard");
 
@@ -502,6 +627,25 @@ export function FloatingSalesAgent() {
           </div>
         </div>
       </aside>
+
+      {/* ========================================================================= */}
+      {/* GSAP MORPHING PROPERTY SEARCH HUB                                        */}
+      {/* ========================================================================= */}
+      <GsapSearchHub
+        isOpen={isSearchHubOpen}
+        isSearching={isSearchingProperties}
+        activeCity={activeSearchCity}
+        isPetFriendlyFilter={isPetFriendlyFilter}
+        properties={searchResults}
+        availableCities={availableCities}
+        onClose={() => setIsSearchHubOpen(false)}
+        onCitySelect={(city) =>
+          executePropertySearch({ city, petFriendly: isPetFriendlyFilter })
+        }
+        onManualSearch={(query) =>
+          executePropertySearch({ query, city: activeSearchCity || undefined })
+        }
+      />
     </>
   );
 }

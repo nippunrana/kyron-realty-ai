@@ -47,6 +47,8 @@ export type UIAction =
   | "close_upload_modal"
   | "open_hyper_local"
   | "close_hyper_local"
+  | "open_search_hub"
+  | "close_search_hub"
   /** Elena winding up an off-topic call. Terminal - the studio hangs up on it. */
   | "end_call"
   /** Elena delivering her closing remarks after deploy. Studio hangs up gracefully on it. */

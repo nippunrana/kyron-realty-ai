@@ -7,11 +7,17 @@ import type { UIAction } from "./voice-agent-types";
  * signal - the spoken-language patterns below are the fallback for a turn without one.
  */
 const UI_TAG = /\[\s*UI\s*:\s*([A-Z_]+)\s*\]/gi;
+const CONTROL_TAG = /\[\s*(UI|SEARCH|SEARCH_RESULT)\s*:[^\]]+\]/gi;
+
 const TAG_ACTIONS: Record<string, UIAction> = {
   OPEN_CORE: "open_core_modal",
   OPEN_REVIEW: "open_review_modal",
   OPEN_PHOTOS: "open_upload_modal",
   OPEN_FINAL: "open_final_modal",
+  OPEN_SEARCH: "open_search_hub",
+  OPEN_SEARCH_HUB: "open_search_hub",
+  CLOSE_SEARCH: "close_search_hub",
+  CLOSE_SEARCH_HUB: "close_search_hub",
   CLOSE: "close_review_modal",
   CLOSE_CALL: "close_call",
   TRIGGER_DEPLOY: "trigger_deploy",
@@ -25,11 +31,40 @@ export interface AssistantIntent {
   source: AssistantIntentSource;
 }
 
-/** Removes screen-control tags so they never reach the owner's transcript or the extractors. */
+export interface ParsedSearchTag {
+  city?: string;
+  pets?: boolean;
+  bedrooms?: number;
+  query?: string;
+}
+
+const SEARCH_TAG = /\[\s*SEARCH\s*:\s*([^\]]+)\]/i;
+
+/** Extracts structured search parameters from silent [SEARCH:city=...,pets=...] tags. */
+export function parseSearchTag(text: string): ParsedSearchTag | null {
+  const match = text.match(SEARCH_TAG);
+  if (!match) return null;
+  const rawParams = match[1];
+  const result: ParsedSearchTag = {};
+
+  const pairs = rawParams.split(",");
+  for (const pair of pairs) {
+    const [k, v] = pair.split("=").map((s) => s.trim());
+    if (!k || !v) continue;
+    const keyLower = k.toLowerCase();
+    if (keyLower === "city") result.city = v;
+    else if (keyLower === "pets" || keyLower === "pet") result.pets = v.toLowerCase() === "true" || v.toLowerCase() === "yes";
+    else if (keyLower === "beds" || keyLower === "bedrooms") result.bedrooms = parseInt(v, 10) || undefined;
+    else if (keyLower === "query") result.query = v;
+  }
+  return result;
+}
+
+/** Removes screen-control and search tags so they never reach the owner's transcript or extractors. */
 export function stripUITags(text: string): string {
-  if (!/\[\s*UI\s*:/i.test(text)) return text;
+  if (!/\[\s*(UI|SEARCH|SEARCH_RESULT)\s*:/i.test(text)) return text;
   return text
-    .replace(UI_TAG, "")
+    .replace(CONTROL_TAG, "")
     .replace(/\s+([.,!?;:])/g, "$1")
     .replace(/\s{2,}/g, " ")
     .trim();
