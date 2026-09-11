@@ -154,7 +154,7 @@ Kyron Realty AI is built with an Agora-only conversational architecture:
 | **Agora Skills** | Guided by the official Agora development skill for token lifecycle, toolkit event ordering, and conversational AI best practices. |
 
 ---
-
+ 
 ## 🛠️ Tech Stack
 
 - **Frontend & App Framework**: [Next.js 16](https://nextjs.org/) (App Router, Turbopack, React 19, TypeScript)
