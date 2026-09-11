@@ -14,6 +14,8 @@ const TAG_ACTIONS: Record<string, UIAction> = {
   OPEN_FINAL: "open_final_modal",
   CLOSE: "close_review_modal",
   CLOSE_CALL: "close_call",
+  TRIGGER_DEPLOY: "trigger_deploy",
+  DEPLOY: "trigger_deploy",
 };
 
 export type AssistantIntentSource = "tag" | "regex";
@@ -65,6 +67,8 @@ const ASSISTANT_OPEN_PHOTOS =
   /(pull|bring|open|show|display).*(photo|photos|image|images|upload window|upload modal).*(screen|for you|right now)/i;
 const ASSISTANT_OPEN_FINAL =
   /(pull|bring|open|show|display).*(final|complete property card|full property review|hit deploy|ready to deploy).*(screen|for you|back up|take a look|right now)/i;
+const ASSISTANT_TRIGGER_DEPLOY =
+  /(deploying|publishing|launching).*(listing|agent|property|right now|for you)/i;
 const ASSISTANT_OPEN_GENERIC =
   /(pull|bring|open|show|display).*(card|modal|pop[- ]?up|review|specs).*(screen|for you|back up|take a look|right now)/i;
 const ASSISTANT_CLOSE = /(close|closed|hide|dismiss|minimiz).*(card|modal|pop[- ]?up|review)/i;
@@ -101,6 +105,7 @@ export function detectAssistantModalIntent(text: string): AssistantIntent | null
   const tagged = parseUITag(text);
   if (tagged) return { action: tagged, source: "tag" };
   if (ASSISTANT_CLOSE.test(text)) return { action: "close_review_modal", source: "regex" };
+  if (ASSISTANT_TRIGGER_DEPLOY.test(text)) return { action: "trigger_deploy", source: "regex" };
   if (ASSISTANT_OPEN_CORE.test(text)) return { action: "open_core_modal", source: "regex" };
   if (ASSISTANT_OPEN_HYPER_LOCAL.test(text)) return { action: "open_hyper_local", source: "regex" };
   if (ASSISTANT_OPEN_PHOTOS.test(text)) return { action: "open_upload_modal", source: "regex" };

@@ -236,6 +236,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
   const voiceControlRef = useRef<VoiceControlState | null>(null);
   const isDeployClosingRef = useRef(false);
   const deployClosingResolveRef = useRef<(() => void) | null>(null);
+  const handlePublishRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const handleVoiceStateSync = useCallback((state: VoiceControlState) => {
     voiceControlRef.current = state;
     setVoiceControl(state);
@@ -812,6 +813,16 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
         return;
       }
 
+      if (action === "trigger_deploy") {
+        if (!areCoreSpecsVerified(dataRef.current.property, dataRef.current.knowledgeBase)) {
+          addTelemetryLog("INTENT", "Ignored trigger_deploy: core specs not verified", null, undefined, "warn");
+          return;
+        }
+        addTelemetryLog("INTENT", "Elena triggered hands-free deploy", null, undefined, "success");
+        handlePublishRef.current();
+        return;
+      }
+
       if (action === "open_core_modal") {
         if (onboardingStageRef.current === "core") {
           if (!isTurnSyncingRef.current || areCoreSpecsVerified(dataRef.current.property, dataRef.current.knowledgeBase)) {
@@ -1255,10 +1266,19 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
 
   // Publish Handler
   const handlePublish = async () => {
+    if (isPublishing) return;
     setIsPublishing(true);
     isDeployClosingRef.current = true;
     try {
-      const publishPromise = fetch(`${BASE_PATH}/api/properties/create`, {
+      addTelemetryLog(
+        "INTENT",
+        "Deploy initiated: Publishing property listing to database",
+        null,
+        undefined,
+        "info"
+      );
+
+      const res = await fetch(`${BASE_PATH}/api/properties/create`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1274,44 +1294,45 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
           negotiationMatrix: data.negotiationMatrix,
           draftId: draftIdRef.current,
         }),
-      }).then((res) => res.json());
+      });
 
-      if (voiceControlRef.current?.isCallActive && voiceControlRef.current?.sendTextMessage) {
+      const json = await res.json();
+
+      if (json.success) {
         addTelemetryLog(
           "INTENT",
-          "Deploy initiated: Alerting Elena Vance to deliver closing remarks",
-          null,
+          "Deploy confirmed: Listing created successfully, alerting Elena Vance",
+          { propertyId: json.property?.id },
           undefined,
-          "info"
+          "success"
         );
 
-        try {
-          await voiceControlRef.current.sendTextMessage(
-            "[DEPLOY_ALERT] The owner has clicked Deploy to publish this listing. Please deliver your final closing congratulations and sign-off now."
-          );
+        if (voiceControlRef.current?.isCallActive && voiceControlRef.current?.sendTextMessage) {
+          try {
+            await voiceControlRef.current.sendTextMessage(
+              "[DEPLOY_CONFIRMED] The listing was successfully published and saved to the database. Deliver your warm, celebratory closing remarks and sign off with [UI:CLOSE_CALL] now."
+            );
 
-          await new Promise<void>((resolve) => {
-            deployClosingResolveRef.current = resolve;
-            setTimeout(() => {
-              if (deployClosingResolveRef.current === resolve) {
-                deployClosingResolveRef.current = null;
-                resolve();
-              }
-            }, 10000);
-          });
-        } catch (msgErr) {
-          console.warn("Deploy alert message warning:", msgErr);
+            await new Promise<void>((resolve) => {
+              deployClosingResolveRef.current = resolve;
+              setTimeout(() => {
+                if (deployClosingResolveRef.current === resolve) {
+                  deployClosingResolveRef.current = null;
+                  resolve();
+                }
+              }, 10000);
+            });
+          } catch (msgErr) {
+            console.warn("Deploy confirmation message warning:", msgErr);
+          }
+
+          try {
+            await voiceControlRef.current.endCall();
+          } catch (endErr) {
+            console.warn("Call disconnect error on deploy:", endErr);
+          }
         }
 
-        try {
-          await voiceControlRef.current.endCall();
-        } catch (endErr) {
-          console.warn("Call disconnect error on deploy:", endErr);
-        }
-      }
-
-      const json = await publishPromise;
-      if (json.success) {
         setShowFinalModal(false);
         setShowUploadModal(false);
         setPublishedResult({
@@ -1320,17 +1341,44 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
           shareUrl: json.shareUrl,
         });
       } else {
-        alert(json.error || "Failed to publish listing.");
+        const errMsg = json.error || "Failed to publish listing.";
+        addTelemetryLog("INTENT", `Deploy failed: ${errMsg}`, null, undefined, "error");
+
+        if (voiceControlRef.current?.isCallActive && voiceControlRef.current?.sendTextMessage) {
+          try {
+            await voiceControlRef.current.sendTextMessage(
+              `[DEPLOY_FAILED] Failed to publish listing: ${errMsg}. Please inform the owner and let them know they can retry or check their details.`
+            );
+          } catch (errAlert) {
+            console.warn("Deploy failure alert warning:", errAlert);
+          }
+        }
+
+        alert(errMsg);
       }
     } catch (err) {
       console.error("Publishing error:", err);
-      alert("An unexpected error occurred while publishing.");
+      const errMsg = "An unexpected error occurred while publishing.";
+      addTelemetryLog("INTENT", `Deploy exception: ${err}`, null, undefined, "error");
+
+      if (voiceControlRef.current?.isCallActive && voiceControlRef.current?.sendTextMessage) {
+        try {
+          await voiceControlRef.current.sendTextMessage(
+            `[DEPLOY_FAILED] An unexpected error occurred while publishing. Please inform the owner and invite them to retry.`
+          );
+        } catch (errAlert) {
+          console.warn("Deploy exception alert warning:", errAlert);
+        }
+      }
+
+      alert(errMsg);
     } finally {
       setIsPublishing(false);
       isDeployClosingRef.current = false;
       deployClosingResolveRef.current = null;
     }
   };
+  handlePublishRef.current = handlePublish;
 
   return (
     <div className="flex flex-col flex-1 h-full min-h-0 overflow-hidden max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">

@@ -49,7 +49,9 @@ export type UIAction =
   /** Elena winding up an off-topic call. Terminal - the studio hangs up on it. */
   | "end_call"
   /** Elena delivering her closing remarks after deploy. Studio hangs up gracefully on it. */
-  | "close_call";
+  | "close_call"
+  /** Elena initiating property publish and agent deployment. */
+  | "trigger_deploy";
 
 export interface UseAgoraVoiceAgentOptions {
   onCallEnd?: (transcript: VoiceMessage[]) => void;

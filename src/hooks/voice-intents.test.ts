@@ -23,7 +23,8 @@ const LINES = {
   openPhotos:
     "I've opened your photo upload window on your screen [UI:OPEN_PHOTOS]. Add photos from your computer, or scan the QR code to send them straight from your phone.",
   openFinal:
-    "That completes your property profile. I've pulled up your final complete property card on your screen [UI:OPEN_FINAL]. Take a look and hit Deploy when you're ready to launch your 24/7 AI sales agent.",
+    "That completes your property profile. I've pulled up your final complete property card on your screen [UI:OPEN_FINAL]. Take a look. If everything looks good, say Deploy or confirm and I'll launch it for you, or hit the button on screen.",
+  triggerDeploy: "Got it, deploying your listing right now! [UI:TRIGGER_DEPLOY]",
   reopen: "I've pulled the review card back up on your screen [UI:OPEN_REVIEW].",
   minimize: "Sure, I've minimized the review card for you [UI:CLOSE].",
   strike2: "I need to keep this to your property listing. If we go off topic again I'll have to close this chat.",
@@ -37,6 +38,7 @@ const SCREEN_LINES: Array<[keyof typeof LINES, string, string]> = [
   ["openReview", "open_review_modal", "open_final_modal"],
   ["openPhotos", "open_upload_modal", "open_upload_modal"],
   ["openFinal", "open_final_modal", "open_final_modal"],
+  ["triggerDeploy", "trigger_deploy", "trigger_deploy"],
   ["reopen", "open_review_modal", "open_review_modal"],
   ["minimize", "close_review_modal", "close_review_modal"],
 ];
