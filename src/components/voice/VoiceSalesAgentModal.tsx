@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
+import { BASE_PATH } from "@/lib/base-path";
 import { useAgoraVoiceAgent } from "@/hooks/useAgoraVoiceAgent";
 import { defaultTourDateTime } from "@/lib/listing-helpers";
 import {
@@ -123,8 +125,15 @@ export function VoiceSalesAgentModal({
         {/* Top Header */}
         <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/80 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-md shadow-blue-600/20">
-              🎙️
+            <div className="relative w-10 h-10 rounded-2xl overflow-hidden ring-2 ring-blue-500/20 shadow-sm shrink-0">
+              <Image
+                src={`${BASE_PATH}/images/salesagent.webp`}
+                alt="Sarah AI Sales Advisor"
+                fill
+                sizes="40px"
+                unoptimized={true}
+                className="object-cover"
+              />
             </div>
             <div>
               <div className="flex items-center gap-2">

@@ -80,7 +80,7 @@ export function FloatingSalesAgent() {
   const [pendingDashboardHref, setPendingDashboardHref] = useState<string | null>(null);
 
   const context = useMemo(() => getPageContext(pathname), [pathname]);
-  const avatarUrl = `${BASE_PATH}/images/sarah-sales-agent.jpg`;
+  const avatarUrl = `${BASE_PATH}/images/salesagent.webp`;
 
   // Search Hub states
   const [isSearchHubOpen, setIsSearchHubOpen] = useState(false);
