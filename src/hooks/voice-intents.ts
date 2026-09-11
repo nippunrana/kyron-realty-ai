@@ -7,7 +7,7 @@ import type { UIAction, ParsedSearchTag } from "./voice-agent-types";
  * signal - the spoken-language patterns below are the fallback for a turn without one.
  */
 const UI_TAG = /\[\s*UI\s*:\s*([A-Z_]+)\s*\]/gi;
-const CONTROL_TAG = /\[\s*(UI|SEARCH|SEARCH_RESULT)\s*:[^\]]+\]/gi;
+const CONTROL_TAG = /\[\s*(UI|SEARCH|SEARCH_RESULT|OPEN_PROPERTY)\s*:[^\]]+\]/gi;
 
 const TAG_ACTIONS: Record<string, UIAction> = {
   OPEN_CORE: "open_core_modal",
@@ -73,6 +73,24 @@ export function parseSearchTag(text: string): ParsedSearchTag | null {
   return result;
 }
 
+const OPEN_PROPERTY_TAG = /\[\s*OPEN_PROPERTY\s*:\s*([^\]]+)\]/i;
+
+/**
+ * The result number Sarah names in her silent [OPEN_PROPERTY:index=2] tag, or null.
+ * Deliberately tag-only, with no spoken-language fallback: opening a listing navigates the
+ * caller away from the search hub, so it must never fire off a sentence that merely
+ * discusses opening one. She emits the tag only after the caller confirms her read-back.
+ */
+export function parseOpenPropertyTag(text: string): number | null {
+  const match = text.match(OPEN_PROPERTY_TAG);
+  if (!match) return null;
+  // Forgiving like the [UI:] tags: index=2, result=2 and a bare 2 all name the same card.
+  const indexMatch = match[1].match(/(\d+)/);
+  if (!indexMatch) return null;
+  const index = parseInt(indexMatch[1], 10);
+  return index > 0 ? index : null;
+}
+
 const ASSISTANT_SEARCH_SPOKEN =
   /(?:let me check|let me search|checking|searching|looking for|looking up|pulling up|finding|find you)\b[\s\S]{1,80}?\b(?:in|around|near)\s+(?:the\s+)?([a-zA-Z\s]+?)(?:\s+(?:within|for|with|under|budget|right now|immediately)|[.,!?;]|$)/i;
 
@@ -123,7 +141,7 @@ export function detectAssistantSearchIntent(text: string): ParsedSearchTag | nul
 
 /** Removes screen-control and search tags so they never reach the owner's transcript or extractors. */
 export function stripUITags(text: string): string {
-  if (!/\[\s*(UI|SEARCH|SEARCH_RESULT)\s*:/i.test(text)) return text;
+  if (!/\[\s*(UI|SEARCH|SEARCH_RESULT|OPEN_PROPERTY)\s*:/i.test(text)) return text;
   return text
     .replace(CONTROL_TAG, "")
     .replace(/\s+([.,!?;:])/g, "$1")

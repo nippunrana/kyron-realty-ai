@@ -70,6 +70,31 @@ interface PropertySearchParams {
   announce?: boolean;
 }
 
+/** Strips the separators that structure a cue tag, so a title can never truncate or re-key it. */
+function sanitizeCueText(value: string): string {
+  return value.replace(/[[\]|;,=]/g, " ").replace(/\s{2,}/g, " ").trim();
+}
+
+/**
+ * The numbered read-back of the hub Sarah gets with every result cue, ordered and numbered
+ * exactly as the cards render. It is what lets her resolve both "open search result 2" and
+ * "the 4 BHK one", and say enough about the match for the caller to confirm it.
+ */
+function buildResultsDigest(properties: SearchHubProperty[]): string {
+  return properties
+    .map((prop, index) => {
+      const priceNum = typeof prop.price === "string" ? parseFloat(prop.price) : prop.price;
+      const parts = [sanitizeCueText(prop.title)];
+      if (prop.bedrooms) parts.push(`${prop.bedrooms} BHK`);
+      if (!isNaN(priceNum) && priceNum > 0) {
+        parts.push(`${Math.round(priceNum)} rupees${prop.listingType === "rent" ? " per month" : ""}`);
+      }
+      if (prop.city) parts.push(sanitizeCueText(prop.city));
+      return `${index + 1}:${parts.join("|")}`;
+    })
+    .join(";");
+}
+
 export function FloatingSalesAgent() {
   const pathname = usePathname() || "/";
   const router = useRouter();
@@ -115,6 +140,10 @@ export function FloatingSalesAgent() {
   }, [activeSearchCriteria]);
 
   const [searchResults, setSearchResults] = useState<SearchHubProperty[]>([]);
+  const searchResultsRef = useRef(searchResults);
+  useEffect(() => {
+    searchResultsRef.current = searchResults;
+  }, [searchResults]);
   const [availableCities, setAvailableCities] = useState<string[]>([]);
   const processedSearchTurnsRef = useRef<Set<string>>(new Set());
   const triggerSearchRef = useRef<((params: PropertySearchParams) => Promise<void>) | null>(null);
@@ -148,6 +177,15 @@ export function FloatingSalesAgent() {
         query: params.query,
       });
     },
+    onOpenPropertyRequest: (index) => {
+      const target = searchResultsRef.current[index - 1];
+      if (!target?.slug) return;
+      // Collapse the hub before navigating: its 75% focus overlay is tied to isSearchHubOpen
+      // and would black out the listing page the caller just asked to see.
+      setIsSearchHubOpen(false);
+      setMobileTab("chat");
+      router.push(`/listings/${target.slug}`);
+    },
     onUIAction: (action) => {
       if (action === "open_search_hub") {
         setIsSearchHubOpen(true);
@@ -166,7 +204,11 @@ export function FloatingSalesAgent() {
       if (lastMsg && lastMsg.role === "user" && lastMsg.text) {
         const cityMatch = lastMsg.text.match(/\b(faridabad|delhi|gurugram|gurgaon|noida|bangalore|bengaluru|mumbai|pune|hyderabad|chennai|kolkata)\b/i);
         const isRefinementIntent = /\b(pet|pets|bhk|bedroom|rent|sale|clear filter|reset filter)\b/i.test(lastMsg.text);
-        if (cityMatch || isRefinementIntent) {
+        // "Open the 4 BHK one" reads as a refinement to the patterns above, and re-running the
+        // search would renumber the cards between Sarah's confirmation and the caller's yes -
+        // so result 2 would open a different home. Asking to open something is never a search.
+        const isOpenIntent = /\b(open|take me to|go to|result\s*(number\s*)?\d+|number\s*\d+)\b/i.test(lastMsg.text);
+        if (!isOpenIntent && (cityMatch || isRefinementIntent)) {
           const city = cityMatch ? cityMatch[1].charAt(0).toUpperCase() + cityMatch[1].slice(1).toLowerCase() : undefined;
           const searchKey = `user_${lastMsg.id || currentTranscript.length}_${city || "active"}_${lastMsg.text.slice(0, 20)}`;
           if (!processedSearchTurnsRef.current.has(searchKey)) {
@@ -291,10 +333,7 @@ export function FloatingSalesAgent() {
             // Re-sync back to Sarah over Agora RTM so she announces findings
             if (isCallActive && data.properties && params.announce !== false) {
               const count = data.properties.length;
-              const titles = (data.properties as SearchHubProperty[])
-                .map((p) => p.title)
-                .slice(0, 2)
-                .join(", ");
+              const results = buildResultsDigest(data.properties as SearchHubProperty[]);
 
               const filterDescs: string[] = [];
               if (resolvedPets) filterDescs.push("pet-friendly");
@@ -302,7 +341,7 @@ export function FloatingSalesAgent() {
               if (resolvedType) filterDescs.push(resolvedType);
               const filterSummary = filterDescs.length > 0 ? filterDescs.join(" ") + " homes" : "properties";
 
-              const cue = `[SEARCH_RESULT:city=${resolvedCity || ""},count=${count},titles=${titles},filters=${filterSummary}]`;
+              const cue = `[SEARCH_RESULT:city=${resolvedCity || ""},count=${count},filters=${filterSummary},results=${results}]`;
               // The search finishes while Sarah is still speaking her acknowledgment beat.
               // APPEND hands the queueing to the Agora gateway, which knows when her
               // interaction actually ends; the client's own speaking flag does not, because

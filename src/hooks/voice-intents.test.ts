@@ -10,6 +10,7 @@ import {
   detectAssistantModalIntent,
   detectAssistantSearchIntent,
   detectUserModalIntent,
+  parseOpenPropertyTag,
   stripUITags,
 } from "./voice-intents.ts";
 
@@ -294,3 +295,36 @@ describe("search hub open and close intents", () => {
   });
 });
 
+describe("opening a numbered search result", () => {
+  const confirmed = "Opening it for you now! [OPEN_PROPERTY:index=2]";
+
+  test("reads the result number from the tag", () => {
+    assert.equal(parseOpenPropertyTag(confirmed), 2);
+    assert.equal(parseOpenPropertyTag("Opening that one! [ open_property : index = 10 ]"), 10);
+    assert.equal(parseOpenPropertyTag("Opening that one! [OPEN_PROPERTY:2]"), 2);
+  });
+
+  test("the confirmation turn before the yes opens nothing", () => {
+    const readBack = "Result 2 is Green Valley Residency, a 3 BHK at 45,000 a month. Shall I open it?";
+    assert.equal(parseOpenPropertyTag(readBack), null);
+    // The read-back must also not be mistaken for a fresh search, which would renumber the cards.
+    assert.equal(detectAssistantSearchIntent(readBack), null);
+  });
+
+  test("is tag-only: spoken sentences about opening never navigate", () => {
+    assert.equal(parseOpenPropertyTag("Let's open that property on your screen."), null);
+    assert.equal(parseOpenPropertyTag("Opening it now [OPEN_PROPERTY:]"), null);
+    assert.equal(parseOpenPropertyTag("Opening it now [OPEN_PROPERTY:index=0]"), null);
+  });
+
+  test("the open tag never reaches the caller's transcript", () => {
+    assert.equal(stripUITags(confirmed), "Opening it for you now!");
+  });
+
+  test("the result cue never reaches the caller's transcript", () => {
+    assert.equal(
+      stripUITags("[SEARCH_RESULT:city=Faridabad,count=2,filters=3 BHK homes,results=1:Green Valley|3 BHK;2:Sun Villa|4 BHK]"),
+      ""
+    );
+  });
+});

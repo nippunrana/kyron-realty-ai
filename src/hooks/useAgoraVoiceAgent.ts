@@ -13,7 +13,7 @@ import type {
 } from "./voice-agent-types";
 import { formatTimestamp, isUserTranscriptionItem, mapTranscriptionsToMessages } from "./voice-transcript";
 import { startFrequencyVisualizer } from "./audio-visualizer";
-import { detectAssistantModalIntent, detectAssistantSearchIntent, detectUserModalIntent } from "./voice-intents";
+import { detectAssistantModalIntent, detectAssistantSearchIntent, detectUserModalIntent, parseOpenPropertyTag } from "./voice-intents";
 
 export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgoraVoiceAgentReturn {
   const [callState, setCallState] = useState<CallState>("idle");
@@ -39,6 +39,7 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
   const onAgentTurnCompleteRef = useRef<((transcript: VoiceMessage[]) => void) | undefined>(options?.onAgentTurnComplete);
   const onUIActionRef = useRef<((action: UIAction) => void) | undefined>(options?.onUIAction);
   const onSearchRequestRef = useRef<((params: ParsedSearchTag) => void) | undefined>(options?.onSearchRequest);
+  const onOpenPropertyRequestRef = useRef<((index: number) => void) | undefined>(options?.onOpenPropertyRequest);
   const onLogEventRef = useRef<((category: "AGORA" | "INTENT", title: string, details?: any) => void) | undefined>(options?.onLogEvent);
   // Keep the latest callbacks reachable from long-lived SDK listeners without re-subscribing
   useEffect(() => {
@@ -46,6 +47,7 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
     onAgentTurnCompleteRef.current = options?.onAgentTurnComplete;
     onUIActionRef.current = options?.onUIAction;
     onSearchRequestRef.current = options?.onSearchRequest;
+    onOpenPropertyRequestRef.current = options?.onOpenPropertyRequest;
     onLogEventRef.current = options?.onLogEvent;
   });
   const transcriptRef = useRef<VoiceMessage[]>([]);
@@ -406,6 +408,18 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
                   processedAssistantTurnIntentsRef.current.add(searchKey);
                   onLogEventRef.current?.("INTENT", `Detected Search Intent: ${intentSig}`, { text: spokenText, searchIntent });
                   onSearchRequestRef.current?.(searchIntent);
+                }
+              }
+
+              // Assistant open-listing action: silent [OPEN_PROPERTY:index=N] tag only, never spoken language
+              const openIndex = parseOpenPropertyTag(spokenText);
+              if (openIndex !== null) {
+                const turnId = item.turn_id !== undefined ? String(item.turn_id) : spokenText.slice(0, 40).toLowerCase();
+                const openKey = `assistant_open_property_${turnId}_${openIndex}`;
+                if (!processedAssistantTurnIntentsRef.current.has(openKey)) {
+                  processedAssistantTurnIntentsRef.current.add(openKey);
+                  onLogEventRef.current?.("INTENT", `Detected Open Property Intent: result ${openIndex}`, { text: spokenText });
+                  onOpenPropertyRequestRef.current?.(openIndex);
                 }
               }
 

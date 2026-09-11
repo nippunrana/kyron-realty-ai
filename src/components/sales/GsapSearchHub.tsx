@@ -216,7 +216,7 @@ export function GsapSearchHub({
       >
         {properties.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {properties.map((prop) => {
+            {properties.map((prop, index) => {
               const priceNum = typeof prop.price === "string" ? parseFloat(prop.price) : prop.price;
               const priceFormatted = !isNaN(priceNum) && priceNum > 0 ? priceNum.toLocaleString("en-IN") : "Price on Request";
               const isRent = prop.listingType === "rent";
@@ -237,6 +237,9 @@ export function GsapSearchHub({
                         loading="lazy"
                       />
                       <div className="absolute top-2 left-2 flex items-center gap-1.5 flex-wrap">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-600 text-white text-[10px] font-bold shadow-xs">
+                          <span>Result {index + 1}</span>
+                        </span>
                         {prop.isPetFriendly && (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-bold shadow-xs">
                             <PawPrint className="w-2.5 h-2.5" />

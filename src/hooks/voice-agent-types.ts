@@ -80,5 +80,7 @@ export interface UseAgoraVoiceAgentOptions {
   onAgentTurnComplete?: (transcript: VoiceMessage[]) => void;
   onUIAction?: (action: UIAction) => void;
   onSearchRequest?: (params: ParsedSearchTag) => void;
+  /** Sarah asking for the Nth on-screen search result to be opened (1-based). */
+  onOpenPropertyRequest?: (index: number) => void;
   onLogEvent?: (category: "AGORA" | "INTENT", title: string, details?: any) => void;
 }
