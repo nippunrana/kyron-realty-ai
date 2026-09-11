@@ -18,6 +18,7 @@ import { buildSalesSearchPrompt } from "./sarah-search-prompt";
 import { buildPropertyAgentContext } from "./property-agent-context";
 import { emptyJourney } from "./sales-journey";
 import { fetchAgoraAgentDetails } from "./agora-telemetry";
+import { MANAGER_RTC_UID } from "./agora-telephony";
 import type { CallerType } from "@/hooks/voice-agent-types";
 
 export interface StartAgentSessionParams {
@@ -424,7 +425,10 @@ ${contactEmail ? `5. If asked for direct owner or leasing office contact, provid
         channel: channelName,
         token: agentToken,
         agent_rtc_uid: String(agentUid),
-        remote_rtc_uids: [String(userUid)],
+        remote_rtc_uids:
+          callerType === "owner_onboarding"
+            ? [String(userUid)]
+            : [String(userUid), String(MANAGER_RTC_UID)],
         idle_timeout: 120,
         asr: asrConfig,
         llm: llmConfig,
