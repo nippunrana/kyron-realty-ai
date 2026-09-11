@@ -64,10 +64,11 @@ export async function getPropertyCalendarAvailability(
   propertySlugOrId: string | number,
   daysAhead = 7
 ): Promise<PropertyAvailabilityResult> {
-  const propertyQuery =
-    typeof propertySlugOrId === "number"
-      ? eq(properties.id, propertySlugOrId)
-      : eq(properties.slug, propertySlugOrId);
+  const numId = typeof propertySlugOrId === "number" ? propertySlugOrId : Number(propertySlugOrId);
+  const isPureNumber = !isNaN(numId) && String(numId) === String(propertySlugOrId).trim();
+  const propertyQuery = isPureNumber
+    ? eq(properties.id, numId)
+    : eq(properties.slug, String(propertySlugOrId));
 
   const [prop] = await db
     .select({
@@ -354,10 +355,11 @@ export async function bookPropertyTourSlot(
     throw new Error("Attendee name and phone number are required for booking.");
   }
 
-  const propertyQuery =
-    typeof propertySlugOrId === "number"
-      ? eq(properties.id, propertySlugOrId)
-      : eq(properties.slug, propertySlugOrId);
+  const numId = typeof propertySlugOrId === "number" ? propertySlugOrId : Number(propertySlugOrId);
+  const isPureNumber = !isNaN(numId) && String(numId) === String(propertySlugOrId).trim();
+  const propertyQuery = isPureNumber
+    ? eq(properties.id, numId)
+    : eq(properties.slug, String(propertySlugOrId));
 
   const [prop] = await db
     .select({

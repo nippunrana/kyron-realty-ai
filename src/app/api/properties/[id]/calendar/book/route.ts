@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { bookPropertyTourSlot } from "@/lib/calendar-service";
 
 interface RouteParams {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ id: string }>;
 }
 
 const cleanText = (val: unknown, maxLen = 255): string =>
@@ -10,10 +10,10 @@ const cleanText = (val: unknown, maxLen = 255): string =>
 
 export async function POST(req: NextRequest, { params }: RouteParams) {
   try {
-    const { slug } = await params;
-    if (!slug) {
+    const { id } = await params;
+    if (!id) {
       return NextResponse.json(
-        { error: "Property slug is required." },
+        { error: "Property ID or slug is required." },
         { status: 400 }
       );
     }
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     }
 
     const result = await bookPropertyTourSlot({
-      propertySlugOrId: slug,
+      propertySlugOrId: id,
       date,
       time,
       attendeeName,
