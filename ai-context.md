@@ -41,6 +41,7 @@ To prevent duplicate code or assuming features that do not yet exist:
 | **Public Listing & Discovery** | Built | [public-listings-and-leads.md](docs/built-systems/public-listings-and-leads.md) | `src/app/listings/`, `src/app/api/properties/search/` | Search & city discovery, QR Code generator, Voice Sales Modal, Tour booking |
 | **Google Calendar Link** | Built | [google-calendar.md](docs/built-systems/google-calendar.md) | `src/lib/google-calendar.ts`, `src/auth.ts` | Google-sign-in-only; absence is silent, never an error. Scheduling itself is Roadmap |
 | **Legal Pages** | Built | [auth.md](docs/built-systems/auth.md) | `src/app/privacy/`, `src/app/terms/`, `src/components/legal/` | Public, unauthenticated by requirement — Google OAuth verification reads them |
+| **Sales Agent (Floating Presence)** | Built | [sales-agent.md](docs/built-systems/sales-agent.md) | `src/components/sales/FloatingSalesAgent.tsx`, `src/app/layout.tsx` | Global floating presence with dynamic page awareness, isolated from onboarding |
 
 ---
 
