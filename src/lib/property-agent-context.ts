@@ -10,6 +10,7 @@ import { computeFloorPrice } from "./listing-helpers";
 import { checkPropertyFit, type FitCheckResult, type FitProperty } from "./property-fit";
 import { summariseLocationValue, type LocationInput } from "./location-value";
 import { buildPropertyPrompt, type PropertyPromptFacts } from "./sarah-property-prompt";
+import { getOwnerCalendarAccess } from "./google-calendar";
 import type { SalesJourney } from "./sales-journey";
 
 export interface PropertyAgentContext {
@@ -82,7 +83,7 @@ function buildLocationInput(kbData: NonNullable<PropertyRow["knowledgeBase"]>["k
 
 type PropertyRow = typeof properties.$inferSelect;
 
-function toFacts(row: PropertyRow): PropertyPromptFacts {
+function toFacts(row: PropertyRow, hasCalendarAccess = false): PropertyPromptFacts {
   const kb = row.knowledgeBase;
   const kbData = kb?.kbData;
   const rules = row.negotiationRules;
@@ -115,6 +116,7 @@ function toFacts(row: PropertyRow): PropertyPromptFacts {
     })),
     // Absent rules mean the owner authorised nothing, so nothing may be offered.
     allowNegotiation: rules?.allowNegotiation !== false && (rules?.concessionRules?.length || 0) > 0,
+    hasCalendarAccess,
   };
 }
 
@@ -169,7 +171,8 @@ export async function buildPropertyAgentContext(
 
   if (!row) return null;
 
-  const facts = toFacts(row);
+  const calendarAccess = row.ownerId ? await getOwnerCalendarAccess(row.ownerId) : null;
+  const facts = toFacts(row, Boolean(calendarAccess));
   const fit = checkPropertyFit(journey.requirements, toFitProperty(row, facts));
   const { greeting, systemPrompt } = buildPropertyPrompt({
     facts,

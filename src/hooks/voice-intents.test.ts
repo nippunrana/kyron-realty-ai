@@ -11,6 +11,8 @@ import {
   detectAssistantSearchIntent,
   detectUserModalIntent,
   parseOpenPropertyTag,
+  parseCalendarSelectDateTag,
+  parseBookTourTag,
   stripUITags,
 } from "./voice-intents.ts";
 
@@ -328,3 +330,58 @@ describe("opening a numbered search result", () => {
     );
   });
 });
+
+describe("calendar hub open, close, and booking intents", () => {
+  test("assistant OPEN_CALENDAR tag routes to open_calendar_hub", () => {
+    assert.deepEqual(
+      detectAssistantModalIntent("I'm pulling up the touring calendar on your screen [UI:OPEN_CALENDAR]."),
+      { action: "open_calendar_hub", source: "tag" }
+    );
+  });
+
+  test("assistant CLOSE_CALENDAR tag routes to close_calendar_hub", () => {
+    assert.deepEqual(
+      detectAssistantModalIntent("I've closed the touring calendar [UI:CLOSE_CALENDAR]."),
+      { action: "close_calendar_hub", source: "tag" }
+    );
+  });
+
+  test("parseCalendarSelectDateTag extracts YYYY-MM-DD", () => {
+    assert.equal(
+      parseCalendarSelectDateTag("Let's look at Friday! [CALENDAR_SELECT_DATE:2026-09-18]"),
+      "2026-09-18"
+    );
+  });
+
+  test("parseBookTourTag extracts booking parameters", () => {
+    const tag = "Reserving that slot! [BOOK_TOUR:date=2026-09-18,time=15:00,name=Alex Kumar,phone=9876543210,email=alex@example.com]";
+    const parsed = parseBookTourTag(tag);
+    assert.deepEqual(parsed, {
+      date: "2026-09-18",
+      time: "15:00",
+      name: "Alex Kumar",
+      phone: "9876543210",
+      email: "alex@example.com",
+    });
+  });
+
+  test("calendar control tags never reach caller transcript", () => {
+    assert.equal(
+      stripUITags("I've pulled up the schedule [UI:OPEN_CALENDAR]"),
+      "I've pulled up the schedule"
+    );
+    assert.equal(
+      stripUITags("Checking Friday [CALENDAR_SELECT_DATE:2026-09-18]"),
+      "Checking Friday"
+    );
+    assert.equal(
+      stripUITags("Booking now [BOOK_TOUR:date=2026-09-18,time=15:00,name=Alex,phone=123]"),
+      "Booking now"
+    );
+    assert.equal(
+      stripUITags("[TOUR_BOOKED:date=2026-09-18,time=15:00,name=Alex]"),
+      ""
+    );
+  });
+});
+

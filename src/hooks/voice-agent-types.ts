@@ -84,6 +84,8 @@ export type UIAction =
   | "close_hyper_local"
   | "open_search_hub"
   | "close_search_hub"
+  | "open_calendar_hub"
+  | "close_calendar_hub"
   /** Elena winding up an off-topic call. Terminal - the studio hangs up on it. */
   | "end_call"
   /** Elena delivering her closing remarks after deploy. Studio hangs up gracefully on it. */
@@ -102,6 +104,15 @@ export interface ParsedSearchTag {
   query?: string;
 }
 
+export interface ParsedBookTourTag {
+  date?: string;
+  time?: string;
+  name?: string;
+  phone?: string;
+  email?: string;
+  notes?: string;
+}
+
 export interface UseAgoraVoiceAgentOptions {
   onCallEnd?: (transcript: VoiceMessage[]) => void;
   onAgentTurnComplete?: (transcript: VoiceMessage[]) => void;
@@ -109,5 +120,9 @@ export interface UseAgoraVoiceAgentOptions {
   onSearchRequest?: (params: ParsedSearchTag) => void;
   /** Sarah asking for the Nth on-screen search result to be opened (1-based). */
   onOpenPropertyRequest?: (index: number) => void;
+  /** Sarah asking to switch the active date on the calendar hub (YYYY-MM-DD). */
+  onCalendarSelectDate?: (date: string) => void;
+  /** Sarah asking to book a 1-hour tour slot. */
+  onBookTourRequest?: (booking: ParsedBookTourTag) => void;
   onLogEvent?: (category: "AGORA" | "INTENT", title: string, details?: any) => void;
 }

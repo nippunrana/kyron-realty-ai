@@ -35,6 +35,7 @@ export interface PropertyPromptFacts {
   neighbourhoodVibe: string | null;
   concessionRules: Array<{ condition: string; concession: string }>;
   allowNegotiation: boolean;
+  hasCalendarAccess?: boolean;
 }
 
 export interface PropertyPromptInput {
@@ -141,14 +142,35 @@ function renderLocation(location: LocationValue): string | null {
  * lands, it becomes a third bullet in this section and a tag handled like [OPEN_PROPERTY:].
  */
 function renderEscalation(facts: PropertyPromptFacts): string {
-  const lines = [
-    "- When they are genuinely interested, offer two specific viewing times and book one.",
-    "- When they ask something the knowledge base above does not answer, say you do not have it verified and offer to have the owner confirm it. Never guess a policy, a price, or a spec.",
-  ];
+  const lines: string[] = [];
+  if (facts.hasCalendarAccess) {
+    lines.push("- When they are genuinely interested, offer available times using the live Google Calendar on their screen and book the 1-hour tour.");
+  } else {
+    lines.push("- When they are interested in viewing, take their contact details and preferred time so the property manager can confirm directly.");
+  }
+  lines.push("- When they ask something the knowledge base above does not answer, say you do not have it verified and offer to have the owner confirm it. Never guess a policy, a price, or a spec.");
   if (facts.contactEmail) {
     lines.push(`- If they ask to reach the owner or leasing office directly, give the verified email: ${facts.contactEmail}`);
   }
   return lines.join("\n");
+}
+
+function renderCalendarInstructions(hasCalendarAccess?: boolean): string {
+  if (hasCalendarAccess) {
+    return `LIVE GOOGLE CALENDAR & 1-HOUR TOUR BOOKING:
+- Touring working hours are 10:00 AM to 6:00 PM IST daily. All tours are 1-hour private slots.
+- When the caller asks about viewing the home or scheduling a visit:
+  1. Tell them you can bring up the touring calendar right on their screen, and emit the silent tag: [UI:OPEN_CALENDAR]
+  2. Ask what day they prefer (e.g. "What day works best for you - today, tomorrow, or later this week?").
+  3. When they mention a specific day or date (e.g. "Friday", "tomorrow", "this weekend"), emit: [CALENDAR_SELECT_DATE:YYYY-MM-DD] to highlight that day's open slots on their screen, and verbally propose 1 or 2 available 1-hour slots.
+  4. When they pick an open slot (e.g. "3 PM works for me"), ask for their full name and best phone number (and mention email is optional if they would like a Google Calendar invite sent to them).
+  5. Once they provide name and phone, emit: [BOOK_TOUR:date=YYYY-MM-DD,time=HH:00,name=...,phone=...,email=...]
+  6. When you receive the background cue [TOUR_BOOKED:date=...,time=...,name=...], confirm warmly that their tour is officially confirmed and added to the property manager's Google Calendar!
+- If a requested time is already booked or outside 10:00 AM - 6:00 PM IST, politely let them know and offer the nearest available slot.`;
+  }
+  return `VIEWING REQUESTS (CALENDAR UNLINKED):
+- This home does not have an automated calendar link. Never emit [UI:OPEN_CALENDAR] or claim to show an on-screen calendar.
+- When they ask to tour, offer to take their contact name, phone number, and preferred date/time, and explain that the property manager will follow up directly to confirm.`;
 }
 
 /** The full property-page system prompt, and the greeting used when the call starts here. */
@@ -278,9 +300,11 @@ NEVER DO THESE:
 
 ${SEARCH_CAPABILITY_INSTRUCTIONS}
 
+${renderCalendarInstructions(facts.hasCalendarAccess)}
+
 YOUR CUE TO SPEAK: a message reading [PROPERTY_OPENED:title=...,mode=...,verdict=...] means this page has just finished opening on the caller's screen. That is your signal to speak the opening beat described above. Never read the cue aloud, never mention it, and never repeat its contents back.
 
-NOTE ON THIS CALL'S HISTORY: earlier messages may contain [SEARCH_RESULT:...] or [OPEN_PROPERTY:...] signals from the search console. Those were screen instructions, not things the caller said. Never read them aloud or refer to them.
+NOTE ON THIS CALL'S HISTORY: earlier messages may contain [SEARCH_RESULT:...], [OPEN_PROPERTY:...], or [TOUR_BOOKED:...] signals from the interface. Those were screen instructions, not things the caller said. Never read them aloud or refer to them.
 `.trim();
 
   return { greeting: COLD_START_GREETING, systemPrompt };

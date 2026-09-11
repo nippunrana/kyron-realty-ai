@@ -8,6 +8,8 @@ import { useGSAP } from "@gsap/react";
 import { BASE_PATH } from "@/lib/base-path";
 import { useAgoraVoiceAgent } from "@/hooks/useAgoraVoiceAgent";
 import { GsapSearchHub, type SearchHubProperty } from "./GsapSearchHub";
+import { GsapCalendarHub, type BookedTourSummary } from "./GsapCalendarHub";
+import type { CalendarDayAvailability, PropertyAvailabilityResult } from "@/lib/calendar-service";
 import { emptyJourney, type SalesJourney } from "@/lib/sales-journey";
 import { SalesDialogueStream } from "./SalesDialogueStream";
 import {
@@ -122,7 +124,7 @@ export function FloatingSalesAgent() {
 
   // Search Hub states
   const [isSearchHubOpen, setIsSearchHubOpen] = useState(false);
-  const [mobileTab, setMobileTab] = useState<"chat" | "search">("chat");
+  const [mobileTab, setMobileTab] = useState<"chat" | "search" | "calendar">("chat");
   const [isSearchingProperties, setIsSearchingProperties] = useState(false);
   const [activeSearchCity, setActiveSearchCity] = useState<string | null>(null);
   const [isPetFriendlyFilter, setIsPetFriendlyFilter] = useState(false);
@@ -153,6 +155,35 @@ export function FloatingSalesAgent() {
   }, [searchResults]);
   const [availableCities, setAvailableCities] = useState<string[]>([]);
 
+  // Calendar Hub states
+  const [isCalendarHubOpen, setIsCalendarHubOpen] = useState(false);
+  const [isLoadingCalendar, setIsLoadingCalendar] = useState(false);
+  const [calendarDays, setCalendarDays] = useState<CalendarDayAvailability[]>([]);
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState<string | null>(null);
+  const [bookedTour, setBookedTour] = useState<BookedTourSummary | null>(null);
+  const [calendarPropertyTitle, setCalendarPropertyTitle] = useState<string>("Viewing Schedule");
+
+  const fetchCalendarAvailability = useCallback(async (slug: string) => {
+    setIsLoadingCalendar(true);
+    try {
+      const res = await fetch(`${BASE_PATH}/api/properties/${encodeURIComponent(slug)}/calendar/availability?days=7`);
+      if (res.ok) {
+        const data = (await res.json()) as PropertyAvailabilityResult;
+        if (data.hasCalendar) {
+          setCalendarDays(data.days || []);
+          setCalendarPropertyTitle(data.propertyTitle || "Viewing Schedule");
+          if (data.days?.length > 0) {
+            setSelectedCalendarDate((prev) => prev || data.days[0].date);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("[FloatingSalesAgent] Failed to fetch calendar availability:", err);
+    } finally {
+      setIsLoadingCalendar(false);
+    }
+  }, []);
+
   // The call's running memory. Held in a ref rather than state because nothing on screen
   // renders from it - it exists to travel back to the server on the next handover.
   const journeyRef = useRef<SalesJourney>(emptyJourney());
@@ -171,6 +202,7 @@ export function FloatingSalesAgent() {
     audioFrequencies,
     transcript,
     errorMessage,
+    voiceSessionId,
     startCall,
     toggleMute,
     endCall,
@@ -209,12 +241,77 @@ export function FloatingSalesAgent() {
       setMobileTab("chat");
       router.push(`/listings/${target.slug}`);
     },
+    onCalendarSelectDate: (date) => {
+      setSelectedCalendarDate(date);
+    },
+    onBookTourRequest: async (booking) => {
+      const slug = getListingSlug(pathname);
+      if (!slug || !booking.date || !booking.time) return;
+
+      const callerTurns = transcript.reduce((n, m) => (m.role === "user" ? n + 1 : n), 0);
+      const bookKey = `book_${callerTurns}_${booking.date}_${booking.time}_${booking.name || ""}`;
+      if (processedSearchTurnsRef.current.has(bookKey)) return;
+      processedSearchTurnsRef.current.add(bookKey);
+
+      try {
+        const res = await fetch(`${BASE_PATH}/api/properties/${encodeURIComponent(slug)}/calendar/book`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            date: booking.date,
+            time: booking.time,
+            attendeeName: booking.name,
+            attendeePhone: booking.phone,
+            attendeeEmail: booking.email,
+            notes: booking.notes,
+            voiceSessionId,
+          }),
+        });
+
+        if (res.ok) {
+          const result = await res.json();
+          setBookedTour({
+            propertyTitle: result.summary?.propertyTitle || calendarPropertyTitle,
+            date: result.summary?.date || booking.date,
+            time: result.summary?.time || booking.time,
+            attendeeName: result.summary?.attendeeName || booking.name || "Guest",
+            attendeePhone: result.summary?.attendeePhone || booking.phone || "",
+            googleEventLink: result.googleEventLink,
+          });
+
+          // Ensure calendar view is open
+          setIsSearchHubOpen(false);
+          setIsCalendarHubOpen(true);
+          setMobileTab("calendar");
+
+          // Feed result back with APPEND priority so Sarah never gets interrupted mid-speech
+          sendTextMessage(
+            `[TOUR_BOOKED:date=${booking.date},time=${booking.time},name=${booking.name || "Guest"}]`,
+            { priority: "append" }
+          );
+        }
+      } catch (err) {
+        console.error("[FloatingSalesAgent] Tour booking error:", err);
+      }
+    },
     onUIAction: (action) => {
       if (action === "open_search_hub") {
+        setIsCalendarHubOpen(false);
         setIsSearchHubOpen(true);
         setMobileTab("search");
       } else if (action === "close_search_hub") {
         setIsSearchHubOpen(false);
+        setMobileTab("chat");
+      } else if (action === "open_calendar_hub") {
+        const slug = getListingSlug(pathname);
+        if (slug) {
+          setIsSearchHubOpen(false);
+          setIsCalendarHubOpen(true);
+          setMobileTab("calendar");
+          fetchCalendarAvailability(slug);
+        }
+      } else if (action === "close_calendar_hub") {
+        setIsCalendarHubOpen(false);
         setMobileTab("chat");
       }
     },
@@ -253,6 +350,11 @@ export function FloatingSalesAgent() {
   useEffect(() => {
     transcriptRef.current = transcript;
   }, [transcript]);
+
+  const sendTextMessageRef = useRef(sendTextMessage);
+  useEffect(() => {
+    sendTextMessageRef.current = sendTextMessage;
+  }, [sendTextMessage]);
 
   const executePropertySearch = useCallback(
     async (params: PropertySearchParams) => {
@@ -389,7 +491,7 @@ export function FloatingSalesAgent() {
               // APPEND hands the queueing to the Agora gateway, which knows when her
               // interaction actually ends; the client's own speaking flag does not, because
               // it flips false during the gateway's "thinking" phase.
-              sendTextMessage(cue, { priority: "append" });
+              sendTextMessageRef.current(cue, { priority: "append" });
             }
           }
         }
@@ -399,7 +501,7 @@ export function FloatingSalesAgent() {
         setIsSearchingProperties(false);
       }
     },
-    [isCallActive, sendTextMessage]
+    [isCallActive]
   );
 
   // Clean up search deduplication on call termination
@@ -473,11 +575,17 @@ export function FloatingSalesAgent() {
   }, [isCallActive]);
 
   const desktopSearchWingRef = useRef<HTMLDivElement>(null);
+  const desktopCalendarWingRef = useRef<HTMLDivElement>(null);
 
   const handleCollapseSearch = useCallback(() => {
     setIsSearchHubOpen(false);
     setMobileTab("chat");
-  }, [setIsSearchHubOpen, setMobileTab]);
+  }, []);
+
+  const handleCollapseCalendar = useCallback(() => {
+    setIsCalendarHubOpen(false);
+    setMobileTab("chat");
+  }, []);
 
   useGSAP(
     () => {
@@ -517,6 +625,46 @@ export function FloatingSalesAgent() {
       }
     },
     { dependencies: [isSearchHubOpen] }
+  );
+
+  useGSAP(
+    () => {
+      const el = desktopCalendarWingRef.current;
+      if (!el) return;
+
+      if (isCalendarHubOpen) {
+        gsap.killTweensOf(el);
+        el.style.display = "flex";
+        gsap.fromTo(
+          el,
+          {
+            width: 0,
+            opacity: 0,
+            x: 24,
+          },
+          {
+            width: 560,
+            opacity: 1,
+            x: 0,
+            duration: 0.45,
+            ease: "power3.out",
+          }
+        );
+      } else {
+        gsap.killTweensOf(el);
+        gsap.to(el, {
+          width: 0,
+          opacity: 0,
+          x: 24,
+          duration: 0.35,
+          ease: "power2.inOut",
+          onComplete: () => {
+            if (el) el.style.display = "none";
+          },
+        });
+      }
+    },
+    { dependencies: [isCalendarHubOpen] }
   );
 
   const isDashboardRoute = pathname.startsWith("/dashboard");
@@ -679,7 +827,7 @@ export function FloatingSalesAgent() {
       <div
         aria-hidden="true"
         className={`fixed inset-0 bg-black/75 z-30 transition-opacity duration-300 pointer-events-auto ${
-          isSearchHubOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+          isSearchHubOpen || isCalendarHubOpen ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
       />
 
@@ -695,7 +843,7 @@ export function FloatingSalesAgent() {
         {/* ========================================================================= */}
         {isOpen && (
           <div className="mb-3 flex items-end gap-3 max-w-[calc(100vw-24px)] sm:max-w-[calc(100vw-40px)]">
-            {/* 1. LEFT WING (Desktop): Search Hub that fluidly expands to the left */}
+            {/* 1a. LEFT WING (Desktop): Search Hub that fluidly expands to the left */}
             <div
               ref={desktopSearchWingRef}
               className="hidden md:flex h-[560px] sm:h-[620px] overflow-hidden shrink-0"
@@ -712,6 +860,23 @@ export function FloatingSalesAgent() {
                 properties={searchResults}
                 availableCities={availableCities}
                 onClose={handleCollapseSearch}
+              />
+            </div>
+
+            {/* 1b. LEFT WING (Desktop): Calendar Hub that fluidly expands to the left */}
+            <div
+              ref={desktopCalendarWingRef}
+              className="hidden md:flex h-[560px] sm:h-[620px] overflow-hidden shrink-0"
+              style={{ display: "none", width: 0, opacity: 0 }}
+            >
+              <GsapCalendarHub
+                isOpen={isCalendarHubOpen}
+                isLoading={isLoadingCalendar}
+                propertyTitle={calendarPropertyTitle}
+                days={calendarDays}
+                selectedDate={selectedCalendarDate}
+                bookedTour={bookedTour}
+                onClose={handleCollapseCalendar}
               />
             </div>
 
@@ -842,8 +1007,8 @@ export function FloatingSalesAgent() {
                     </div>
                   </div>
 
-                  {/* Mobile Segmented Switcher (Visible only on mobile when listings exist or search active) */}
-                  {(searchResults.length > 0 || isSearchHubOpen) && (
+                  {/* Mobile Segmented Switcher (Visible only on mobile when listings exist or search/calendar active) */}
+                  {(searchResults.length > 0 || isSearchHubOpen || isCalendarHubOpen) && (
                     <div className="md:hidden px-3 py-1.5 bg-slate-100/90 border-b border-slate-200/60 flex items-center gap-1.5 shrink-0">
                       <button
                         type="button"
@@ -854,28 +1019,43 @@ export function FloatingSalesAgent() {
                             : "text-slate-500 hover:text-slate-800"
                         }`}
                       >
-                        💬 Conversation
+                        💬 Chat
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => setMobileTab("search")}
-                        className={`flex-1 py-1 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${
-                          mobileTab === "search"
-                            ? "bg-white text-blue-600 shadow-2xs"
-                            : "text-slate-500 hover:text-slate-800"
-                        }`}
-                      >
-                        <span>🏠 Properties</span>
-                        {searchResults.length > 0 && (
-                          <span className="px-1.5 py-0.2 rounded-full bg-blue-100 text-blue-700 text-[10px] font-extrabold">
-                            {searchResults.length}
-                          </span>
-                        )}
-                      </button>
+                      {(searchResults.length > 0 || isSearchHubOpen) && (
+                        <button
+                          type="button"
+                          onClick={() => setMobileTab("search")}
+                          className={`flex-1 py-1 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${
+                            mobileTab === "search"
+                              ? "bg-white text-blue-600 shadow-2xs"
+                              : "text-slate-500 hover:text-slate-800"
+                          }`}
+                        >
+                          <span>🏠 Homes</span>
+                          {searchResults.length > 0 && (
+                            <span className="px-1.5 py-0.2 rounded-full bg-blue-100 text-blue-700 text-[10px] font-extrabold">
+                              {searchResults.length}
+                            </span>
+                          )}
+                        </button>
+                      )}
+                      {isCalendarHubOpen && (
+                        <button
+                          type="button"
+                          onClick={() => setMobileTab("calendar")}
+                          className={`flex-1 py-1 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${
+                            mobileTab === "calendar"
+                              ? "bg-white text-indigo-600 shadow-2xs"
+                              : "text-slate-500 hover:text-slate-800"
+                          }`}
+                        >
+                          <span>📅 Schedule</span>
+                        </button>
+                      )}
                     </div>
                   )}
 
-                  {/* Body: Mobile Search Tab (mobile-only) and Dialogue Stream (always on desktop, toggleable on mobile) */}
+                  {/* Body: Mobile Search/Calendar Tabs (mobile-only) and Dialogue Stream (always on desktop, toggleable on mobile) */}
                   <div className="flex-1 overflow-hidden flex flex-col min-h-0">
                     {/* Mobile Search View (visible only on screens < md when mobileTab === 'search') */}
                     {mobileTab === "search" && (
@@ -896,10 +1076,26 @@ export function FloatingSalesAgent() {
                       </div>
                     )}
 
-                    {/* Dialogue Stream: ALWAYS visible on desktop (md:flex), hidden on mobile when mobileTab === 'search' */}
+                    {/* Mobile Calendar View (visible only on screens < md when mobileTab === 'calendar') */}
+                    {mobileTab === "calendar" && (
+                      <div className="md:hidden flex-1 overflow-hidden flex flex-col min-h-0">
+                        <GsapCalendarHub
+                          isOpen={true}
+                          isLoading={isLoadingCalendar}
+                          propertyTitle={calendarPropertyTitle}
+                          days={calendarDays}
+                          selectedDate={selectedCalendarDate}
+                          bookedTour={bookedTour}
+                          onClose={() => setMobileTab("chat")}
+                          isMobileTab={true}
+                        />
+                      </div>
+                    )}
+
+                    {/* Dialogue Stream: ALWAYS visible on desktop (md:flex), hidden on mobile when viewing tabs */}
                     <div
                       className={`flex-1 overflow-hidden flex flex-col min-h-0 ${
-                        mobileTab === "search" ? "hidden md:flex" : "flex"
+                        mobileTab !== "chat" ? "hidden md:flex" : "flex"
                       }`}
                     >
                       <SalesDialogueStream

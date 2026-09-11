@@ -1,4 +1,4 @@
-import type { UIAction, ParsedSearchTag } from "./voice-agent-types";
+import type { UIAction, ParsedSearchTag, ParsedBookTourTag } from "./voice-agent-types";
 
 /**
  * Silent screen-control tags. Elena ends the sentence that announces a card with one of
@@ -7,7 +7,7 @@ import type { UIAction, ParsedSearchTag } from "./voice-agent-types";
  * signal - the spoken-language patterns below are the fallback for a turn without one.
  */
 const UI_TAG = /\[\s*UI\s*:\s*([A-Z_]+)\s*\]/gi;
-const CONTROL_TAG = /\[\s*(UI|SEARCH|SEARCH_RESULT|OPEN_PROPERTY|PROPERTY_OPENED)\s*:[^\]]+\]/gi;
+const CONTROL_TAG = /\[\s*(UI|SEARCH|SEARCH_RESULT|OPEN_PROPERTY|PROPERTY_OPENED|CALENDAR_SELECT_DATE|BOOK_TOUR|TOUR_BOOKED)\s*:[^\]]+\]/gi;
 
 const TAG_ACTIONS: Record<string, UIAction> = {
   OPEN_CORE: "open_core_modal",
@@ -18,6 +18,10 @@ const TAG_ACTIONS: Record<string, UIAction> = {
   OPEN_SEARCH_HUB: "open_search_hub",
   CLOSE_SEARCH: "close_search_hub",
   CLOSE_SEARCH_HUB: "close_search_hub",
+  OPEN_CALENDAR: "open_calendar_hub",
+  OPEN_CALENDAR_HUB: "open_calendar_hub",
+  CLOSE_CALENDAR: "close_calendar_hub",
+  CLOSE_CALENDAR_HUB: "close_calendar_hub",
   CLOSE: "close_review_modal",
   CLOSE_CALL: "close_call",
   TRIGGER_DEPLOY: "trigger_deploy",
@@ -91,6 +95,42 @@ export function parseOpenPropertyTag(text: string): number | null {
   return index > 0 ? index : null;
 }
 
+const CALENDAR_SELECT_DATE_TAG = /\[\s*CALENDAR_SELECT_DATE\s*:\s*([^\]]+)\]/i;
+
+/** Extracts date string (YYYY-MM-DD) from [CALENDAR_SELECT_DATE:YYYY-MM-DD]. */
+export function parseCalendarSelectDateTag(text: string): string | null {
+  const match = text.match(CALENDAR_SELECT_DATE_TAG);
+  if (!match) return null;
+  const raw = match[1].trim();
+  const dateMatch = raw.match(/(\d{4}-\d{2}-\d{2})/);
+  return dateMatch ? dateMatch[1] : raw;
+}
+
+const BOOK_TOUR_TAG = /\[\s*BOOK_TOUR\s*:\s*([^\]]+)\]/i;
+
+/** Extracts booking parameters from silent [BOOK_TOUR:date=...,time=...,name=...,phone=...] tags. */
+export function parseBookTourTag(text: string): ParsedBookTourTag | null {
+  const match = text.match(BOOK_TOUR_TAG);
+  if (!match) return null;
+  const raw = match[1];
+  const result: ParsedBookTourTag = {};
+
+  const pairs = raw.split(",");
+  for (const pair of pairs) {
+    const [k, ...rest] = pair.split("=");
+    const v = rest.join("=").trim();
+    if (!k || !v) continue;
+    const keyLower = k.trim().toLowerCase();
+    if (keyLower === "date") result.date = v;
+    else if (keyLower === "time") result.time = v;
+    else if (keyLower === "name") result.name = v;
+    else if (keyLower === "phone") result.phone = v;
+    else if (keyLower === "email") result.email = v;
+    else if (keyLower === "notes") result.notes = v;
+  }
+  return result.date && result.time ? result : null;
+}
+
 const ASSISTANT_SEARCH_SPOKEN =
   /(?:let me check|let me search|checking|searching|looking for|looking up|pulling up|finding|find you)\b[\s\S]{1,80}?\b(?:in|around|near)\s+(?:the\s+)?([a-zA-Z\s]+?)(?:\s+(?:within|for|with|under|budget|right now|immediately)|[.,!?;]|$)/i;
 
@@ -141,7 +181,7 @@ export function detectAssistantSearchIntent(text: string): ParsedSearchTag | nul
 
 /** Removes screen-control and search tags so they never reach the owner's transcript or extractors. */
 export function stripUITags(text: string): string {
-  if (!/\[\s*(UI|SEARCH|SEARCH_RESULT|OPEN_PROPERTY|PROPERTY_OPENED)\s*:/i.test(text)) return text;
+  if (!/\[\s*(UI|SEARCH|SEARCH_RESULT|OPEN_PROPERTY|PROPERTY_OPENED|CALENDAR_SELECT_DATE|BOOK_TOUR|TOUR_BOOKED)\s*:/i.test(text)) return text;
   return text
     .replace(CONTROL_TAG, "")
     .replace(/\s+([.,!?;:])/g, "$1")
@@ -163,6 +203,10 @@ const USER_OPEN_SEARCH =
   /(pull|bring|open|show|display|reopen|pull back|bring back).*(search|listings|properties|search bar|search hub|search panel|search results)/i;
 const USER_CLOSE_SEARCH =
   /(close|hide|dismiss|minimize|shut).*(search|listings|properties|search bar|search hub|search panel|search results)/i;
+const USER_OPEN_CALENDAR =
+  /(pull|bring|open|show|display|reopen|look at|check).*(calendar|schedule|tour slots|viewing slots|timing|available times|availability)/i;
+const USER_CLOSE_CALENDAR =
+  /(close|hide|dismiss|minimize|shut).*(calendar|schedule|tour slots|viewing slots)/i;
 const USER_OPEN_CORE =
   /(pull|bring|open|show|display|pop).*(core specs|core details|\d+ core)/i;
 const USER_OPEN_PHOTOS =
@@ -181,6 +225,10 @@ const ASSISTANT_OPEN_SEARCH =
   /(pull|bring|open|show|display|reopen|pull back|bring back).*(search|listings|properties|search bar|search hub|search panel|search results).*(screen|for you|back up|take a look|right now)/i;
 const ASSISTANT_CLOSE_SEARCH =
   /(close|closed|hide|dismiss|minimiz|shut).*(search|listings|properties|search bar|search hub|search panel|search results)/i;
+const ASSISTANT_OPEN_CALENDAR =
+  /(pull|bring|open|show|display|reopen).*(calendar|schedule|tour slots|viewing slots|availability).*(screen|for you|take a look|right now)/i;
+const ASSISTANT_CLOSE_CALENDAR =
+  /(close|closed|hide|dismiss|minimiz|shut).*(calendar|schedule|tour slots|viewing slots)/i;
 const ASSISTANT_OPEN_CORE =
   /(pull|bring|open|show|display).*(core specs|core details|\d+ core).*(screen|for you|back up|take a look|right now)/i;
 const ASSISTANT_OPEN_HYPER_LOCAL =
@@ -207,6 +255,8 @@ const ASSISTANT_END_CALL =
 export function detectUserModalIntent(text: string): UIAction | null {
   if (USER_OPEN_SEARCH.test(text)) return "open_search_hub";
   if (USER_CLOSE_SEARCH.test(text)) return "close_search_hub";
+  if (USER_OPEN_CALENDAR.test(text)) return "open_calendar_hub";
+  if (USER_CLOSE_CALENDAR.test(text)) return "close_calendar_hub";
   if (USER_OPEN_CORE.test(text)) return "open_core_modal";
   if (USER_OPEN_PHOTOS.test(text)) return "open_upload_modal";
   if (USER_OPEN_FINAL.test(text)) return "open_final_modal";
@@ -228,6 +278,8 @@ export function detectAssistantModalIntent(text: string): AssistantIntent | null
   if (ASSISTANT_END_CALL.test(text)) return { action: "end_call", source: "regex" };
   const tagged = parseUITag(text);
   if (tagged) return { action: tagged, source: "tag" };
+  if (ASSISTANT_CLOSE_CALENDAR.test(text)) return { action: "close_calendar_hub", source: "regex" };
+  if (ASSISTANT_OPEN_CALENDAR.test(text)) return { action: "open_calendar_hub", source: "regex" };
   if (ASSISTANT_CLOSE_SEARCH.test(text)) return { action: "close_search_hub", source: "regex" };
   if (ASSISTANT_OPEN_SEARCH.test(text)) return { action: "open_search_hub", source: "regex" };
   if (ASSISTANT_CLOSE.test(text)) return { action: "close_review_modal", source: "regex" };

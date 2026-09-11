@@ -38,6 +38,14 @@ Canonical source: **`src/lib/google-calendar.ts`**. Wired into sign-in by `src/a
 - **The Drizzle adapter never updates an account row.** `linkAccount` is an insert that
   fires once, on first link. Fresh tokens reach the database only through
   `persistGoogleTokens`. Do not assume the adapter keeps them current.
+- **Voice Agent Tour Scheduling is strictly voice-driven with zero calendar data exposure.**
+  During live calls, Sarah inspects the owner's Google Calendar (`calendar.freebusy` on primary
+  and Kyron calendar) + local DB bookings. Conflicting slots are strictly rendered as "Booked"
+  with zero event titles or attendee data exposed. Slot selection is pure voice-driven (no clickable
+  slot buttons). All tour booking completion cues (`[TOUR_BOOKED:...]`) must be sent with
+  `append` priority so Sarah is never interrupted mid-speech. Same-day bookings require a minimum
+  2-hour notice within 10:00-18:00 IST. If the owner has no calendar grant, calendar scheduling
+  is omitted entirely.
 
 ---
 

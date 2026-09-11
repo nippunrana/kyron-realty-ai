@@ -12,10 +12,18 @@ import type {
   UseAgoraVoiceAgentReturn,
   VoiceMessage,
   ParsedSearchTag,
+  ParsedBookTourTag,
 } from "./voice-agent-types";
 import { formatTimestamp, isUserTranscriptionItem, mapTranscriptionsToMessages } from "./voice-transcript";
 import { startFrequencyVisualizer } from "./audio-visualizer";
-import { detectAssistantModalIntent, detectAssistantSearchIntent, detectUserModalIntent, parseOpenPropertyTag } from "./voice-intents";
+import {
+  detectAssistantModalIntent,
+  detectAssistantSearchIntent,
+  detectUserModalIntent,
+  parseOpenPropertyTag,
+  parseCalendarSelectDateTag,
+  parseBookTourTag,
+} from "./voice-intents";
 
 export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgoraVoiceAgentReturn {
   const [callState, setCallState] = useState<CallState>("idle");
@@ -42,6 +50,8 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
   const onUIActionRef = useRef<((action: UIAction) => void) | undefined>(options?.onUIAction);
   const onSearchRequestRef = useRef<((params: ParsedSearchTag) => void) | undefined>(options?.onSearchRequest);
   const onOpenPropertyRequestRef = useRef<((index: number) => void) | undefined>(options?.onOpenPropertyRequest);
+  const onCalendarSelectDateRef = useRef<((date: string) => void) | undefined>(options?.onCalendarSelectDate);
+  const onBookTourRequestRef = useRef<((booking: ParsedBookTourTag) => void) | undefined>(options?.onBookTourRequest);
   const onLogEventRef = useRef<((category: "AGORA" | "INTENT", title: string, details?: any) => void) | undefined>(options?.onLogEvent);
   // Keep the latest callbacks reachable from long-lived SDK listeners without re-subscribing
   useEffect(() => {
@@ -50,6 +60,8 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
     onUIActionRef.current = options?.onUIAction;
     onSearchRequestRef.current = options?.onSearchRequest;
     onOpenPropertyRequestRef.current = options?.onOpenPropertyRequest;
+    onCalendarSelectDateRef.current = options?.onCalendarSelectDate;
+    onBookTourRequestRef.current = options?.onBookTourRequest;
     onLogEventRef.current = options?.onLogEvent;
   });
   const transcriptRef = useRef<VoiceMessage[]>([]);
@@ -422,6 +434,30 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
                   processedAssistantTurnIntentsRef.current.add(openKey);
                   onLogEventRef.current?.("INTENT", `Detected Open Property Intent: result ${openIndex}`, { text: spokenText });
                   onOpenPropertyRequestRef.current?.(openIndex);
+                }
+              }
+
+              // Assistant calendar date selection: silent [CALENDAR_SELECT_DATE:YYYY-MM-DD] tag
+              const selectedDate = parseCalendarSelectDateTag(spokenText);
+              if (selectedDate) {
+                const turnId = item.turn_id !== undefined ? String(item.turn_id) : spokenText.slice(0, 40).toLowerCase();
+                const dateKey = `assistant_calendar_date_${turnId}_${selectedDate}`;
+                if (!processedAssistantTurnIntentsRef.current.has(dateKey)) {
+                  processedAssistantTurnIntentsRef.current.add(dateKey);
+                  onLogEventRef.current?.("INTENT", `Detected Calendar Date Intent: ${selectedDate}`, { text: spokenText });
+                  onCalendarSelectDateRef.current?.(selectedDate);
+                }
+              }
+
+              // Assistant book tour action: silent [BOOK_TOUR:date=...,time=...,name=...,phone=...] tag
+              const bookTour = parseBookTourTag(spokenText);
+              if (bookTour) {
+                const turnId = item.turn_id !== undefined ? String(item.turn_id) : spokenText.slice(0, 40).toLowerCase();
+                const bookKey = `assistant_book_tour_${turnId}_${bookTour.date}_${bookTour.time}`;
+                if (!processedAssistantTurnIntentsRef.current.has(bookKey)) {
+                  processedAssistantTurnIntentsRef.current.add(bookKey);
+                  onLogEventRef.current?.("INTENT", `Detected Book Tour Intent: ${bookTour.date} ${bookTour.time}`, { text: spokenText, bookTour });
+                  onBookTourRequestRef.current?.(bookTour);
                 }
               }
 
