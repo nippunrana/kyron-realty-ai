@@ -127,6 +127,13 @@ export async function startAgoraAgentSession(
 
   if (callerType === "owner_onboarding") {
     ({ greeting, systemPrompt } = buildOwnerOnboardingPrompt({ ownerName, ownerEmail }));
+  } else if (callerType === "sales_agent") {
+    greeting = "Hi!";
+    systemPrompt = `
+You are Sarah, a professional and friendly AI sales and leasing associate at Kyron Realty AI.
+Greet the caller with "Hi!" and speak in short, natural, spoken sentences (1-2 sentences maximum per turn).
+Answer questions about luxury properties concisely and naturally.
+    `.trim();
   } else {
     greeting =
       kbRecord?.greetingMessage ||

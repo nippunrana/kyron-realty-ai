@@ -11,9 +11,13 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { propertySlug, propertyId } = body || {};
     const callerType: CallerType =
-      body?.callerType === "owner_onboarding" ? "owner_onboarding" : "buyer_inquiry";
+      body?.callerType === "owner_onboarding"
+        ? "owner_onboarding"
+        : body?.callerType === "sales_agent"
+        ? "sales_agent"
+        : "buyer_inquiry";
 
-    // Owner onboarding is only reachable from the authenticated studio; buyer calls stay public.
+    // Owner onboarding is only reachable from the authenticated studio; buyer and sales agent calls stay public.
     if (callerType === "owner_onboarding" && !sessionUser) {
       return NextResponse.json({ success: false, error: "Authentication required." }, { status: 401 });
     }
@@ -27,6 +31,8 @@ export async function POST(req: NextRequest) {
     const resolvedChannelName =
       callerType === "owner_onboarding"
         ? `onboard-owner-${Date.now().toString(36)}`
+        : callerType === "sales_agent"
+        ? `sales-sarah-${Date.now().toString(36)}`
         : `listing-${propertySlug || "call"}-${Date.now().toString(36)}`;
 
     const sessionResult = await startAgoraAgentSession({

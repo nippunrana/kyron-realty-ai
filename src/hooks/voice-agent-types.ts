@@ -9,7 +9,7 @@ export type CallState =
   | "error";
 
 /** Who the agent is talking to; selects the persona and the auth rules on the server. */
-export type CallerType = "buyer_inquiry" | "owner_onboarding";
+export type CallerType = "buyer_inquiry" | "owner_onboarding" | "sales_agent";
 
 export interface VoiceMessage {
   id: string;

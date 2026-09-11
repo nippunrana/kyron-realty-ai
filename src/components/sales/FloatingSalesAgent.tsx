@@ -1,153 +1,120 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
 import { BASE_PATH } from "@/lib/base-path";
+import { useAgoraVoiceAgent } from "@/hooks/useAgoraVoiceAgent";
 import {
-  Sparkles,
-  X,
-  Compass,
-  Search,
   Mic,
-  ChevronDown,
-  MessageSquare,
-  CheckCircle2,
-  Zap,
+  MicOff,
+  PhoneOff,
+  X,
+  Radio,
+  Volume2,
+  AlertCircle,
+  Sparkles,
 } from "lucide-react";
 
 interface PageContextInfo {
   pageTitle: string;
-  category: string;
-  hint: string;
-  suggestedPrompts: string[];
   isStudio: boolean;
 }
 
 /**
- * Derives contextual real estate insights based on current route
+ * Derives current page title for light-weight context badge
  */
 function getPageContext(pathname: string): PageContextInfo {
   if (pathname.includes("/dashboard/properties/new")) {
-    return {
-      pageTitle: "Property Onboarding Studio",
-      category: "Intake Active",
-      hint: "Elena Vance is currently guiding you through property onboarding. I am on standby to avoid audio crossover.",
-      suggestedPrompts: ["How do I verify parking?", "What happens after deploy?"],
-      isStudio: true,
-    };
+    return { pageTitle: "Onboarding Studio", isStudio: true };
   }
-
   if (pathname.startsWith("/dashboard")) {
-    return {
-      pageTitle: "Owner Dashboard",
-      category: "Portfolio Management",
-      hint: "Reviewing your active properties, lead inquiries, and occupancy metrics.",
-      suggestedPrompts: [
-        "How many active leads this week?",
-        "Which listing has the highest interest?",
-      ],
-      isStudio: false,
-    };
+    return { pageTitle: "Owner Dashboard", isStudio: false };
   }
-
   if (pathname.startsWith("/listings/")) {
     const slug = pathname.replace(/^\/listings\//, "").split("/")[0];
-    const formattedSlug = slug
+    const formatted = slug
       ? slug
           .split("-")
           .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
           .join(" ")
-      : "Property Listing";
-
-    return {
-      pageTitle: formattedSlug,
-      category: "Property Detail",
-      hint: "Ask me anything about this property's floor plan, HOA rules, negotiable concessions, or schedule an in-person tour.",
-      suggestedPrompts: [
-        "Is the monthly rent negotiable?",
-        "What are the parking and pet policies?",
-        "Schedule a private viewing tour",
-      ],
-      isStudio: false,
-    };
+      : "Listing Detail";
+    return { pageTitle: formatted, isStudio: false };
   }
-
   if (pathname.startsWith("/listings")) {
-    return {
-      pageTitle: "All Active Listings",
-      category: "Property Directory",
-      hint: "Browsing all verified residential and commercial properties in our portfolio.",
-      suggestedPrompts: [
-        "Find 3BHK flats under ₹1.5 Cr",
-        "Show luxury villas with private garden",
-        "Commercial office spaces in Cyber Hub",
-      ],
-      isStudio: false,
-    };
+    return { pageTitle: "Property Directory", isStudio: false };
   }
-
   if (pathname.startsWith("/login")) {
-    return {
-      pageTitle: "Client Authentication",
-      category: "Account Access",
-      hint: "Sign in to manage your listings, access owner intelligence, or manage scheduled viewings.",
-      suggestedPrompts: ["How does Google login work?", "Where can I register as an owner?"],
-      isStudio: false,
-    };
+    return { pageTitle: "Sign In", isStudio: false };
   }
-
-  if (pathname.startsWith("/privacy") || pathname.startsWith("/terms")) {
-    return {
-      pageTitle: "Legal & Terms",
-      category: "Compliance",
-      hint: "Kyron Realty AI privacy policies, data protections, and terms of service.",
-      suggestedPrompts: ["How is voice data processed?", "What are the tenant terms?"],
-      isStudio: false,
-    };
-  }
-
-  // Default: Homepage
-  return {
-    pageTitle: "Home & Showcase",
-    category: "Main Portal",
-    hint: "Welcome to Kyron Realty AI! I'm Sarah, your autonomous sales & leasing associate. How can I help you find your dream property?",
-    suggestedPrompts: [
-      "Show me top luxury apartments",
-      "Which properties are available immediately?",
-      "How does the AI sales assistant work?",
-    ],
-    isStudio: false,
-  };
+  return { pageTitle: "Home Showcase", isStudio: false };
 }
 
 export function FloatingSalesAgent() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
-  const [activeFeedback, setActiveFeedback] = useState<string | null>(null);
+  const [isRequestingMic, setIsRequestingMic] = useState(false);
+  const [permissionError, setPermissionError] = useState<string | null>(null);
 
   const context = useMemo(() => getPageContext(pathname || "/"), [pathname]);
-
   const avatarUrl = `${BASE_PATH}/images/sarah-sales-agent.jpg`;
 
-  const handlePromptClick = (prompt: string) => {
-    setActiveFeedback(`"${prompt}" — Sales Brain coming in next step! I'll query our database and reply via voice.`);
-    setTimeout(() => {
-      setActiveFeedback(null);
-    }, 4500);
-  };
+  const {
+    callState,
+    isCallActive,
+    isMuted,
+    isAgentSpeaking,
+    audioFrequencies,
+    errorMessage,
+    startCall,
+    toggleMute,
+    endCall,
+  } = useAgoraVoiceAgent();
 
-  // When on onboarding studio, stay minimally collapsed to avoid overlapping Elena Vance's studio
-  if (context.isStudio && !isOpen) {
+  // Microphone pre-flight check before initiating billed Agora session
+  const handleStartCall = useCallback(async () => {
+    setPermissionError(null);
+    setIsRequestingMic(true);
+
+    try {
+      if (typeof navigator !== "undefined" && navigator.mediaDevices?.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach((track) => track.stop());
+      }
+    } catch {
+      setIsRequestingMic(false);
+      setPermissionError("Microphone permission was denied. Please allow microphone access in your browser to speak with Sarah.");
+      return;
+    }
+
+    setIsRequestingMic(false);
+    await startCall(undefined, undefined, "sales_agent");
+  }, [startCall]);
+
+  // Teardown call to prevent burning minutes
+  const handleEndCall = useCallback(async () => {
+    await endCall();
+  }, [endCall]);
+
+  // If user closes pod while on call, disconnect immediately to protect minutes
+  const handleClosePod = useCallback(async () => {
+    if (isCallActive) {
+      await endCall();
+    }
+    setIsOpen(false);
+  }, [isCallActive, endCall]);
+
+  // In Onboarding Studio (Elena Vance active), stay tucked in to avoid overlap
+  if (context.isStudio && !isOpen && !isCallActive) {
     return (
       <aside
         aria-label="Sales Agent Standby"
-        className="fixed bottom-4 right-4 z-30 opacity-75 hover:opacity-100 transition-opacity"
+        className="fixed bottom-4 right-4 z-30 opacity-80 hover:opacity-100 transition-opacity"
       >
         <button
           onClick={() => setIsOpen(true)}
-          className="px-3 py-1.5 rounded-full bg-slate-900/90 border border-slate-700 text-slate-300 text-xs font-medium flex items-center gap-2 shadow-lg backdrop-blur-md cursor-pointer hover:border-slate-500"
-          title="Sarah (Sales AI) is in standby while Elena Vance guides onboarding"
+          className="px-3 py-1.5 rounded-full bg-white/95 border border-slate-200 text-slate-700 text-xs font-medium flex items-center gap-2 shadow-md backdrop-blur-md cursor-pointer hover:border-slate-300"
+          title="Sarah is on standby while Elena Vance guides onboarding"
         >
           <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
           <span>Sarah • Standby</span>
@@ -158,150 +125,201 @@ export function FloatingSalesAgent() {
 
   return (
     <aside
-      aria-label="Kyron Sales Agent Widget"
+      aria-label="Kyron Sales Voice Agent"
       className="fixed bottom-5 right-5 z-40 select-none font-sans"
     >
       {/* ========================================================================= */}
-      {/* EXPANDED POPOVER CARD                                                     */}
+      {/* LIGHT-MODE VOICE POD (Expanded)                                           */}
       {/* ========================================================================= */}
       {isOpen && (
-        <div className="mb-3 w-[92vw] sm:w-[380px] max-w-[400px] bg-slate-950/95 border border-slate-800 rounded-3xl shadow-2xl shadow-blue-950/40 backdrop-blur-2xl text-white overflow-hidden flex flex-col animate-in fade-in slide-in-from-bottom-5 duration-200">
-          {/* Card Top Header */}
-          <div className="px-5 py-4 border-b border-slate-800/80 bg-slate-900/50 flex items-center justify-between">
+        <div className="mb-3 w-[90vw] sm:w-[340px] max-w-[360px] bg-white/95 border border-slate-200/90 rounded-3xl shadow-2xl shadow-slate-900/15 backdrop-blur-xl text-slate-900 overflow-hidden flex flex-col animate-in fade-in slide-in-from-bottom-5 duration-200">
+          {/* Header */}
+          <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/70 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="relative w-11 h-11 rounded-2xl overflow-hidden ring-2 ring-blue-500/30 shrink-0">
+              <div className="relative w-10 h-10 rounded-2xl overflow-hidden ring-2 ring-blue-500/20 shadow-sm shrink-0">
                 <Image
                   src={avatarUrl}
                   alt="Sarah AI Sales Advisor"
                   fill
-                  sizes="44px"
+                  sizes="40px"
                   unoptimized={true}
                   className="object-cover"
                 />
               </div>
               <div>
-                <div className="flex items-center gap-1.5">
-                  <h3 className="text-sm font-bold text-white tracking-tight">Sarah</h3>
-                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 text-[10px] font-semibold">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    <span>Online</span>
-                  </span>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-slate-900 tracking-tight">Sarah</h3>
+                  {isCallActive ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-bold">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span>Live Voice</span>
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-slate-600 text-[10px] font-medium">
+                      <span>Ready</span>
+                    </span>
+                  )}
                 </div>
-                <p className="text-[11px] text-slate-400 font-medium">
+                <p className="text-[11px] text-slate-500 font-medium">
                   AI Sales &amp; Leasing Associate
                 </p>
               </div>
             </div>
 
             <button
-              onClick={() => setIsOpen(false)}
-              className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/80 transition-colors cursor-pointer"
-              aria-label="Close sales assistant preview"
+              onClick={handleClosePod}
+              className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+              aria-label="Close voice assistant"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
 
-          {/* Dynamic Page Awareness Badge */}
-          <div className="px-5 pt-4 pb-2">
-            <div className="p-3 rounded-2xl bg-blue-950/30 border border-blue-800/30 flex items-start gap-2.5">
-              <div className="w-7 h-7 rounded-xl bg-blue-600/20 text-blue-400 flex items-center justify-center shrink-0 mt-0.5">
-                <Compass className="w-4 h-4" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-blue-400">
-                    Live Page Context
-                  </span>
-                  <span className="text-[10px] font-mono px-2 py-0.2 rounded-full bg-blue-900/40 text-blue-200 border border-blue-700/30 truncate max-w-[120px]">
-                    {context.category}
-                  </span>
-                </div>
-                <p className="text-xs font-semibold text-slate-200 truncate mt-0.5">
-                  {context.pageTitle}
-                </p>
-                <p className="text-[11px] text-slate-400 leading-relaxed mt-1">
-                  {context.hint}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Core Capabilities Preview */}
-          <div className="px-5 py-2">
-            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
-              <Zap className="w-3 h-3 text-amber-400" />
-              <span>Sales Agent Superpowers</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-left">
-              <div className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80">
-                <div className="flex items-center gap-1.5 text-blue-400 text-xs font-bold mb-0.5">
-                  <Search className="w-3.5 h-3.5" />
-                  <span>DB Search</span>
-                </div>
-                <p className="text-[10px] text-slate-400 leading-tight">
-                  Instant search across all properties &amp; prices
-                </p>
-              </div>
-              <div className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80">
-                <div className="flex items-center gap-1.5 text-emerald-400 text-xs font-bold mb-0.5">
-                  <Mic className="w-3.5 h-3.5" />
-                  <span>&lt;300ms Voice</span>
-                </div>
-                <p className="text-[10px] text-slate-400 leading-tight">
-                  Conversational negotiation via Agora SD-RTN
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Interactive Prompt Chips */}
-          <div className="px-5 py-2">
-            <div className="text-[11px] font-semibold text-slate-400 mb-1.5 flex items-center justify-between">
-              <span>Suggested Inquiries:</span>
-              <span className="text-[10px] text-slate-500 font-mono">Try clicking</span>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              {context.suggestedPrompts.map((prompt) => (
-                <button
-                  key={prompt}
-                  onClick={() => handlePromptClick(prompt)}
-                  className="w-full text-left px-3 py-2 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 text-xs text-slate-300 hover:text-white transition-all duration-150 flex items-center justify-between group cursor-pointer"
-                >
-                  <span className="truncate">{prompt}</span>
-                  <MessageSquare className="w-3 h-3 text-slate-500 group-hover:text-blue-400 transition-colors shrink-0 ml-2" />
-                </button>
-              ))}
+          {/* Body: Voice Arena */}
+          <div className="p-6 flex flex-col items-center text-center">
+            {/* Context Badge */}
+            <div className="mb-4 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50/80 border border-blue-200/60 text-blue-700 text-[11px] font-medium">
+              <Radio className="w-3 h-3 text-blue-600 animate-pulse" />
+              <span>Viewing: {context.pageTitle}</span>
             </div>
 
-            {/* Prompt Feedback Alert */}
-            {activeFeedback && (
-              <div className="mt-2 p-2 rounded-xl bg-blue-950/60 border border-blue-500/30 text-[11px] text-blue-200 animate-in fade-in duration-150 flex items-start gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-blue-400 shrink-0 mt-0.5" />
-                <span className="leading-snug">{activeFeedback}</span>
+            {/* Central Voice Avatar with Animated Pulse Rings */}
+            <div className="relative mb-5 flex items-center justify-center">
+              {/* Outer pulsing ripples when active */}
+              {isCallActive && (
+                <>
+                  <span className={`absolute inset-0 -m-3 rounded-full opacity-40 animate-ping ${isAgentSpeaking ? "bg-blue-400" : "bg-emerald-400"}`} />
+                  <span className={`absolute inset-0 -m-1.5 rounded-full opacity-30 animate-pulse ${isAgentSpeaking ? "bg-blue-500" : "bg-emerald-500"}`} />
+                </>
+              )}
+
+              <div
+                className={`relative w-24 h-24 rounded-full overflow-hidden shadow-xl transition-all duration-300 ${
+                  isAgentSpeaking
+                    ? "ring-4 ring-blue-500 shadow-blue-500/20 scale-105"
+                    : isCallActive
+                    ? "ring-4 ring-emerald-500 shadow-emerald-500/20"
+                    : "ring-4 ring-slate-100 shadow-slate-200"
+                }`}
+              >
+                <Image
+                  src={avatarUrl}
+                  alt="Sarah AI Sales Advisor"
+                  fill
+                  sizes="96px"
+                  unoptimized={true}
+                  className="object-cover"
+                />
+              </div>
+            </div>
+
+            {/* Dynamic Status Text */}
+            <div className="mb-4 min-h-[38px] flex flex-col items-center justify-center">
+              {isRequestingMic ? (
+                <p className="text-xs font-semibold text-blue-600 animate-pulse">
+                  Requesting microphone permission...
+                </p>
+              ) : callState === "connecting" ? (
+                <div className="flex items-center gap-2 text-xs font-semibold text-blue-600">
+                  <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+                  <span>Connecting to Sarah via Agora...</span>
+                </div>
+              ) : isAgentSpeaking ? (
+                <div className="flex items-center gap-1.5 text-xs font-bold text-blue-600">
+                  <Volume2 className="w-3.5 h-3.5 animate-bounce" />
+                  <span>Sarah is speaking...</span>
+                </div>
+              ) : isCallActive ? (
+                <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>Listening... Speak naturally</span>
+                </div>
+              ) : (
+                <p className="text-xs text-slate-500 font-medium">
+                  Tap below to start voice conversation
+                </p>
+              )}
+            </div>
+
+            {/* Real-time Frequency Visualizer (when active) */}
+            {isCallActive && (
+              <div className="flex items-center justify-center gap-1 h-7 mb-4 px-4 py-1 rounded-xl bg-slate-50 border border-slate-100 w-full">
+                {audioFrequencies.slice(0, 14).map((freq, idx) => {
+                  const heightPercent = Math.min(100, Math.max(15, (freq / 255) * 100));
+                  return (
+                    <span
+                      key={idx}
+                      style={{ height: `${heightPercent}%` }}
+                      className={`w-1 rounded-full transition-all duration-75 ${
+                        isAgentSpeaking ? "bg-blue-500" : "bg-emerald-500"
+                      }`}
+                    />
+                  );
+                })}
               </div>
             )}
+
+            {/* Error or Permission Alert */}
+            {(permissionError || errorMessage) && (
+              <div className="mb-4 p-2.5 rounded-xl bg-red-50 border border-red-200 text-[11px] text-red-700 flex items-start gap-1.5 text-left w-full">
+                <AlertCircle className="w-3.5 h-3.5 text-red-600 shrink-0 mt-0.5" />
+                <span className="leading-tight">{permissionError || errorMessage}</span>
+              </div>
+            )}
+
+            {/* Controls: Start or Disconnect */}
+            <div className="w-full flex items-center gap-2">
+              {!isCallActive ? (
+                <button
+                  type="button"
+                  disabled={isRequestingMic || callState === "connecting"}
+                  onClick={handleStartCall}
+                  className="w-full py-3 px-4 rounded-2xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 transition-all cursor-pointer disabled:opacity-50"
+                >
+                  <Mic className="w-4 h-4" />
+                  <span>{callState === "connecting" ? "Connecting..." : "Start Conversation"}</span>
+                </button>
+              ) : (
+                <>
+                  {/* Mute toggle */}
+                  <button
+                    type="button"
+                    onClick={toggleMute}
+                    className={`p-3 rounded-2xl border transition-colors cursor-pointer ${
+                      isMuted
+                        ? "bg-amber-500 text-white border-amber-600"
+                        : "bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200"
+                    }`}
+                    title={isMuted ? "Unmute microphone" : "Mute microphone"}
+                  >
+                    {isMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                  </button>
+
+                  {/* Prominent Red Disconnect Button */}
+                  <button
+                    type="button"
+                    onClick={handleEndCall}
+                    className="flex-1 py-3 px-4 rounded-2xl bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-red-600/25 transition-all cursor-pointer"
+                    title="Disconnect call to stop billing minutes"
+                  >
+                    <PhoneOff className="w-4 h-4" />
+                    <span>Disconnect</span>
+                  </button>
+                </>
+              )}
+            </div>
           </div>
 
-          {/* Bottom Action Footer (Prep for Brain) */}
-          <div className="p-4 border-t border-slate-800/80 bg-slate-900/70 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 flex-1 px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-500">
-              <Sparkles className="w-3.5 h-3.5 text-blue-400 animate-pulse" />
-              <span className="truncate text-[11px]">Brain coming up in next step...</span>
-            </div>
-            <button
-              onClick={() => setIsOpen(false)}
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
-              title="Minimize agent"
-            >
-              <ChevronDown className="w-4 h-4" />
-            </button>
+          {/* Footer Note */}
+          <div className="px-5 py-2.5 border-t border-slate-100 bg-slate-50/70 text-center text-[10px] text-slate-400 flex items-center justify-center gap-1">
+            <Sparkles className="w-3 h-3 text-blue-500" />
+            <span>Sub-300ms real-time voice • Agora &amp; Gemini</span>
           </div>
         </div>
       )}
 
       {/* ========================================================================= */}
-      {/* RESTING FLOATING PILL                                                     */}
+      {/* RESTING FLOATING PILL (Light Mode Luxury)                                 */}
       {/* ========================================================================= */}
       <div
         onClick={() => setIsOpen(!isOpen)}
@@ -313,10 +331,14 @@ export function FloatingSalesAgent() {
             setIsOpen(!isOpen);
           }
         }}
-        className="group relative flex items-center gap-3 p-1.5 pr-4 rounded-full bg-slate-950/90 hover:bg-slate-900 border border-slate-800 hover:border-blue-500/50 text-white shadow-xl shadow-slate-950/50 hover:shadow-blue-500/20 backdrop-blur-xl transition-all duration-300 cursor-pointer"
+        className={`group relative flex items-center gap-3 p-1.5 pr-4 rounded-full bg-white/95 hover:bg-white border text-slate-800 shadow-xl hover:shadow-2xl transition-all duration-300 cursor-pointer backdrop-blur-xl ${
+          isCallActive
+            ? "border-emerald-400 ring-2 ring-emerald-400/30"
+            : "border-slate-200 hover:border-blue-300 ring-1 ring-slate-100"
+        }`}
       >
         {/* Avatar with Live Indicator */}
-        <div className="relative w-9 h-9 rounded-full overflow-hidden ring-2 ring-blue-500/40 group-hover:ring-blue-400 transition-all shrink-0">
+        <div className="relative w-9 h-9 rounded-full overflow-hidden ring-2 ring-blue-500/20 group-hover:ring-blue-400 transition-all shrink-0">
           <Image
             src={avatarUrl}
             alt="Sarah AI Sales Advisor"
@@ -325,31 +347,39 @@ export function FloatingSalesAgent() {
             unoptimized={true}
             className="object-cover"
           />
-          {/* Pulsing online badge */}
-          <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-slate-950" />
+          {/* Pulsing online/active badge */}
+          <span
+            className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full ring-2 ring-white ${
+              isCallActive ? "bg-emerald-500 animate-pulse" : "bg-emerald-500"
+            }`}
+          />
         </div>
 
         {/* Info Text */}
         <div className="flex flex-col text-left">
           <div className="flex items-center gap-1.5">
-            <span className="text-xs font-bold text-white tracking-tight group-hover:text-blue-200 transition-colors">
+            <span className="text-xs font-bold text-slate-900 tracking-tight group-hover:text-blue-600 transition-colors">
               Sarah
             </span>
-            <span className="text-[10px] text-slate-400 font-medium hidden sm:inline">
-              • Sales Advisor
+            <span className="text-[10px] text-slate-500 font-medium hidden sm:inline">
+              • Sales AI
             </span>
           </div>
           <div className="flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
-            <span className="text-[10px] text-blue-300/90 font-mono truncate max-w-[130px] sm:max-w-[170px]">
-              {context.pageTitle}
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                isCallActive ? "bg-emerald-500 animate-ping" : "bg-blue-500"
+              }`}
+            />
+            <span className="text-[10px] text-slate-500 font-medium truncate max-w-[120px] sm:max-w-[150px]">
+              {isCallActive ? "In Call" : context.pageTitle}
             </span>
           </div>
         </div>
 
-        {/* Subtle Toggle Hint */}
-        <div className="ml-1 text-slate-500 group-hover:text-slate-300 transition-colors">
-          <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+        {/* Mic Indicator */}
+        <div className="ml-1 text-slate-400 group-hover:text-blue-600 transition-colors">
+          <Mic className="w-3.5 h-3.5" />
         </div>
       </div>
     </aside>
