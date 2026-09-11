@@ -31,6 +31,7 @@ export interface VoiceControlState {
   /** Sends a text/prompt message to Elena Vance over Agora RTM. */
   sendTextMessage: (text: string) => void | Promise<void>;
   voiceSessionId?: number | null;
+  isAgentSpeaking?: boolean;
 }
 
 interface ConversationalPanelProps {
@@ -125,8 +126,9 @@ export function ConversationalPanel({
       endCall,
       sendTextMessage,
       voiceSessionId,
+      isAgentSpeaking,
     });
-  }, [isCallActive, isMuted, toggleMute, endCall, sendTextMessage, voiceSessionId, onVoiceStateSync]);
+  }, [isCallActive, isMuted, toggleMute, endCall, sendTextMessage, voiceSessionId, isAgentSpeaking, onVoiceStateSync]);
 
   /**
    * Acquire the microphone before `startCall`, not during it. Agora asks for the mic at

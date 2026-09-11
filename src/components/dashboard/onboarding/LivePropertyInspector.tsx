@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import Link from "next/link";
 import {
   Sparkles,
   ShieldCheck,
@@ -15,6 +16,9 @@ import {
   Layers,
   Eye,
   Mail,
+  ExternalLink,
+  LayoutDashboard,
+  QrCode,
 } from "lucide-react";
 import type { ExtractedPropertyPayload } from "@/lib/kb-extractor";
 import type { PillLabels } from "@/lib/turn-extractor";
@@ -56,6 +60,13 @@ interface LivePropertyInspectorProps {
   enrichmentError?: string | null;
   enrichmentAttempt?: number;
   maxEnrichmentAttempts?: number;
+  isPublished?: boolean;
+  publishedProperty?: {
+    id: number;
+    title?: string;
+    slug: string;
+  } | null;
+  onReopenSuccessModal?: () => void;
 }
 
 export function LivePropertyInspector({
@@ -76,6 +87,9 @@ export function LivePropertyInspector({
   enrichmentError = null,
   enrichmentAttempt = 1,
   maxEnrichmentAttempts = 1,
+  isPublished = false,
+  publishedProperty = null,
+  onReopenSuccessModal,
 }: LivePropertyInspectorProps) {
   const [activeImageIdx, setActiveImageIdx] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -569,7 +583,46 @@ export function LivePropertyInspector({
 
       {/* Sticky Bottom Action Bar */}
       <div className="p-4 border-t border-slate-200 bg-white/95 backdrop-blur-md shrink-0">
-        {isFullyVerified ? (
+        {isPublished && publishedProperty ? (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Link
+                href={`/listings/${publishedProperty.slug}`}
+                className="flex-1 py-3 px-4 rounded-2xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-extrabold text-sm shadow-md shadow-blue-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer text-center"
+              >
+                <ExternalLink className="w-4 h-4" />
+                <span>View Property</span>
+              </Link>
+
+              <Link
+                href="/dashboard"
+                className="py-3 px-4 rounded-2xl bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-800 font-bold text-sm border border-slate-200 transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center"
+              >
+                <LayoutDashboard className="w-4 h-4 text-slate-600" />
+                <span>Go to Dashboard</span>
+              </Link>
+
+              {onReopenSuccessModal && (
+                <button
+                  type="button"
+                  onClick={onReopenSuccessModal}
+                  className="p-3 rounded-2xl bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-200 text-emerald-700 font-bold text-sm border border-emerald-200 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  title="View QR Code & Share"
+                  aria-label="View QR Code & Share"
+                >
+                  <QrCode className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
+            <p className="text-[11px] text-center mt-1.5 flex items-center justify-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+              <span className="text-emerald-700 font-semibold">
+                Listing Published & Live • 24/7 Voice Sales Agent active
+              </span>
+            </p>
+          </div>
+        ) : isFullyVerified ? (
           <div className="flex items-center gap-2">
             {onOpenReviewModal && (
               <button
@@ -611,23 +664,25 @@ export function LivePropertyInspector({
           </button>
         )}
 
-        <p className="text-[11px] text-center mt-2 flex items-center justify-center gap-1.5">
-          {isFullyVerified ? (
-            <>
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-              <span className="text-slate-600 font-medium">
-                {checklistItems.length}/{checklistItems.length} Attributes Verified • Ready to deploy with Elena Vance
-              </span>
-            </>
-          ) : (
-            <>
-              <Lock className="w-3.5 h-3.5 text-slate-400" />
-              <span className="text-slate-500">
-                Complete {checklistItems.length} verification attributes to deploy ({verifiedCount}/{checklistItems.length} verified)
-              </span>
-            </>
-          )}
-        </p>
+        {!isPublished && (
+          <p className="text-[11px] text-center mt-2 flex items-center justify-center gap-1.5">
+            {isFullyVerified ? (
+              <>
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                <span className="text-slate-600 font-medium">
+                  {checklistItems.length}/{checklistItems.length} Attributes Verified • Ready to deploy with Elena Vance
+                </span>
+              </>
+            ) : (
+              <>
+                <Lock className="w-3.5 h-3.5 text-slate-400" />
+                <span className="text-slate-500">
+                  Complete {checklistItems.length} verification attributes to deploy ({verifiedCount}/{checklistItems.length} verified)
+                </span>
+              </>
+            )}
+          </p>
+        )}
       </div>
     </div>
   );

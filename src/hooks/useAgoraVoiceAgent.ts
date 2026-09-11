@@ -542,16 +542,19 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
       return;
     }
 
-    // Render the pending local message until the remote transcript confirms it
+    // Render the pending local message until remote transcript confirms it (skip synthetic system control cues like [DEPLOY_CONFIRMED])
+    const isSystemCue = trimmed.startsWith("[");
     const localMsgId = `local-text-${Date.now()}`;
-    const localMsg: VoiceMessage = {
-      id: localMsgId,
-      role: "user",
-      text: trimmed,
-      timestamp: formatTimestamp(),
-    };
-    localMessagesRef.current = [...localMessagesRef.current, localMsg];
-    setTranscript([...mappedRemoteRef.current, ...localMessagesRef.current]);
+    if (!isSystemCue) {
+      const localMsg: VoiceMessage = {
+        id: localMsgId,
+        role: "user",
+        text: trimmed,
+        timestamp: formatTimestamp(),
+      };
+      localMessagesRef.current = [...localMessagesRef.current, localMsg];
+      setTranscript([...mappedRemoteRef.current, ...localMessagesRef.current]);
+    }
 
     try {
       const { ChatMessageType, ChatMessagePriority } = await import(
@@ -566,8 +569,10 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
       });
     } catch (sendErr: any) {
       console.error("[Agora Voice Agent] Could not send text message over RTM:", sendErr);
-      localMessagesRef.current = localMessagesRef.current.filter((msg) => msg.id !== localMsgId);
-      setTranscript([...mappedRemoteRef.current, ...localMessagesRef.current]);
+      if (!isSystemCue) {
+        localMessagesRef.current = localMessagesRef.current.filter((msg) => msg.id !== localMsgId);
+        setTranscript([...mappedRemoteRef.current, ...localMessagesRef.current]);
+      }
       setErrorMessage(
         `Failed to deliver message to voice agent: ${sendErr?.message || "RTM communication failure"}`
       );

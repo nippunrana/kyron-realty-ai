@@ -26,7 +26,7 @@ export function mapTranscriptionsToMessages(
 ): VoiceMessage[] {
   return transcriptions
     .map((item: any) => ({ item, text: stripUITags((item.text || "").trim()) }))
-    .filter(({ text }) => text.length > 0)
+    .filter(({ item, text }) => text.length > 0 && !text.startsWith("[") && !(item.text || "").trim().startsWith("["))
     .map(({ item, text }, idx: number) => {
       const fromUser = isUser(item);
       return {

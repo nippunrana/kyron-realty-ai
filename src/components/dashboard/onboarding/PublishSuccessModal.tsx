@@ -6,12 +6,13 @@ import {
   Copy,
   Check,
   Share2,
-  PhoneCall,
   Download,
   Sparkles,
   ShieldCheck,
   X,
   Loader2,
+  ExternalLink,
+  LayoutDashboard,
 } from "lucide-react";
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
 import { ModalMuteButton } from "./ModalMuteButton";
@@ -162,26 +163,35 @@ export function PublishSuccessModal({
             </button>
           </div>
 
-          {/* Primary CTA: Test Voice Call Live */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-            <a
-              href={whatsAppUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-md shadow-emerald-600/20 text-center"
-            >
-              <Share2 className="w-4 h-4" />
-              <span>Share to WhatsApp</span>
-            </a>
-
+          {/* Primary Action Buttons: View Property & Go to Dashboard */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
             <Link
               href={`/listings/${property.slug}`}
               className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-md shadow-blue-600/20 text-center"
             >
-              <PhoneCall className="w-4 h-4" />
-              <span>Test Voice Agent Live</span>
+              <ExternalLink className="w-4 h-4" />
+              <span>View Property</span>
+            </Link>
+
+            <Link
+              href="/dashboard"
+              className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 text-xs font-bold transition-all text-center"
+            >
+              <LayoutDashboard className="w-4 h-4 text-slate-600" />
+              <span>Go to Dashboard</span>
             </Link>
           </div>
+
+          {/* WhatsApp Share CTA */}
+          <a
+            href={whatsAppUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-sm text-center w-full"
+          >
+            <Share2 className="w-4 h-4" />
+            <span>Share to WhatsApp</span>
+          </a>
         </div>
       </div>
     </div>

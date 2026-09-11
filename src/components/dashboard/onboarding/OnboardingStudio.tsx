@@ -237,6 +237,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
   const voiceSessionIdsRef = useRef<Set<number>>(new Set());
   const isDeployClosingRef = useRef(false);
   const deployClosingResolveRef = useRef<(() => void) | null>(null);
+  const deployClosingPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const handlePublishRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const handleVoiceStateSync = useCallback((state: VoiceControlState) => {
     voiceControlRef.current = state;
@@ -335,6 +336,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
   useEffect(
     () => () => {
       if (conductHangupTimerRef.current) clearTimeout(conductHangupTimerRef.current);
+      if (deployClosingPollRef.current) clearInterval(deployClosingPollRef.current);
     },
     []
   );
@@ -498,6 +500,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
     qrCodeSvg: string;
     shareUrl: string;
   } | null>(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const handleUpdateProperty = (updates: Partial<ExtractedPropertyPayload["property"]>) => {
     setData((prev) => ({
@@ -825,10 +828,25 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
       }
 
       if (action === "close_call") {
-        addTelemetryLog("INTENT", "Elena delivered closing sign-off for deployment", null, undefined, "success");
+        addTelemetryLog("INTENT", "Elena delivered closing sign-off tag; playing full closing audio", null, undefined, "success");
         if (deployClosingResolveRef.current) {
-          deployClosingResolveRef.current();
-          deployClosingResolveRef.current = null;
+          if (deployClosingPollRef.current) clearInterval(deployClosingPollRef.current);
+          const startTime = Date.now();
+          deployClosingPollRef.current = setInterval(() => {
+            const elapsed = Date.now() - startTime;
+            const isSpeaking = voiceControlRef.current?.isAgentSpeaking;
+            // Allow Elena's TTS to finish reading her celebratory remarks (~25 words), with a 9s safety backstop
+            if ((elapsed >= 4500 && !isSpeaking) || elapsed >= 9000) {
+              if (deployClosingPollRef.current) {
+                clearInterval(deployClosingPollRef.current);
+                deployClosingPollRef.current = null;
+              }
+              if (deployClosingResolveRef.current) {
+                deployClosingResolveRef.current();
+                deployClosingResolveRef.current = null;
+              }
+            }
+          }, 300);
         }
         return;
       }
@@ -1264,12 +1282,6 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
     if (!slidingWindow || slidingWindow.length === 0) return;
 
     if (isDeployClosingRef.current) {
-      setTimeout(() => {
-        if (deployClosingResolveRef.current) {
-          deployClosingResolveRef.current();
-          deployClosingResolveRef.current = null;
-        }
-      }, 1500);
       return;
     }
 
@@ -1339,6 +1351,15 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
           "success"
         );
 
+        setShowFinalModal(false);
+        setShowUploadModal(false);
+        setPublishedResult({
+          property: json.property,
+          qrCodeSvg: json.qrCodeSvg,
+          shareUrl: json.shareUrl,
+        });
+        setShowSuccessModal(true);
+
         if (voiceControlRef.current?.isCallActive && voiceControlRef.current?.sendTextMessage) {
           try {
             await voiceControlRef.current.sendTextMessage(
@@ -1352,7 +1373,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
                   deployClosingResolveRef.current = null;
                   resolve();
                 }
-              }, 10000);
+              }, 12000);
             });
           } catch (msgErr) {
             console.warn("Deploy confirmation message warning:", msgErr);
@@ -1364,14 +1385,6 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
             console.warn("Call disconnect error on deploy:", endErr);
           }
         }
-
-        setShowFinalModal(false);
-        setShowUploadModal(false);
-        setPublishedResult({
-          property: json.property,
-          qrCodeSvg: json.qrCodeSvg,
-          shareUrl: json.shareUrl,
-        });
       } else {
         const errMsg = json.error || "Failed to publish listing.";
         addTelemetryLog("INTENT", `Deploy failed: ${errMsg}`, null, undefined, "error");
@@ -1541,6 +1554,9 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
             enrichmentError={enrichmentError}
             enrichmentAttempt={enrichmentAttempt}
             maxEnrichmentAttempts={MAX_ENRICHMENT_ATTEMPTS}
+            isPublished={Boolean(publishedResult)}
+            publishedProperty={publishedResult?.property || null}
+            onReopenSuccessModal={() => setShowSuccessModal(true)}
           />
         </div>
         )}
@@ -1627,9 +1643,9 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
       )}
 
       {/* Success Launchpad Modal */}
-      {publishedResult && (
+      {showSuccessModal && publishedResult && (
         <PublishSuccessModal
-          onClose={() => setPublishedResult(null)}
+          onClose={() => setShowSuccessModal(false)}
           property={publishedResult.property}
           qrCodeSvg={publishedResult.qrCodeSvg}
           shareUrl={publishedResult.shareUrl}
