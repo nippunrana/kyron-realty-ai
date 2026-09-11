@@ -106,7 +106,7 @@ export function SessionHistoryDrawer({
       />
 
       {/* Slide-over Drawer Panel */}
-      <div className="fixed inset-y-0 right-0 w-full sm:w-[580px] md:w-[640px] lg:w-[720px] bg-slate-950 text-slate-100 shadow-2xl border-l border-slate-800 flex flex-col z-50 animate-in slide-in-from-right duration-200">
+      <div className="fixed inset-y-0 right-0 w-full sm:w-[620px] md:w-[680px] lg:w-[760px] bg-slate-950 text-slate-100 shadow-2xl border-l border-slate-800 flex flex-col z-50 animate-in slide-in-from-right duration-200">
         {/* Drawer Header */}
         <div className="p-4 sm:p-5 border-b border-slate-800 bg-slate-900/90 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
@@ -230,16 +230,8 @@ export function SessionHistoryDrawer({
           </div>
         )}
 
-        {/* Session Log Table Header */}
-        <div className="grid grid-cols-12 gap-2 px-5 py-2.5 bg-slate-950/80 border-b border-slate-800/80 text-[11px] font-semibold text-slate-400 uppercase tracking-wider shrink-0">
-          <div className="col-span-5">Property / Draft</div>
-          <div className="col-span-3">Call Type</div>
-          <div className="col-span-2 text-right">Duration</div>
-          <div className="col-span-2 text-right">Date</div>
-        </div>
-
         {/* Sessions List */}
-        <div className="flex-1 overflow-y-auto divide-y divide-slate-800/60 p-2 sm:p-4 space-y-1">
+        <div className="flex-1 overflow-y-auto p-3 sm:p-5 space-y-3">
           {filteredSessions.length === 0 ? (
             <div className="h-64 flex flex-col items-center justify-center text-center p-6 text-slate-500">
               <PhoneCall className="w-8 h-8 stroke-[1.5] mb-2 opacity-30 text-slate-400" />
@@ -261,144 +253,179 @@ export function SessionHistoryDrawer({
               return (
                 <div
                   key={sess.id}
-                  className="rounded-xl hover:bg-slate-900/80 transition-colors border border-transparent hover:border-slate-800/80 overflow-hidden"
+                  className="rounded-2xl bg-slate-900/60 hover:bg-slate-900 border border-slate-800/80 hover:border-slate-700/80 p-4 transition-all duration-200 shadow-sm flex flex-col gap-3"
                 >
-                  {/* Main session row */}
-                  <div className="p-3 grid grid-cols-12 gap-2 items-center text-xs">
-                    {/* Col 1: Property / Draft */}
-                    <div className="col-span-5 min-w-0 pr-2">
-                      <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
+                  {/* Card Header Row: Title & Status (Left), Date (Right) */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
                         {sess.propertySlug && !sess.isDraft && !sess.isUnsavedIntake ? (
                           <a
                             href={`${BASE_PATH}/listings/${sess.propertySlug}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="font-semibold text-slate-100 hover:text-blue-400 truncate inline-flex items-center gap-1 group/link transition-colors max-w-full"
+                            className="font-bold text-sm text-slate-100 hover:text-blue-400 transition-colors inline-flex items-center gap-1.5 group/link"
                             title={`Open ${sess.propertyTitle} in new tab`}
                           >
-                            <span className="truncate">{sess.propertyTitle}</span>
-                            <ExternalLink className="w-3 h-3 text-slate-500 group-hover/link:text-blue-400 shrink-0 transition-colors" />
+                            <span className="line-clamp-1">{sess.propertyTitle}</span>
+                            <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover/link:text-blue-400 shrink-0 transition-colors" />
                           </a>
                         ) : (
-                          <span className="font-semibold text-slate-100 truncate block max-w-full">
+                          <span className="font-bold text-sm text-slate-100 line-clamp-1">
                             {sess.propertyTitle}
                           </span>
                         )}
-                      </div>
-                      <div className="flex items-center gap-1.5">
                         {sess.isUnsavedIntake ? (
-                          <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9.5px] font-bold uppercase bg-slate-900 text-slate-400 border border-slate-700/60">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-slate-800 text-slate-400 border border-slate-700/80 shrink-0">
                             Unsaved Intake
                           </span>
                         ) : sess.isDraft ? (
-                          <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9.5px] font-bold uppercase bg-amber-950 text-amber-300 border border-amber-800/40">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-amber-950/80 text-amber-300 border border-amber-800/60 shrink-0">
                             Draft
                           </span>
                         ) : (
-                          <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9.5px] font-bold uppercase bg-emerald-950 text-emerald-300 border border-emerald-800/40">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-950/80 text-emerald-300 border border-emerald-800/60 shrink-0">
                             Published
                           </span>
                         )}
-                        {sess.mapsUsageSummary && (
-                          <span className="inline-flex items-center gap-1 text-[10px] text-amber-300/80 bg-slate-900 px-1.5 py-0.2 rounded border border-slate-800">
-                            <MapPin className="w-2.5 h-2.5 text-amber-400" />
-                            <span>{sess.mapsUsageSummary}</span>
-                          </span>
-                        )}
                       </div>
                     </div>
-
-                    {/* Col 2: Call Type */}
-                    <div className="col-span-3">
-                      <span
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium ${
-                          isOnboarding
-                            ? "bg-purple-950/70 text-purple-300 border border-purple-800/40"
-                            : "bg-blue-950/70 text-blue-300 border border-blue-800/40"
-                        }`}
-                      >
-                        <Sparkles className="w-3 h-3 shrink-0" />
-                        <span>{isOnboarding ? "Owner Intake" : "Buyer Call"}</span>
-                      </span>
-                    </div>
-
-                    {/* Col 3: Duration */}
-                    <div className="col-span-2 text-right font-mono">
-                      <div className="flex items-center justify-end gap-1">
-                        {sess.isAgoraVerified && (
-                          <span
-                            title="Duration verified by Agora Cloud Gateway"
-                            className="inline-flex items-center gap-0.5 px-1 py-0.2 rounded bg-blue-950/80 text-blue-400 border border-blue-800/40 text-[9px] font-sans font-semibold tracking-tight"
-                          >
-                            <CheckCircle2 className="w-2.5 h-2.5 text-blue-400" />
-                            <span>Agora</span>
-                          </span>
-                        )}
-                        <span className="font-bold text-slate-100 block">
-                          {sess.durationFormatted}
-                        </span>
-                      </div>
-                      <span className="text-[10px] text-slate-500 block">
-                        {sess.durationMinutes}m
-                      </span>
-                    </div>
-
-                    {/* Col 4: Date */}
-                    <div className="col-span-2 text-right">
-                      <span className="text-[11px] text-slate-400 block whitespace-nowrap">
+                    <div className="text-right shrink-0">
+                      <span className="text-xs text-slate-400 font-medium whitespace-nowrap">
                         {sess.formattedDate}
                       </span>
                     </div>
                   </div>
 
-                  {/* Cost breakdown strip — always visible */}
+                  {/* Card Meta Row: Call Type, Maps summary, Duration & Agora Verification */}
+                  <div className="flex items-center justify-between gap-2 flex-wrap text-xs pt-1 border-t border-slate-800/40">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {/* Call Type */}
+                      <span
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold ${
+                          isOnboarding
+                            ? "bg-purple-900/40 text-purple-200 border border-purple-700/50"
+                            : "bg-blue-900/40 text-blue-200 border border-blue-700/50"
+                        }`}
+                      >
+                        <Sparkles className="w-3 h-3 shrink-0" />
+                        <span>{isOnboarding ? "Owner Intake" : "Buyer Call"}</span>
+                      </span>
+
+                      {/* Maps / Routes usage summary */}
+                      {sess.mapsUsageSummary && (
+                        <span className="inline-flex items-center gap-1 text-[11px] text-amber-200 bg-amber-900/40 px-2 py-1 rounded-lg border border-amber-700/50">
+                          <MapPin className="w-3 h-3 text-amber-400 shrink-0" />
+                          <span>{sess.mapsUsageSummary}</span>
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Duration & Agora Badge */}
+                    <div className="flex items-center gap-2 font-mono">
+                      {sess.isAgoraVerified && (
+                        <span
+                          title="Duration verified by Agora Cloud Gateway"
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-blue-900/40 text-blue-300 border border-blue-700/50 text-[10px] font-sans font-semibold tracking-tight"
+                        >
+                          <CheckCircle2 className="w-3 h-3 text-blue-400" />
+                          <span>Agora Verified</span>
+                        </span>
+                      )}
+                      <span className="font-bold text-slate-100 text-xs">
+                        {sess.durationFormatted}
+                      </span>
+                      <span className="text-[11px] text-slate-500 font-sans">
+                        ({sess.durationMinutes}m)
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Telemetry & Cost Breakdown: Lighter surface, rich color, crisp typography */}
                   {b && (
-                    <div className="px-3 pb-3 -mt-1">
-                      <div className="flex items-center justify-between gap-2 bg-slate-900/70 rounded-lg px-3 py-2 border border-slate-800/60">
-                        {/* Four micro-chips */}
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          {/* Voice chip */}
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-purple-950/60 text-purple-300 border border-purple-800/40 text-[10px] font-semibold whitespace-nowrap">
-                            <Mic className="w-2.5 h-2.5" />
-                            <span>Voice: {commercialMode ? `$${b.voiceCostUsd.toFixed(3)}` : `$0.00`} ({durationMinutes.toFixed(1)}m)</span>
-                          </span>
-                          {/* Routes chip */}
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-amber-950/60 text-amber-300 border border-amber-800/40 text-[10px] font-semibold whitespace-nowrap">
-                            <Navigation className="w-2.5 h-2.5" />
-                            <span>Routes: {commercialMode ? `$${b.routesCostUsd.toFixed(3)}` : `$0.00`} ({routesElemCount} elem)</span>
-                          </span>
-                          {/* Maps chip */}
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-950/60 text-emerald-300 border border-emerald-800/40 text-[10px] font-semibold whitespace-nowrap">
-                            <Map className="w-2.5 h-2.5" />
-                            <span>Maps: {commercialMode ? `$${b.mapsCostUsd.toFixed(3)}` : `$0.00`} ({groundingQueriesCount} queries)</span>
-                          </span>
-                          {/* AI chip */}
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-indigo-950/60 text-indigo-300 border border-indigo-800/40 text-[10px] font-semibold whitespace-nowrap">
-                            <Bot className="w-2.5 h-2.5" />
-                            <span>AI Engine: {commercialMode ? `$${b.aiCostUsd.toFixed(4)}` : `$0.00`}</span>
-                          </span>
+                    <div className="bg-slate-800/80 rounded-xl p-3 border border-slate-700/70 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                      {/* 4 Telemetry Micro-Pills in a balanced grid */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 flex-1">
+                        {/* Voice chip */}
+                        <div className="px-2.5 py-1.5 rounded-lg bg-purple-500/20 hover:bg-purple-500/25 border border-purple-400/40 text-purple-100 flex items-center gap-2 min-w-0 transition-colors">
+                          <div className="w-6 h-6 rounded-md bg-purple-500/20 border border-purple-400/30 flex items-center justify-center shrink-0">
+                            <Mic className="w-3.5 h-3.5 text-purple-300" />
+                          </div>
+                          <div className="min-w-0 leading-tight">
+                            <p className="text-[10px] text-purple-200 font-semibold tracking-wide">Voice</p>
+                            <p className="text-[11px] font-bold text-white font-mono truncate">
+                              {commercialMode ? `$${b.voiceCostUsd.toFixed(3)}` : `$0.00`}
+                              <span className="text-[9.5px] font-medium text-purple-200/90 ml-1">({durationMinutes.toFixed(1)}m)</span>
+                            </p>
+                          </div>
                         </div>
 
-                        {/* Total call cost */}
-                        <div className="text-right shrink-0 ml-2">
-                          {commercialMode ? (
-                            <>
-                              <p className="text-[11px] font-extrabold text-orange-300 font-mono whitespace-nowrap">
-                                ${b.totalCostUsd.toFixed(3)}
-                              </p>
-                              <p className="text-[9px] text-slate-500">≈ ₹{b.totalCostInr.toFixed(2)}</p>
-                            </>
-                          ) : (
-                            <>
-                              <p className="text-[11px] font-extrabold text-emerald-400 font-mono">
-                                $0.00
-                              </p>
-                              <p className="text-[9px] text-slate-500 whitespace-nowrap">
-                                ${b.totalCostUsd.toFixed(3)} / ₹{b.totalCostInr.toFixed(2)} covered
-                              </p>
-                            </>
-                          )}
+                        {/* Routes chip */}
+                        <div className="px-2.5 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/25 border border-amber-400/40 text-amber-100 flex items-center gap-2 min-w-0 transition-colors">
+                          <div className="w-6 h-6 rounded-md bg-amber-500/20 border border-amber-400/30 flex items-center justify-center shrink-0">
+                            <Navigation className="w-3.5 h-3.5 text-amber-300" />
+                          </div>
+                          <div className="min-w-0 leading-tight">
+                            <p className="text-[10px] text-amber-200 font-semibold tracking-wide">Routes</p>
+                            <p className="text-[11px] font-bold text-white font-mono truncate">
+                              {commercialMode ? `$${b.routesCostUsd.toFixed(3)}` : `$0.00`}
+                              <span className="text-[9.5px] font-medium text-amber-200/90 ml-1">({routesElemCount} elem)</span>
+                            </p>
+                          </div>
                         </div>
+
+                        {/* Maps chip */}
+                        <div className="px-2.5 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/25 border border-emerald-400/40 text-emerald-100 flex items-center gap-2 min-w-0 transition-colors">
+                          <div className="w-6 h-6 rounded-md bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center shrink-0">
+                            <Map className="w-3.5 h-3.5 text-emerald-300" />
+                          </div>
+                          <div className="min-w-0 leading-tight">
+                            <p className="text-[10px] text-emerald-200 font-semibold tracking-wide">Maps</p>
+                            <p className="text-[11px] font-bold text-white font-mono truncate">
+                              {commercialMode ? `$${b.mapsCostUsd.toFixed(3)}` : `$0.00`}
+                              <span className="text-[9.5px] font-medium text-emerald-200/90 ml-1">({groundingQueriesCount} q)</span>
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* AI Engine chip */}
+                        <div className="px-2.5 py-1.5 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/25 border border-indigo-400/40 text-indigo-100 flex items-center gap-2 min-w-0 transition-colors">
+                          <div className="w-6 h-6 rounded-md bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center shrink-0">
+                            <Bot className="w-3.5 h-3.5 text-indigo-300" />
+                          </div>
+                          <div className="min-w-0 leading-tight">
+                            <p className="text-[10px] text-indigo-200 font-semibold tracking-wide">AI Engine</p>
+                            <p className="text-[11px] font-bold text-white font-mono truncate">
+                              {commercialMode ? `$${b.aiCostUsd.toFixed(4)}` : `$0.00`}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Total Spend Badge */}
+                      <div className="sm:border-l sm:border-slate-700/70 sm:pl-3 flex sm:flex-col justify-between items-end shrink-0 text-right">
+                        <span className="text-[10px] uppercase font-semibold text-slate-300 tracking-wider">
+                          {commercialMode ? "Total Spend" : "Free Tier"}
+                        </span>
+                        {commercialMode ? (
+                          <div>
+                            <p className="text-sm font-extrabold text-orange-300 font-mono leading-tight">
+                              ${b.totalCostUsd.toFixed(3)}
+                            </p>
+                            <p className="text-[10px] text-slate-300 font-mono">
+                              ≈ ₹{b.totalCostInr.toFixed(2)}
+                            </p>
+                          </div>
+                        ) : (
+                          <div>
+                            <p className="text-sm font-extrabold text-emerald-400 font-mono leading-tight">
+                              $0.00
+                            </p>
+                            <p className="text-[10px] text-slate-300 font-mono">
+                              ${b.totalCostUsd.toFixed(3)} covered
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
