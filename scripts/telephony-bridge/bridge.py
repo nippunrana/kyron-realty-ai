@@ -32,6 +32,7 @@ from agora.rtc.audio_frame_observer import (
     AudioFrame,
 )
 from agora.rtc.rtc_connection_observer import IRTCConnectionObserver
+from agora.rtc.local_user_observer import IRTCLocalUserObserver
 
 logging.basicConfig(
     level=logging.INFO,
@@ -67,7 +68,7 @@ service_config = AgoraServiceConfig(
     appid=APP_ID,
     area_code=AreaCode.AREA_CODE_GLOB.value,
     channel_profile=ChannelProfileType.CHANNEL_PROFILE_LIVE_BROADCASTING,
-    audio_scenario=AudioScenarioType.AUDIO_SCENARIO_AI_SERVER,
+    audio_scenario=AudioScenarioType.AUDIO_SCENARIO_DEFAULT,
     enable_audio_processor=1,
     enable_audio_device=0,
 )
@@ -94,36 +95,99 @@ def notify_nextjs_event(event_type: str, channel_name: str, property_id: int, st
 
 
 class ChannelAudioObserver(IAudioFrameObserver):
-    """Receives mixed playback audio from Agora channel and feeds it into the WebSocket queue."""
+    """Receives playback audio from Agora channel and feeds it into the WebSocket queue."""
 
     def __init__(self, queue: asyncio.Queue, loop: asyncio.AbstractEventLoop):
         super().__init__()
         self.queue = queue
         self.loop = loop
+        self.playback_count = 0
+        self.before_mixing_count = 0
 
     def on_playback_audio_frame(self, agora_local_user, channel_id, frame: AudioFrame):
         try:
             raw_pcm = bytes(frame.buffer)
             if not raw_pcm:
                 return 1
+
+            self.playback_count += 1
+            if self.playback_count <= 5 or self.playback_count % 250 == 0:
+                logger.info(
+                    f"[Agora -> Twilio Mixed] Frame #{self.playback_count}: "
+                    f"rate={frame.samples_per_sec}, channels={frame.channels}, bytes={len(raw_pcm)}"
+                )
+
+            # Convert to mono if multi-channel
+            if frame.channels > 1:
+                raw_pcm = audioop.tomono(raw_pcm, 2, 0.5, 0.5)
+
+            # Resample to 8000Hz for Twilio if needed
+            if frame.samples_per_sec != 8000:
+                raw_pcm, _ = audioop.ratecv(raw_pcm, 2, 1, frame.samples_per_sec, 8000, None)
+
             # Convert 16-bit linear PCM (8kHz) to 8kHz mu-law
             ulaw_chunk = audioop.lin2ulaw(raw_pcm, 2)
             if not self.queue.full():
                 self.loop.call_soon_threadsafe(self.queue.put_nowait, ulaw_chunk)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Error in on_playback_audio_frame: {e}")
+        return 1
+
+    def on_playback_audio_frame_before_mixing(
+        self, agora_local_user, channel_id, uid, frame: AudioFrame, vad_result_state: int, vad_result_bytearray: bytearray
+    ):
+        try:
+            # If mixed playback frames are already arriving, skip per-user pre-mix frames to prevent duplication
+            if self.playback_count > 0:
+                return 1
+
+            # Ignore audio from ourselves (UID 888)
+            if str(uid) == str(MANAGER_RTC_UID):
+                return 1
+
+            raw_pcm = bytes(frame.buffer)
+            if not raw_pcm:
+                return 1
+
+            self.before_mixing_count += 1
+            if self.before_mixing_count <= 5 or self.before_mixing_count % 250 == 0:
+                logger.info(
+                    f"[Agora -> Twilio Pre-Mix] uid={uid} Frame #{self.before_mixing_count}: "
+                    f"rate={frame.samples_per_sec}, channels={frame.channels}, bytes={len(raw_pcm)}"
+                )
+
+            if frame.channels > 1:
+                raw_pcm = audioop.tomono(raw_pcm, 2, 0.5, 0.5)
+
+            if frame.samples_per_sec != 8000:
+                raw_pcm, _ = audioop.ratecv(raw_pcm, 2, 1, frame.samples_per_sec, 8000, None)
+
+            ulaw_chunk = audioop.lin2ulaw(raw_pcm, 2)
+            if not self.queue.full():
+                self.loop.call_soon_threadsafe(self.queue.put_nowait, ulaw_chunk)
+        except Exception as e:
+            logger.warning(f"Error in on_playback_audio_frame_before_mixing: {e}")
         return 1
 
     def on_get_playback_audio_frame_param(self, agora_local_user) -> AudioParams:
-        # Request 8000Hz mono audio with 160 samples (20ms) per frame to match Twilio exactly
         return AudioParams(sample_rate=8000, channels=1, mode=0, samples_per_call=160)
 
 
 class ChannelConnectionObserver(IRTCConnectionObserver):
     """Monitors Agora connection lifecycle."""
 
+    def __init__(self, rtc_conn=None):
+        super().__init__()
+        self.rtc_conn = rtc_conn
+
     def on_connected(self, agora_rtc_conn, conn_info, reason):
         logger.info(f"[Agora Connection] Successfully joined channel as UID {MANAGER_RTC_UID}")
+        if self.rtc_conn:
+            try:
+                ret = self.rtc_conn.publish_audio()
+                logger.info(f"[Agora Connection] Published audio track on connect (result={ret})")
+            except Exception as e:
+                logger.warning(f"[Agora Connection] Error publishing audio on connect: {e}")
 
     def on_disconnected(self, agora_rtc_conn, conn_info, reason):
         logger.info("[Agora Connection] Disconnected from Agora channel")
@@ -131,9 +195,30 @@ class ChannelConnectionObserver(IRTCConnectionObserver):
     def on_connection_failure(self, agora_rtc_conn, conn_info, reason):
         logger.error(f"[Agora Connection] Connection failed: {reason}")
 
+    def on_aiqos_capability_missing(self, agora_rtc_conn, default_scenario):
+        """Prevents TypeError in Agora SDK capabilities callback."""
+        return -1
+
+
+class ChannelLocalUserObserver(IRTCLocalUserObserver):
+    """Monitors Agora local user audio publishing and remote user subscriptions."""
+
+    def on_audio_track_publish_success(self, agora_local_user, audio_track):
+        logger.info("[Agora LocalUser] Local audio track successfully published to channel!")
+
+    def on_audio_track_publication_failure(self, agora_local_user, audio_track, error):
+        logger.error(f"[Agora LocalUser] Local audio track publish failed: {error}")
+
+    def on_user_audio_track_subscribed(self, agora_local_user, user_id, agora_remote_audio_track):
+        logger.info(f"[Agora LocalUser] Subscribed to remote user audio track: user_id={user_id}")
+
+    def on_first_remote_audio_frame(self, agora_local_user, user_id):
+        logger.info(f"[Agora LocalUser] First remote audio frame received from user_id={user_id}")
+
 
 async def twilio_audio_sender(websocket, stream_sid: str, queue: asyncio.Queue, stop_event: asyncio.Event):
     """Pulls mu-law audio chunks from queue and sends them as Twilio media messages."""
+    sent_count = 0
     try:
         while not stop_event.is_set():
             try:
@@ -147,10 +232,13 @@ async def twilio_audio_sender(websocket, stream_sid: str, queue: asyncio.Queue, 
                     },
                 }
                 await websocket.send(json.dumps(msg))
+                sent_count += 1
+                if sent_count <= 5 or sent_count % 250 == 0:
+                    logger.info(f"[Twilio Sender] Sent {sent_count} audio packets to Twilio (streamSid={stream_sid})")
             except asyncio.TimeoutError:
                 continue
     except Exception as e:
-        logger.info(f"Audio sender ended: {e}")
+        logger.info(f"Twilio audio sender ended: {e}")
 
 
 async def handle_twilio_stream(websocket):
@@ -159,7 +247,7 @@ async def handle_twilio_stream(websocket):
     logger.info(f"New connection from {client_ip} on path {websocket.request.path if hasattr(websocket, 'request') else 'ws'}")
 
     loop = asyncio.get_running_loop()
-    audio_queue = asyncio.Queue(maxsize=100)
+    audio_queue = asyncio.Queue(maxsize=200)
     stop_event = asyncio.Event()
 
     stream_sid = None
@@ -170,6 +258,7 @@ async def handle_twilio_stream(websocket):
 
     rtc_conn = None
     sender_task = None
+    media_in_count = 0
 
     try:
         async for raw_message in websocket:
@@ -205,37 +294,50 @@ async def handle_twilio_stream(websocket):
                     logger.error("Missing channelName or token in stream customParameters!")
                     break
 
-                # 1. Create Agora RTC Connection
+                # 1. Create Agora RTC Connection with audio recording & playout enabled
                 conn_config = RTCConnConfig(
                     client_role_type=ClientRoleType.CLIENT_ROLE_BROADCASTER,
                     channel_profile=ChannelProfileType.CHANNEL_PROFILE_LIVE_BROADCASTING,
                     auto_subscribe_audio=1,
                     auto_subscribe_video=0,
+                    enable_audio_recording_or_playout=1,
                 )
                 pub_config = RtcConnectionPublishConfig(
                     is_publish_audio=True,
                     is_publish_video=False,
+                    audio_scenario=AudioScenarioType.AUDIO_SCENARIO_DEFAULT,
                 )
                 rtc_conn = agora_service.create_rtc_connection(conn_config, pub_config)
 
-                # 2. Register Connection & Audio Observers
-                conn_observer = ChannelConnectionObserver()
+                # 2. Register Connection, LocalUser, and Audio Observers
+                conn_observer = ChannelConnectionObserver(rtc_conn)
                 rtc_conn.register_observer(conn_observer)
+
+                local_user_observer = ChannelLocalUserObserver()
+                rtc_conn.local_user._register_local_user_observer(local_user_observer)
 
                 audio_observer = ChannelAudioObserver(audio_queue, loop)
                 rtc_conn.register_audio_frame_observer(audio_observer, 0, None)
 
-                # 3. Connect to channel as UID 888 and publish audio
-                ret = rtc_conn.connect(token, channel_name, str(MANAGER_RTC_UID))
-                rtc_conn.publish_audio()
-                logger.info(f"Joined Agora channel={channel_name} as UID={MANAGER_RTC_UID} (result={ret})")
+                # 3. Configure audio frame playback format & subscribe to channel audio
+                rtc_conn.local_user.set_playback_audio_frame_parameters(1, 8000, 0, 160)
+                rtc_conn.local_user.set_playback_audio_frame_before_mixing_parameters(1, 8000)
+                rtc_conn.local_user.subscribe_all_audio()
 
-                # 4. Start background sender task to stream Agora audio back to Twilio
+                # 4. Connect to channel as UID 888 and publish audio track
+                ret = rtc_conn.connect(token, channel_name, str(MANAGER_RTC_UID))
+                pub_ret = rtc_conn.publish_audio()
+                logger.info(
+                    f"Joined Agora channel={channel_name} as UID={MANAGER_RTC_UID} "
+                    f"(connect_ret={ret}, pub_ret={pub_ret})"
+                )
+
+                # 5. Start background sender task to stream Agora audio back to Twilio
                 sender_task = asyncio.create_task(
                     twilio_audio_sender(websocket, stream_sid, audio_queue, stop_event)
                 )
 
-                # 5. Notify Next.js server so Sarah announces manager arrival & enters Observer Mode
+                # 6. Notify Next.js server so Sarah announces manager arrival & enters Observer Mode
                 notify_nextjs_event("connected", channel_name, property_id, stream_sid or "", call_sid or "")
 
             elif event == "media":
@@ -247,10 +349,19 @@ async def handle_twilio_stream(websocket):
                             ulaw_bytes = base64.b64decode(payload)
                             # Convert 8kHz mu-law from phone to 16-bit linear PCM (8kHz, 1 channel)
                             pcm_bytes = audioop.ulaw2lin(ulaw_bytes, 2)
-                            # Push into Agora RTC
-                            rtc_conn.push_audio_pcm_data(pcm_bytes, 8000, 1)
+                            # Agora SDK's send_audio_pcm_data calls ctypes.from_buffer which requires
+                            # a mutable buffer (bytearray), otherwise it raises TypeError: buffer is not writable
+                            pcm_buffer = bytearray(pcm_bytes)
+                            ret_push = rtc_conn.push_audio_pcm_data(pcm_buffer, 8000, 1)
+
+                            media_in_count += 1
+                            if media_in_count <= 5 or media_in_count % 250 == 0:
+                                logger.info(
+                                    f"[Twilio -> Agora] Pushed packet #{media_in_count}: "
+                                    f"{len(pcm_buffer)} bytes, ret={ret_push}"
+                                )
                         except Exception as pcm_err:
-                            logger.debug(f"Audio push error: {pcm_err}")
+                            logger.error(f"Audio push error: {pcm_err}")
 
             elif event == "stop":
                 logger.info(f"Twilio stream stop event received: streamSid={stream_sid}")
