@@ -47,6 +47,11 @@ function buildNearbyLines(kbData: NonNullable<PropertyRow["knowledgeBase"]>["kbD
     for (const school of (kbData?.neighborhood?.topSchools || []).slice(0, 3)) {
       lines.push(`School nearby: ${school} (no measured travel time on file)`);
     }
+    // Hospitals belong here for the same reason schools do: `location-value.ts` counts them
+    // either way, so omitting them leaves Sarah told about hospitals she cannot name.
+    for (const hospital of (kbData?.neighborhood?.topHospitals || []).slice(0, 3)) {
+      lines.push(`Hospital nearby: ${hospital} (no measured travel time on file)`);
+    }
   }
 
   return lines.slice(0, 8);

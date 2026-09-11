@@ -193,6 +193,8 @@ ${priceBeat}`
 ${priceBeat}
 Then continue: give them one concrete reason this home is worth their time, drawn from the verified facts above, and move into the conversation.`;
 
+  const locationSection = renderLocation(location);
+
   const journeyText = visits.length
     ? visits.map((v, i) => `${i + 1}. ${v.title}: ${v.notes}`).join("\n")
     : "- This is the first home they have opened on this call.";
@@ -214,7 +216,7 @@ ${section("VERIFIED POLICIES:", `- Pets: ${detail(facts.petPolicy)}
 
 ${section("WHAT IS ACTUALLY NEARBY (measured, use these exact numbers):", facts.nearby.length ? facts.nearby.map((n) => `- ${n}`).join("\n") : "- No measured distances on file. Do not estimate travel times.")}
 ${facts.neighbourhoodVibe ? `- Neighbourhood: ${facts.neighbourhoodVibe}` : ""}
-${renderLocation(location) ? `\n${renderLocation(location)}\n` : ""}
+${locationSection ? `\n${locationSection}\n` : ""}
 
 ${section("VERIFIED FAQS:", faqsText)}
 

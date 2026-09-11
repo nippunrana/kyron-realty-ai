@@ -7,6 +7,30 @@ import { describe, test } from "node:test";
 import { checkPropertyFit, emptyRequirements, type BuyerRequirements, type FitProperty } from "./property-fit.ts";
 import { buildPropertyPrompt, VIEWING_PIVOT_LINE, type PropertyPromptFacts } from "./sarah-property-prompt.ts";
 import { emptyJourney } from "./sales-journey.ts";
+import { summariseLocationValue, emptyLocationValue, type LocationInput } from "./location-value.ts";
+
+/** A metro, two schools and a hospital, all measured and all close: clears the density gate. */
+const DENSE: LocationInput = {
+  measured: [
+    { name: "Sector 21 Metro", category: "transit", walkSeconds: 360 },
+    { name: "DPS Faridabad", category: "school", walkSeconds: 540 },
+    { name: "Modern School", category: "school", walkSeconds: 720 },
+    { name: "Asian Hospital", category: "hospital", driveSeconds: 420 },
+  ],
+  named: { transit: [], school: [], hospital: [] },
+};
+
+/** One measured school and nothing else - real numbers, but no claim about the area. */
+const THIN: LocationInput = {
+  measured: [{ name: "Modern School", category: "school", walkSeconds: 540 }],
+  named: { transit: [], school: [], hospital: [] },
+};
+
+/** Enriched before distances were ever measured: names only. */
+const NAMED_ONLY: LocationInput = {
+  measured: [],
+  named: { transit: ["Sector 21 Metro"], school: ["DPS Faridabad", "Modern School"], hospital: ["Asian Hospital"] },
+};
 
 const HOME: FitProperty = {
   city: "Faridabad",
@@ -45,7 +69,11 @@ const FACTS: PropertyPromptFacts = {
   allowNegotiation: true,
 };
 
-function promptFor(overrides: Partial<BuyerRequirements>, entry: "handover" | "cold" = "handover") {
+function promptFor(
+  overrides: Partial<BuyerRequirements>,
+  entry: "handover" | "cold" = "handover",
+  location: LocationInput = DENSE
+) {
   const requirements = { ...emptyRequirements(), city: "Faridabad", listingType: "rent" as const, bedrooms: 3, ...overrides };
   const fit = checkPropertyFit(requirements, HOME);
   return {
@@ -54,6 +82,7 @@ function promptFor(overrides: Partial<BuyerRequirements>, entry: "handover" | "c
       facts: FACTS,
       requirements,
       fit,
+      location: summariseLocationValue(location),
       visits: emptyJourney().visits,
       searchSummary: "They want a 3 BHK in Faridabad under 50,000.",
       entry,
@@ -114,6 +143,7 @@ describe("the opening beat always states what the home costs", () => {
       facts: { ...FACTS, price: 0 },
       requirements: emptyRequirements(),
       fit: checkPropertyFit(emptyRequirements(), { ...HOME, price: 0 }),
+      location: emptyLocationValue(),
       visits: [],
       searchSummary: "",
       entry: "cold",
@@ -135,6 +165,7 @@ describe("the two ways a caller arrives", () => {
       facts: FACTS,
       requirements: emptyRequirements(),
       fit: checkPropertyFit(emptyRequirements(), HOME),
+      location: emptyLocationValue(),
       visits: [],
       searchSummary: "",
       entry: "cold",
@@ -191,5 +222,69 @@ describe("discovery asks only what is still open", () => {
   test("the open questions are listed in the order the home constrains them", () => {
     const { systemPrompt } = promptFor({});
     assert.match(systemPrompt, /Still unknown, most important first: budget/);
+  });
+});
+
+describe("the location argument she is allowed to make", () => {
+  test("a measured, service-dense address licenses the well-served claim", () => {
+    const { systemPrompt } = promptFor({}, "handover", DENSE);
+    assert.match(systemPrompt, /WHAT THIS ADDRESS MEASURABLY OFFERS - ALREADY COMPUTED, TREAT AS FACT:/);
+    assert.match(systemPrompt, /well-served, established pocket/);
+    assert.match(systemPrompt, /2 schools \(nearest 9 min walk\)/);
+  });
+
+  test("a thin one forbids any claim about the area at all", () => {
+    const { systemPrompt } = promptFor({}, "handover", THIN);
+    assert.match(systemPrompt, /NOT enough to make any claim about the neighbourhood/);
+    assert.doesNotMatch(systemPrompt, /well-served, established pocket/);
+  });
+
+  test("names without measurements forbid every distance", () => {
+    const { systemPrompt } = promptFor({}, "handover", NAMED_ONLY);
+    assert.match(systemPrompt, /You may NOT say how far any of them is/);
+    assert.doesNotMatch(systemPrompt, /well-served, established pocket/);
+    assert.doesNotMatch(systemPrompt, /min walk\)/, "an unmeasured home must carry no travel times");
+  });
+
+  test("no neighbourhood data means no location section at all", () => {
+    const { systemPrompt } = promptFor({}, "handover", { measured: [], named: { transit: [], school: [], hospital: [] } });
+    assert.doesNotMatch(systemPrompt, /WHAT THIS ADDRESS MEASURABLY OFFERS/);
+  });
+});
+
+describe("a price objection is answered with value before it is answered with a number", () => {
+  const { systemPrompt } = promptFor({ budgetMax: 46000 });
+
+  test("the reframe comes first, and the unstated budget is captured", () => {
+    assert.match(systemPrompt, /WHEN THEY SAY THE PRICE IS TOO HIGH:/);
+    assert.match(systemPrompt, /the first answer is never a number/);
+    assert.match(systemPrompt, /If they have not named a figure yet, reframe first and then ask what they had in mind/);
+  });
+
+  test("but never on a hard miss, where the honest answer is to stop selling", () => {
+    assert.match(systemPrompt, /EXCEPTION - if the verdict is HARD, do none of this/);
+  });
+
+  test("status adjectives are banned: service density does not prove them", () => {
+    assert.match(systemPrompt, /Never call a location posh, prime, premium, upmarket or luxury/);
+  });
+});
+
+describe("she answers the feeling, not only the question", () => {
+  const { systemPrompt } = promptFor({ budgetMax: 50000 });
+
+  test("what they said is reflected once, then attached to a measured fact", () => {
+    assert.match(systemPrompt, /LISTEN FOR WHAT THIS MOVE ACTUALLY MEANS TO THEM:/);
+    assert.match(systemPrompt, /say back the one thing you heard in a single short clause/);
+    assert.match(systemPrompt, /Say it once, then move to the fact/);
+  });
+
+  test("a feeling they did not express is never put in their mouth", () => {
+    assert.match(systemPrompt, /Never tell a caller how they feel, never invent a worry they have not voiced/);
+  });
+
+  test("a nearby service is never sold through the misfortune it would soften", () => {
+    assert.match(systemPrompt, /never an accident, never an emergency, never someone falling ill/);
+    assert.match(systemPrompt, /what it gives them, never as what it would rescue them from/);
   });
 });
