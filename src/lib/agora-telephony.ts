@@ -1,14 +1,15 @@
 /**
- * Telephony orchestration service for Sarah's Three-Way Owner/Manager Call feature.
+ * Kyron Realty AI — Agora Real-Time Telephony Bridge
  * Connects Twilio PSTN outbound dialing (+91 Indian numbers) with Agora SD-RTN channels.
+ * Facilitates 3-way conference bridging between prospect and property manager.
  */
 import { db } from "@/db";
-import { properties, users, inquiriesAndLeads } from "@/db/schema";
+import { properties, inquiriesAndLeads, users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { BASE_PATH } from "@/lib/base-path";
 import { generateAgoraRtcToken, getAgoraAppId } from "@/lib/agora-token";
 
-export const MANAGER_RTC_UID = 888;
+export const MANAGER_RTC_UID = 888; // Reserved RTC UID for the dialed property manager
 
 export interface ManagerCallSession {
   callSid: string;
@@ -65,14 +66,17 @@ export interface DialManagerResult {
 }
 
 /**
- * Resolves the property manager's phone number and initiates an outbound screening call.
- * The manager's phone number is NEVER returned to the client or leaked in logs.
+ * Initiates an outbound whisper IVR call to the property manager.
+ * If credentials are missing, gracefully falls back to simulation mode.
  */
-export async function dialPropertyManager(params: DialManagerParams): Promise<DialManagerResult> {
+export async function dialPropertyManager(
+  params: DialManagerParams
+): Promise<DialManagerResult> {
   pruneStaleCalls();
+
   const { propertyId, channelName, prospectName, hostUrl } = params;
 
-  // 1. Fetch property and owner details from PostgreSQL
+  // 1. Fetch property details and manager contact
   const [property] = await db
     .select({
       id: properties.id,
@@ -138,7 +142,10 @@ export async function dialPropertyManager(params: DialManagerParams): Promise<Di
   // 2. Dispatch Twilio Voice Outbound Call via standard REST API
   try {
     const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Calls.json`;
-    const cleanHost = hostUrl.replace(/\/+$/, "");
+    let cleanHost = hostUrl.replace(/\/+$/, "");
+    if (BASE_PATH && cleanHost.endsWith(BASE_PATH)) {
+      cleanHost = cleanHost.slice(0, -BASE_PATH.length);
+    }
     const gatherActionUrl = `${cleanHost}${BASE_PATH}/api/agora/telephony/webhook?action=gather&propertyId=${propertyId}&channelName=${encodeURIComponent(channelName)}&prospectName=${encodeURIComponent(prospectName || "a prospect")}`;
     const statusWebhook = `${cleanHost}${BASE_PATH}/api/agora/telephony/webhook?action=status&channelName=${encodeURIComponent(channelName)}&propertyId=${propertyId}`;
 
@@ -146,9 +153,13 @@ export async function dialPropertyManager(params: DialManagerParams): Promise<Di
       To: formattedPhone,
       From: fromNumber,
       Twiml: generateWhisperTwiML(property.title, prospectName || "a prospect", gatherActionUrl),
-      StatusCallback: statusWebhook,
-      StatusCallbackMethod: "POST",
     });
+
+    // Twilio blocks StatusCallback to localhost; only set if it's a public URL
+    if (cleanHost.startsWith("https://") && !cleanHost.includes("localhost")) {
+      bodyParams.set("StatusCallback", statusWebhook);
+      bodyParams.set("StatusCallbackMethod", "POST");
+    }
 
     const basicAuth = Buffer.from(`${accountSid}:${authToken}`).toString("base64");
     const response = await fetch(twilioUrl, {
@@ -217,19 +228,46 @@ export function updateManagerCallSession(
   }
 }
 
+/** Escapes special characters for safe XML/TwiML attribute and text inclusion */
+export function escapeXml(unsafe: string): string {
+  return (unsafe || "").replace(/[<>&'"]/g, (c) => {
+    switch (c) {
+      case "<":
+        return "&lt;";
+      case ">":
+        return "&gt;";
+      case "&":
+        return "&amp;";
+      case "'":
+        return "&apos;";
+      case '"':
+        return "&quot;";
+      default:
+        return c;
+    }
+  });
+}
+
 /**
  * Generates TwiML for the private screening whisper.
  */
 export function generateWhisperTwiML(
   propertyTitle: string,
   prospectName: string,
-  gatherActionUrl: string
+  gatherActionUrl?: string
 ): string {
-  const caller = prospectName && prospectName !== "a prospect" ? prospectName : "a prospective tenant";
+  const caller = escapeXml(
+    prospectName && prospectName !== "a prospect" ? prospectName : "a prospective tenant"
+  );
+  const title = escapeXml(propertyTitle);
+  const actionAttr = gatherActionUrl
+    ? ` action="${escapeXml(gatherActionUrl)}" method="POST"`
+    : "";
+
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Gather numDigits="1" timeout="10" action="${gatherActionUrl}" method="POST">
-    <Say voice="Polly.Aditi">Hello, this is Kyron Realty AI. A verified prospect, ${caller}, is currently on our website exploring ${propertyTitle} and would like to speak with you directly. Press 1 on your keypad to join the live call now, or press 2 if you are currently occupied.</Say>
+  <Gather numDigits="1" timeout="10"${actionAttr}>
+    <Say voice="Polly.Aditi">Hello, this is Kyron Realty AI. A verified prospect, ${caller}, is currently on our website exploring ${title} and would like to speak with you directly. Press 1 on your keypad to join the live call now, or press 2 if you are currently occupied.</Say>
   </Gather>
   <Say voice="Polly.Aditi">We did not receive any input. We will log this inquiry for your follow-up. Goodbye.</Say>
   <Hangup/>
@@ -277,7 +315,7 @@ export async function handleWhisperInput(
 <Response>
   <Say voice="Polly.Aditi">Connecting you to the live call now. Please go ahead.</Say>
   <Dial>
-    <Sip>${sipUri}</Sip>
+    <Sip>${escapeXml(sipUri)}</Sip>
   </Dial>
 </Response>`;
 

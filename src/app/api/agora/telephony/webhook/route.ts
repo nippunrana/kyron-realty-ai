@@ -31,8 +31,11 @@ async function handleWebhook(req: NextRequest) {
     if (action === "whisper") {
       const proto = req.headers.get("x-forwarded-proto") || "https";
       const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || "localhost:3000";
-      const hostUrl = process.env.NEXTAUTH_URL || `${proto}://${host}`;
-      const cleanHost = hostUrl.replace(/\/+$/, "");
+      const hostUrl = process.env.TWILIO_WEBHOOK_BASE_URL || process.env.NEXTAUTH_URL || `${proto}://${host}`;
+      let cleanHost = hostUrl.replace(/\/+$/, "");
+      if (BASE_PATH && cleanHost.endsWith(BASE_PATH)) {
+        cleanHost = cleanHost.slice(0, -BASE_PATH.length);
+      }
 
       let propertyTitle = "the property";
       if (propertyId > 0) {
