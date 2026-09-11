@@ -66,3 +66,16 @@
 .animate-wave-bar {
   animation: wave-bounce 1.1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
+
+@keyframes indeterminate-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(350%);
+  }
+}
+
+.animate-indeterminate-shimmer {
+  animation: indeterminate-shimmer 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}

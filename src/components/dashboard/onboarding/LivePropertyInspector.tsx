@@ -52,7 +52,7 @@ interface LivePropertyInspectorProps {
   /** Re-opens the confirmed core specs from a later stage. */
   onOpenCoreModal?: () => void;
   isPublishing: boolean;
-  isExtracting: boolean;
+  isExtracting?: boolean;
   isTurnSyncing?: boolean;
   /** Stage 4.5 background Google Maps research, surfaced live above Additional Specs. */
   isEnrichingLocation?: boolean;
@@ -80,7 +80,7 @@ export function LivePropertyInspector({
   onOpenReviewModal,
   onOpenCoreModal,
   isPublishing,
-  isExtracting,
+  isExtracting = false,
   isTurnSyncing = false,
   isEnrichingLocation = false,
   hyperLocalData = null,
@@ -208,25 +208,12 @@ export function LivePropertyInspector({
       (knowledgeBase.faqs && knowledgeBase.faqs.length > 0)
   );
 
+  const isSyncing = Boolean(isTurnSyncing || isExtracting);
+
   return (
     <div className="flex flex-col h-full min-h-0 bg-white rounded-3xl border border-slate-200/90 shadow-xl shadow-slate-200/40 overflow-hidden relative text-slate-900">
-      {/* Extraction Overlay Spinner if AI is parsing */}
-      {isExtracting && (
-        <div className="absolute inset-0 z-30 bg-white/80 backdrop-blur-xs flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-200">
-          <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 mb-3 animate-bounce">
-            <Sparkles className="w-6 h-6 animate-spin" />
-          </div>
-          <h4 className="text-sm font-bold text-slate-900">
-            Synthesizing Property Intelligence...
-          </h4>
-          <p className="text-xs text-slate-500 mt-1 max-w-xs">
-            Extracting core specs, voice sales pitch, and guardrails
-          </p>
-        </div>
-      )}
-
       {/* Top Header Bar */}
-      <div className="px-5 py-3.5 border-b border-slate-100 bg-slate-50/70 flex items-center justify-between shrink-0">
+      <div className="px-5 py-3.5 border-b border-slate-100 bg-slate-50/70 flex items-center justify-between shrink-0 relative">
         <div className="flex items-center gap-2">
           <div
             className={`w-2.5 h-2.5 rounded-full ${
@@ -243,7 +230,7 @@ export function LivePropertyInspector({
         </div>
 
         <div className="flex items-center gap-2">
-          {isTurnSyncing && (
+          {isSyncing && (
             <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-[11px] font-semibold text-blue-700 animate-pulse">
               <Sparkles className="w-3 h-3 text-blue-600 animate-spin" />
               <span>Syncing specs...</span>
@@ -289,6 +276,13 @@ export function LivePropertyInspector({
             </div>
           )}
         </div>
+
+        {/* Subtle Hairline Indeterminate Extraction Shimmer Line */}
+        {isSyncing && (
+          <div className="absolute bottom-0 inset-x-0 h-[2px] overflow-hidden bg-slate-100">
+            <div className="h-full w-1/3 bg-gradient-to-r from-transparent via-blue-500 to-transparent animate-indeterminate-shimmer rounded-full" />
+          </div>
+        )}
       </div>
 
       {/* Main Scrollable Inspector Body */}

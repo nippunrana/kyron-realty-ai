@@ -1547,7 +1547,6 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
               }
             }}
             isPublishing={isPublishing}
-            isExtracting={isTurnSyncing}
             isTurnSyncing={isTurnSyncing}
             isEnrichingLocation={isEnrichingLocation}
             hyperLocalData={hyperLocalData}
