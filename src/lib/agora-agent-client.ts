@@ -409,7 +409,7 @@ ${contactEmail ? `5. If asked for direct owner or leasing office contact, provid
               mode: "vad",
               vad_config: {
                 interrupt_duration_ms: 160,
-                speaking_interrupt_duration_ms: 800,
+                speaking_interrupt_duration_ms: callerType === "sales_agent" ? 650 : 800,
                 prefix_padding_ms: 300,
               },
             },

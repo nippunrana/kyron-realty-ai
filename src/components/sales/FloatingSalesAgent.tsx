@@ -88,6 +88,8 @@ export function FloatingSalesAgent() {
   const [availableCities, setAvailableCities] = useState<string[]>([]);
   const processedSearchTurnsRef = useRef<Set<string>>(new Set());
   const triggerSearchRef = useRef<((params: PropertySearchParams) => Promise<void>) | null>(null);
+  const pendingSearchCueRef = useRef<string | null>(null);
+  const prevIsAgentSpeakingRef = useRef<boolean>(false);
 
   const {
     callState,
@@ -203,7 +205,12 @@ export function FloatingSalesAgent() {
                 .slice(0, 2)
                 .join(", ");
               const cue = `[SEARCH_RESULT:city=${city || ""},count=${count},titles=${titles}]`;
-              sendTextMessage(cue);
+              if (isAgentSpeaking) {
+                // Agent is actively speaking her initial sentence - queue cue until she finishes speaking
+                pendingSearchCueRef.current = cue;
+              } else {
+                sendTextMessage(cue);
+              }
             }
           }
         }
@@ -213,8 +220,32 @@ export function FloatingSalesAgent() {
         setIsSearchingProperties(false);
       }
     },
-    [transcript, isCallActive, sendTextMessage]
+    [transcript, isCallActive, sendTextMessage, isAgentSpeaking]
   );
+
+  // Dispatch queued search result cue only AFTER Sarah finishes speaking her initial turn
+  useEffect(() => {
+    // Detect speaking transition from true -> false
+    if (prevIsAgentSpeakingRef.current && !isAgentSpeaking) {
+      if (pendingSearchCueRef.current && isCallActive) {
+        const cue = pendingSearchCueRef.current;
+        pendingSearchCueRef.current = null;
+        // 250ms buffer after speech ends so Agora gateway cleanly finishes TTS playback before receiving the cue
+        const timer = setTimeout(() => {
+          sendTextMessage(cue);
+        }, 250);
+        return () => clearTimeout(timer);
+      }
+    }
+    prevIsAgentSpeakingRef.current = isAgentSpeaking;
+  }, [isAgentSpeaking, isCallActive, sendTextMessage]);
+
+  // Clean up pending cues on call termination
+  useEffect(() => {
+    if (!isCallActive) {
+      pendingSearchCueRef.current = null;
+    }
+  }, [isCallActive]);
 
   useEffect(() => {
     triggerSearchRef.current = executePropertySearch;
@@ -429,11 +460,11 @@ export function FloatingSalesAgent() {
       )}
 
       {/* ========================================================================= */}
-      {/* 50% BLACK FOCUS OVERLAY (Click-barrier behind active search & chat pod)   */}
+      {/* 75% BLACK FOCUS OVERLAY (Click-barrier behind active search & chat pod)   */}
       {/* ========================================================================= */}
       <div
         aria-hidden="true"
-        className={`fixed inset-0 bg-black/50 z-30 transition-opacity duration-300 pointer-events-auto ${
+        className={`fixed inset-0 bg-black/75 z-30 transition-opacity duration-300 pointer-events-auto ${
           isSearchHubOpen ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
       />
