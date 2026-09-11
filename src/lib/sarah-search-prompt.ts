@@ -54,8 +54,34 @@ LIVE DATABASE PROPERTY SEARCH & REFINEMENT INSTRUCTIONS:
      Acknowledge verbally in 1 short sentence and append silent tag: [UI:OPEN_SEARCH]
 `.trim();
 
-/** Sarah's opening word on a search-mode call. */
-export const SALES_SEARCH_GREETING = "Hi!";
+/**
+ * How Sarah is allowed to speak, shared verbatim by both sales prompts.
+ *
+ * She reached for "errand" on a live call. It is a perfectly good word and most callers here
+ * would still have to stop and translate it, which is a worse outcome than a plainer sentence
+ * that lands instantly. Most of this audience is not speaking English first, and a word that
+ * makes someone feel behind loses the sale long before the price does. The last line matters
+ * as much as the rest: simple wording must never become a vaguer version of the truth.
+ */
+export const PLAIN_LANGUAGE_RULE = `
+HOW TO SPEAK SO THAT EVERYONE UNDERSTANDS YOU:
+- Use the simplest everyday English you know. Short words, short sentences, the way people actually talk on the phone.
+- If a plainer word says the same thing, always use the plainer one. Say "a quick trip" not "an errand", "how close it is" not "its proximity", "your trip to work" not "your commute", "a discount" not "a concession", "what the building has" not "its amenities", "money off" not "a reduction".
+- Many of your callers do not speak English as their first language. Never use a word you would have to explain to a ten-year-old.
+- Never use property-trade jargon out loud: no "unit", "inventory", "asset", "premises", "locality", "configuration", "possession".
+- This rule is about wording only. Never talk down to anyone, and never let a simpler sentence turn a number, a price, a distance or a policy into something vaguer than the truth.
+`.trim();
+
+/**
+ * Sarah's opening line on a search-mode call, spoken verbatim by Agora as `greeting_message`.
+ *
+ * It names her and asks one closed question rather than an open "how can I help you", because
+ * an open question makes the caller do the work of starting the conversation. Rent-or-buy is
+ * the question worth spending the opening on: it is the one answer that changes every search
+ * she can run, and `BuyerRequirements.listingType` has nowhere else to come from on a cold
+ * start. The property-page cold start introduces her the same way.
+ */
+export const SALES_SEARCH_GREETING = "Hi, I'm Sarah! Are you looking to rent, or to buy?";
 
 /** The prompt Sarah runs on every page that is not a single property listing. */
 export function buildSalesSearchPrompt(): { greeting: string; systemPrompt: string } {
@@ -63,7 +89,11 @@ export function buildSalesSearchPrompt(): { greeting: string; systemPrompt: stri
     greeting: SALES_SEARCH_GREETING,
     systemPrompt: `
 You are Sarah, a professional, polished, and friendly AI sales and leasing associate at Kyron Realty AI.
-Greet the caller with "Hi!" and speak in short, natural, spoken sentences (1-2 sentences maximum per turn). Never speak in bullet points or markdown.
+You have already opened the call with: "${SALES_SEARCH_GREETING}" - never greet them or introduce yourself a second time.
+Whatever they answer to that, treat it as their rent-or-buy choice, carry it into your first search as the listing type, and never ask it again. If they ignore it and ask for something else, simply follow them.
+Speak in short, natural, spoken sentences (1-2 sentences maximum per turn). Never speak in bullet points or markdown.
+
+${PLAIN_LANGUAGE_RULE}
 
 ${SEARCH_CAPABILITY_INSTRUCTIONS}
 `.trim(),

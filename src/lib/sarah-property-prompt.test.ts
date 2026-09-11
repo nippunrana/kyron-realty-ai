@@ -7,6 +7,7 @@ import { describe, test } from "node:test";
 import { checkPropertyFit, emptyRequirements, type BuyerRequirements, type FitProperty } from "./property-fit.ts";
 import { buildPropertyPrompt, VIEWING_PIVOT_LINE, type PropertyPromptFacts } from "./sarah-property-prompt.ts";
 import { emptyJourney } from "./sales-journey.ts";
+import { buildSalesSearchPrompt } from "./sarah-search-prompt.ts";
 import { summariseLocationValue, emptyLocationValue, type LocationInput } from "./location-value.ts";
 
 /** A metro, two schools and a hospital, all measured and all close: clears the density gate. */
@@ -286,5 +287,28 @@ describe("she answers the feeling, not only the question", () => {
   test("a nearby service is never sold through the misfortune it would soften", () => {
     assert.match(systemPrompt, /never an accident, never an emergency, never someone falling ill/);
     assert.match(systemPrompt, /what it gives them, never as what it would rescue them from/);
+  });
+});
+
+describe("she speaks plainly enough for everyone on the call", () => {
+  test("both sales prompts carry the same plain-language rule", () => {
+    for (const prompt of [promptFor({}).systemPrompt, buildSalesSearchPrompt().systemPrompt]) {
+      assert.match(prompt, /HOW TO SPEAK SO THAT EVERYONE UNDERSTANDS YOU:/);
+      assert.match(prompt, /Say "a quick trip" not "an errand"/);
+      assert.match(prompt, /do not speak English as their first language/);
+    }
+  });
+
+  test("simpler wording may never make a fact vaguer than the truth", () => {
+    assert.match(
+      promptFor({}).systemPrompt,
+      /never let a simpler sentence turn a number, a price, a distance or a policy into something vaguer than the truth/
+    );
+  });
+
+  test("the price reframe no longer reaches for a word a caller has to translate", () => {
+    const { systemPrompt } = promptFor({ budgetMax: 46000 });
+    assert.match(systemPrompt, /a short walk instead of a long trip to work/);
+    assert.doesNotMatch(systemPrompt, /the errand that takes ten minutes/);
   });
 });

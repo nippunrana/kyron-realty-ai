@@ -256,6 +256,19 @@ export function FloatingSalesAgent() {
 
   const executePropertySearch = useCallback(
     async (params: PropertySearchParams) => {
+      // No city means no search, and no search means the hub stays shut.
+      //
+      // The caller's first sentence is usually "I'm looking for a place to rent", which the
+      // user-speech fast-path reads as a refinement because it contains the word "rent" -
+      // but there is nothing yet to refine. Searching on it queries every city at once,
+      // returns nothing, and drops an empty "No matching listings found" panel over the page
+      // while Sarah is still asking which city they want. The guard sits here rather than in
+      // the fast-path because Sarah's own [SEARCH:] tag can arrive city-less too, and one
+      // choke point is the only way that invariant actually holds. `reset=all` is the single
+      // exception: clearing the city is the point of it.
+      const activeCity = activeSearchCriteriaRef.current.city;
+      if (!params.city && !activeCity && params.reset !== "all") return;
+
       setIsSearchingProperties(true);
       setIsSearchHubOpen(true);
       setMobileTab("search");
