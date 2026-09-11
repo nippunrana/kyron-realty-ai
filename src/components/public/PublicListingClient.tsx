@@ -17,6 +17,7 @@ import {
   CheckCircle2,
   HelpCircle,
   Clock,
+  Camera,
 } from "lucide-react";
 import { VoiceSalesAgentModal } from "@/components/voice/VoiceSalesAgentModal";
 import { TourBookingForm } from "./TourBookingForm";
@@ -45,6 +46,7 @@ export function PublicListingClient({
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const [failedImageUrls, setFailedImageUrls] = useState<Record<string, boolean>>({});
   const { copied, copy: copyShareUrl } = useCopyToClipboard();
 
   // Booking Form State
@@ -169,12 +171,25 @@ export function PublicListingClient({
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5">
             {/* Primary Hero Image (8 cols) */}
             <div className="lg:col-span-8 relative aspect-16/10 rounded-3xl overflow-hidden bg-slate-900 shadow-md border border-slate-200/80">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={currentHeroImage}
-                alt={property.title}
-                className="w-full h-full object-cover transition-transform duration-500 hover:scale-102"
-              />
+              {failedImageUrls[currentHeroImage] ? (
+                <div className="w-full h-full bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col items-center justify-center p-6 text-center select-none">
+                  <div className="w-16 h-16 rounded-3xl bg-white/10 backdrop-blur-md border border-white/15 flex items-center justify-center text-slate-300 mb-3 shadow-inner">
+                    <Camera className="w-8 h-8 text-slate-300" />
+                  </div>
+                  <p className="text-base sm:text-lg font-bold text-white max-w-sm mb-1 line-clamp-1">
+                    {property.title}
+                  </p>
+                  <span className="text-xs text-slate-400 font-medium">Photo Preview Pending</span>
+                </div>
+              ) : (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={currentHeroImage}
+                  alt={property.title}
+                  onError={() => setFailedImageUrls((prev) => ({ ...prev, [currentHeroImage]: true }))}
+                  className="w-full h-full object-cover transition-transform duration-500 hover:scale-102"
+                />
+              )}
               <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-black/15 pointer-events-none" />
 
               {/* Floating Top Badges */}
@@ -228,8 +243,20 @@ export function PublicListingClient({
                       : "border-slate-200/80 opacity-70 hover:opacity-100"
                   }`}
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={img} alt="" className="w-full h-full object-cover" />
+                  {failedImageUrls[img] ? (
+                    <div className="w-full h-full bg-gradient-to-br from-slate-900 to-slate-800 flex flex-col items-center justify-center text-slate-400 p-2">
+                      <Camera className="w-5 h-5 opacity-60 mb-1" />
+                      <span className="text-[10px] text-slate-500 font-medium">Photo {idx + 1}</span>
+                    </div>
+                  ) : (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={img}
+                      alt=""
+                      onError={() => setFailedImageUrls((prev) => ({ ...prev, [img]: true }))}
+                      className="w-full h-full object-cover"
+                    />
+                  )}
                 </button>
               ))}
             </div>

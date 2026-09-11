@@ -6,6 +6,7 @@ import { eq, and } from "drizzle-orm";
 import { unlink } from "node:fs/promises";
 import path from "node:path";
 import { BASE_PATH } from "@/lib/base-path";
+import { getUploadsDir } from "@/lib/storage";
 
 import QRCode from "qrcode";
 
@@ -163,7 +164,7 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
       const uploadPrefix = `${BASE_PATH}/uploads/properties/${draftId}/`;
       if (imageUrl.startsWith(uploadPrefix)) {
         const filename = path.basename(imageUrl.slice(uploadPrefix.length));
-        const filePath = path.join(process.cwd(), "public", "uploads", "properties", String(draftId), filename);
+        const filePath = getUploadsDir("properties", String(draftId), filename);
         await unlink(filePath).catch(() => {});
       }
     } catch {

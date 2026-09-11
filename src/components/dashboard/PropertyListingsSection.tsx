@@ -18,6 +18,7 @@ import {
   Search,
   X,
   SlidersHorizontal,
+  Camera,
 } from "lucide-react";
 import { DeletePropertyModal } from "./DeletePropertyModal";
 import { BASE_PATH } from "@/lib/base-path";
@@ -52,6 +53,7 @@ export function PropertyListingsSection({ initialProperties }: PropertyListingsS
   const [propertyToDelete, setPropertyToDelete] = useState<ListingCardItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [failedImages, setFailedImages] = useState<Record<number, boolean>>({});
 
   const publishedItems = items.filter((item) => item.status !== "draft");
   const draftItems = items.filter((item) => item.status === "draft");
@@ -333,13 +335,26 @@ export function PropertyListingsSection({ initialProperties }: PropertyListingsS
                 <div>
                   {/* Photo Thumbnail */}
                   <div className="relative aspect-16/10 bg-slate-900 overflow-hidden">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={coverImage}
-                      alt={prop.title}
-                      className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-300"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-black/20" />
+                    {failedImages[prop.id] ? (
+                      <div className="w-full h-full bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col items-center justify-center p-4 text-center select-none">
+                        <div className="w-11 h-11 rounded-2xl bg-white/10 backdrop-blur-md border border-white/15 flex items-center justify-center text-slate-300 mb-2 shadow-inner">
+                          <Camera className="w-5 h-5 text-slate-300" />
+                        </div>
+                        <p className="text-xs font-bold text-white line-clamp-1 max-w-[220px]">
+                          {prop.title || "Property Photo"}
+                        </p>
+                        <span className="text-[10px] text-slate-400 mt-0.5 font-medium">Photo Preview Pending</span>
+                      </div>
+                    ) : (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={coverImage}
+                        alt={prop.title}
+                        onError={() => setFailedImages((prev) => ({ ...prev, [prop.id]: true }))}
+                        className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-300"
+                      />
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-black/20 pointer-events-none" />
 
                     {/* Top Badges */}
                     <div className="absolute top-3 left-3 flex items-center gap-1.5">

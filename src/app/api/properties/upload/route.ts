@@ -3,10 +3,11 @@ import { auth } from "@/auth";
 import { db } from "@/db";
 import { properties, propertyMedia } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { writeFile, mkdir } from "node:fs/promises";
+import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
 import { BASE_PATH } from "@/lib/base-path";
+import { ensureUploadsDir } from "@/lib/storage";
 
 const ALLOWED_MIME_TYPES = new Set([
   "image/jpeg",
@@ -83,8 +84,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const uploadDir = path.join(process.cwd(), "public", "uploads", "properties", String(draftId));
-    await mkdir(uploadDir, { recursive: true });
+    const uploadDir = await ensureUploadsDir("properties", String(draftId));
 
     const newImageUrls: string[] = [];
     const mediaRecordsToInsert: Array<{

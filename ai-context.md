@@ -50,6 +50,7 @@ The application runs under the subpath prefix **`/projects/kyron-realty-ai`**:
 - **Client-side Fetch Calls**: Must explicitly prepend `BASE_PATH` imported from `@/lib/base-path` (e.g. `fetch(`${BASE_PATH}/api/auth/status`)`).
 - **Static Assets & Next/Image**: Static assets in `public/images/` must be referenced using `${BASE_PATH}/images/filename.jpg` with `unoptimized={true}` on `<Image />` to prevent Next.js image optimizer 400 path mismatches.
 - **NextAuth Callbacks**: Redirect URLs must specify `${BASE_PATH}/` (e.g. callbackUrl: `/projects/kyron-realty-ai/`).
+- **Persistent Upload Storage**: All uploaded property files must resolve through `@/lib/storage` (`getUploadsDir()`), which resolves to root `public/uploads/` outside `.next/`. **Never** use raw `process.cwd()` for file uploads — Next.js standalone runs `process.chdir(__dirname)` into `.next/standalone`, which is wiped clean on every `next build`.
 
 ---
 

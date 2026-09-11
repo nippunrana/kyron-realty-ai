@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { getUploadsDir } from "@/lib/storage";
 
 const MIME_TYPES: Record<string, string> = {
   ".jpg": "image/jpeg",
@@ -20,7 +21,7 @@ export async function GET(
     const safeFilename = path.basename(filename);
     const safeId = path.basename(id);
 
-    const filePath = path.join(process.cwd(), "public", "uploads", "properties", safeId, safeFilename);
+    const filePath = getUploadsDir("properties", safeId, safeFilename);
     const ext = path.extname(safeFilename).toLowerCase();
     const contentType = MIME_TYPES[ext] || "application/octet-stream";
 

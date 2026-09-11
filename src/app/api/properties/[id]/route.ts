@@ -7,8 +7,8 @@ import {
   propertyMedia,
 } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import path from "path";
 import fs from "fs";
+import { getUploadsDir } from "@/lib/storage";
 
 export async function GET(
   _req: NextRequest,
@@ -102,7 +102,7 @@ export async function DELETE(
 
     // 3. Remove physical upload assets from public/uploads/properties/[id] if present
     try {
-      const uploadDir = path.join(process.cwd(), "public", "uploads", "properties", String(propertyId));
+      const uploadDir = getUploadsDir("properties", String(propertyId));
       if (fs.existsSync(uploadDir)) {
         await fs.promises.rm(uploadDir, { recursive: true, force: true });
       }

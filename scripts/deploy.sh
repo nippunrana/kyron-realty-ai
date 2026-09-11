@@ -21,12 +21,20 @@ npx drizzle-kit migrate
 echo "🏗️ Building Next.js application..."
 npm run build
 
+echo "📂 Ensuring persistent upload storage..."
+mkdir -p "$PROJECT_DIR/public/uploads/properties"
+
 echo "📂 Copying public and static assets to standalone directory..."
 mkdir -p .next/standalone/.next
 cp -r .next/static .next/standalone/.next/
 if [ -d public ]; then
   cp -r public .next/standalone/
 fi
+
+# Ensure standalone public/uploads symlinks to root persistent uploads directory
+rm -rf "$PROJECT_DIR/.next/standalone/public/uploads"
+ln -sfn "$PROJECT_DIR/public/uploads" "$PROJECT_DIR/.next/standalone/public/uploads"
+
 if [ -f .env ]; then
   cp .env .next/standalone/
 fi
