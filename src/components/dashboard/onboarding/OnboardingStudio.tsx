@@ -1265,7 +1265,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
   };
 
   // Publish Handler
-  const handlePublish = async () => {
+  const handlePublish = useCallback(async () => {
     if (isPublishing) return;
     setIsPublishing(true);
     isDeployClosingRef.current = true;
@@ -1377,8 +1377,11 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
       isDeployClosingRef.current = false;
       deployClosingResolveRef.current = null;
     }
-  };
-  handlePublishRef.current = handlePublish;
+  }, [isPublishing, data, addTelemetryLog]);
+
+  useEffect(() => {
+    handlePublishRef.current = handlePublish;
+  }, [handlePublish]);
 
   return (
     <div className="flex flex-col flex-1 h-full min-h-0 overflow-hidden max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
