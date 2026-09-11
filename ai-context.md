@@ -72,5 +72,10 @@ The application runs under the subpath prefix **`/projects/kyron-realty-ai`**:
 - **Zero Secrets in Git**: Sensitive keys and database passwords must only reside in `.env`.
 - **Standalone Build**: `next.config.ts` uses `output: 'standalone'` for minimal VPS memory footprint.
 - **Database Migrations**: Always manage schema changes through `src/db/schema.ts`, generate migrations with `npm run db:generate`, and apply via `drizzle-kit migrate` (automated in CI/CD).
-- **CI/CD**: Pushes to `main` automatically trigger GitHub Actions to deploy to the VPS with zero downtime.
+- **CI/CD Verification Gate (`.github/workflows/deploy.yml`)**: Pushes to `main` trigger GitHub Actions deployment to VPS. Every change must be validated against the CI gates before pushing:
+  - `npm run lint`: Zero ESLint errors. Strictly enforce React 19 render purity (never assign or access `ref.current` during render; update refs in `useEffect` or event handlers).
+  - `npm run lint:unused`: Knip dead-code & unused export detection.
+  - `npm run test:intents`: Voice intent & scripted prompt alignment.
+  - `npm run build`: Strict TypeScript check + Next.js standalone production build.
+  - Agora policy: Zero browser speech APIs (`speechSynthesis`, `webkitSpeechRecognition`) in `src/`.
 
