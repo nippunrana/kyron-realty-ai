@@ -220,6 +220,29 @@ describe("detectAssistantSearchIntent", () => {
     });
   });
 
+  test("detects refinement tag with pets only (city omitted for sticky context)", () => {
+    const res = detectAssistantSearchIntent("Checking pet-friendly options for you! [SEARCH:pets=true]");
+    assert.deepEqual(res, {
+      pets: true,
+    });
+  });
+
+  test("detects refinement tag with bedrooms and listingType", () => {
+    const res = detectAssistantSearchIntent("Pulling up 2 BHK rentals! [SEARCH:bedrooms=2,type=rent,maxPrice=45000]");
+    assert.deepEqual(res, {
+      bedrooms: 2,
+      listingType: "rent",
+      maxPrice: 45000,
+    });
+  });
+
+  test("detects filter reset tag", () => {
+    const res = detectAssistantSearchIntent("Showing all properties in this city! [SEARCH:reset=filters]");
+    assert.deepEqual(res, {
+      reset: "filters",
+    });
+  });
+
   test("returns null for non-search sentences", () => {
     assert.equal(
       detectAssistantSearchIntent(

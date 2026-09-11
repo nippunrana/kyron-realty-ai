@@ -398,12 +398,13 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
 
               // Assistant search action: silent [SEARCH:...] tag or spoken natural language fallback
               const searchIntent = detectAssistantSearchIntent(spokenText);
-              if (searchIntent && searchIntent.city) {
+              if (searchIntent) {
                 const turnId = item.turn_id !== undefined ? String(item.turn_id) : spokenText.slice(0, 40).toLowerCase();
-                const searchKey = `assistant_search_${turnId}_${searchIntent.city.toLowerCase()}`;
+                const intentSig = `${searchIntent.city || ""}_${searchIntent.pets}_${searchIntent.bedrooms}_${searchIntent.listingType || ""}_${searchIntent.reset || ""}`;
+                const searchKey = `assistant_search_${turnId}_${intentSig}`;
                 if (!processedAssistantTurnIntentsRef.current.has(searchKey)) {
                   processedAssistantTurnIntentsRef.current.add(searchKey);
-                  onLogEventRef.current?.("INTENT", `Detected Search Intent in city: ${searchIntent.city}`, { text: spokenText, searchIntent });
+                  onLogEventRef.current?.("INTENT", `Detected Search Intent: ${intentSig}`, { text: spokenText, searchIntent });
                   onSearchRequestRef.current?.(searchIntent);
                 }
               }

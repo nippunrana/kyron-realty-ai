@@ -60,6 +60,10 @@ export interface ParsedSearchTag {
   city?: string;
   pets?: boolean;
   bedrooms?: number;
+  listingType?: "rent" | "sale";
+  minPrice?: number;
+  maxPrice?: number;
+  reset?: "filters" | "all";
   query?: string;
 }
 

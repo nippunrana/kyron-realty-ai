@@ -47,13 +47,28 @@ export function parseSearchTag(text: string): ParsedSearchTag | null {
     const [k, v] = pair.split("=").map((s) => s.trim());
     if (!k || !v) continue;
     const keyLower = k.toLowerCase();
-    if (keyLower === "city") result.city = v;
-    else if (keyLower === "pets" || keyLower === "pet") result.pets = v.toLowerCase() === "true" || v.toLowerCase() === "yes";
-    else if (keyLower === "beds" || keyLower === "bedrooms") {
+    if (keyLower === "city") {
+      result.city = v;
+    } else if (keyLower === "pets" || keyLower === "pet") {
+      result.pets = v.toLowerCase() === "true" || v.toLowerCase() === "yes";
+    } else if (keyLower === "beds" || keyLower === "bedrooms") {
       const b = parseInt(v, 10);
       if (!isNaN(b)) result.bedrooms = b;
+    } else if (keyLower === "type" || keyLower === "listingtype") {
+      const t = v.toLowerCase();
+      if (t === "rent" || t === "sale") result.listingType = t;
+    } else if (keyLower === "minprice" || keyLower === "min_price") {
+      const p = parseInt(v, 10);
+      if (!isNaN(p)) result.minPrice = p;
+    } else if (keyLower === "maxprice" || keyLower === "max_price" || keyLower === "price") {
+      const p = parseInt(v, 10);
+      if (!isNaN(p)) result.maxPrice = p;
+    } else if (keyLower === "reset") {
+      const r = v.toLowerCase();
+      result.reset = r === "all" ? "all" : "filters";
+    } else if (keyLower === "query") {
+      result.query = v;
     }
-    else if (keyLower === "query") result.query = v;
   }
   return result;
 }
@@ -64,10 +79,22 @@ const ASSISTANT_SEARCH_SPOKEN =
 /**
  * Detects assistant search intent either from silent [SEARCH:city=...] tags (primary)
  * or spoken natural language confirmation (fallback).
+ * Supports contextual refinement tags where city is omitted.
  */
 export function detectAssistantSearchIntent(text: string): ParsedSearchTag | null {
   const tagged = parseSearchTag(text);
-  if (tagged && tagged.city) return tagged;
+  if (tagged) {
+    const hasCriteria =
+      Boolean(tagged.city) ||
+      tagged.pets !== undefined ||
+      tagged.bedrooms !== undefined ||
+      Boolean(tagged.listingType) ||
+      tagged.minPrice !== undefined ||
+      tagged.maxPrice !== undefined ||
+      Boolean(tagged.reset) ||
+      Boolean(tagged.query);
+    if (hasCriteria) return tagged;
+  }
 
   const match = text.match(ASSISTANT_SEARCH_SPOKEN);
   if (match) {

@@ -56,6 +56,10 @@ interface PropertySearchParams {
   city?: string;
   petFriendly?: boolean;
   bedrooms?: number;
+  listingType?: "rent" | "sale";
+  minPrice?: number;
+  maxPrice?: number;
+  reset?: "filters" | "all";
   query?: string;
   userSpeech?: string;
 }
@@ -84,6 +88,26 @@ export function FloatingSalesAgent() {
   const [isSearchingProperties, setIsSearchingProperties] = useState(false);
   const [activeSearchCity, setActiveSearchCity] = useState<string | null>(null);
   const [isPetFriendlyFilter, setIsPetFriendlyFilter] = useState(false);
+  const [activeSearchCriteria, setActiveSearchCriteria] = useState<{
+    city: string | null;
+    petFriendly: boolean | null;
+    bedrooms: number | null;
+    listingType: "rent" | "sale" | null;
+    minPrice: number | null;
+    maxPrice: number | null;
+  }>({
+    city: null,
+    petFriendly: null,
+    bedrooms: null,
+    listingType: null,
+    minPrice: null,
+    maxPrice: null,
+  });
+  const activeSearchCriteriaRef = useRef(activeSearchCriteria);
+  useEffect(() => {
+    activeSearchCriteriaRef.current = activeSearchCriteria;
+  }, [activeSearchCriteria]);
+
   const [searchResults, setSearchResults] = useState<SearchHubProperty[]>([]);
   const [availableCities, setAvailableCities] = useState<string[]>([]);
   const processedSearchTurnsRef = useRef<Set<string>>(new Set());
@@ -105,13 +129,18 @@ export function FloatingSalesAgent() {
     sendTextMessage,
   } = useAgoraVoiceAgent({
     onSearchRequest: (params) => {
-      const searchKey = `search_${params.city?.toLowerCase()}`;
+      const criteriaSig = `${params.city || ""}_${params.pets}_${params.bedrooms}_${params.listingType || ""}_${params.reset || ""}`;
+      const searchKey = `req_${transcript.length}_${criteriaSig}`;
       if (processedSearchTurnsRef.current.has(searchKey)) return;
       processedSearchTurnsRef.current.add(searchKey);
       executePropertySearch({
         city: params.city,
         petFriendly: params.pets,
         bedrooms: params.bedrooms,
+        listingType: params.listingType,
+        minPrice: params.minPrice,
+        maxPrice: params.maxPrice,
+        reset: params.reset,
         query: params.query,
       });
     },
@@ -130,14 +159,19 @@ export function FloatingSalesAgent() {
       for (const msg of recent) {
         if (!msg.text) continue;
         const tag = detectAssistantSearchIntent(msg.text);
-        if (tag && tag.city) {
-          const searchKey = `search_${tag.city.toLowerCase()}`;
+        if (tag) {
+          const criteriaSig = `${tag.city || ""}_${tag.pets}_${tag.bedrooms}_${tag.listingType || ""}_${tag.reset || ""}`;
+          const searchKey = `assistant_${msg.id || currentTranscript.length}_${criteriaSig}`;
           if (!processedSearchTurnsRef.current.has(searchKey)) {
             processedSearchTurnsRef.current.add(searchKey);
             triggerSearchRef.current?.({
               city: tag.city,
               petFriendly: tag.pets,
               bedrooms: tag.bedrooms,
+              listingType: tag.listingType,
+              minPrice: tag.minPrice,
+              maxPrice: tag.maxPrice,
+              reset: tag.reset,
               query: tag.query,
             });
             break;
@@ -145,13 +179,14 @@ export function FloatingSalesAgent() {
         }
       }
 
-      // 2. User Turn Fast-Path: If user provides city, trigger search in parallel while Sarah speaks
+      // 2. User Turn Fast-Path: If user provides city or refinement speech, trigger search in parallel
       const lastMsg = currentTranscript[currentTranscript.length - 1];
       if (lastMsg && lastMsg.role === "user" && lastMsg.text) {
         const cityMatch = lastMsg.text.match(/\b(faridabad|delhi|gurugram|gurgaon|noida|bangalore|bengaluru|mumbai|pune|hyderabad|chennai|kolkata)\b/i);
-        if (cityMatch) {
-          const city = cityMatch[1].charAt(0).toUpperCase() + cityMatch[1].slice(1).toLowerCase();
-          const searchKey = `search_${city.toLowerCase()}`;
+        const isRefinementIntent = /\b(pet|pets|bhk|bedroom|rent|sale|clear filter|reset filter)\b/i.test(lastMsg.text);
+        if (cityMatch || isRefinementIntent) {
+          const city = cityMatch ? cityMatch[1].charAt(0).toUpperCase() + cityMatch[1].slice(1).toLowerCase() : undefined;
+          const searchKey = `user_${lastMsg.id || currentTranscript.length}_${city || "active"}_${lastMsg.text.slice(0, 20)}`;
           if (!processedSearchTurnsRef.current.has(searchKey)) {
             processedSearchTurnsRef.current.add(searchKey);
             triggerSearchRef.current?.({
@@ -164,6 +199,11 @@ export function FloatingSalesAgent() {
     },
   });
 
+  const transcriptRef = useRef(transcript);
+  useEffect(() => {
+    transcriptRef.current = transcript;
+  }, [transcript]);
+
   const executePropertySearch = useCallback(
     async (params: PropertySearchParams) => {
       setIsSearchingProperties(true);
@@ -171,17 +211,70 @@ export function FloatingSalesAgent() {
       setMobileTab("search");
 
       try {
+        const prev = activeSearchCriteriaRef.current;
+        let mergedCity = params.city || prev.city || null;
+        let mergedPetFriendly = prev.petFriendly;
+        let mergedBedrooms = prev.bedrooms;
+        let mergedListingType = prev.listingType;
+        let mergedMinPrice = prev.minPrice;
+        let mergedMaxPrice = prev.maxPrice;
+
+        if (params.reset === "all") {
+          mergedCity = null;
+          mergedPetFriendly = null;
+          mergedBedrooms = null;
+          mergedListingType = null;
+          mergedMinPrice = null;
+          mergedMaxPrice = null;
+        } else if (params.reset === "filters") {
+          // Keep active city, clear specific filters
+          mergedPetFriendly = null;
+          mergedBedrooms = null;
+          mergedListingType = null;
+          mergedMinPrice = null;
+          mergedMaxPrice = null;
+        } else {
+          if (params.city && params.city.toLowerCase() !== prev.city?.toLowerCase()) {
+            mergedCity = params.city;
+          }
+          if (params.petFriendly !== undefined) {
+            mergedPetFriendly = params.petFriendly;
+          }
+          if (params.bedrooms !== undefined) {
+            mergedBedrooms = params.bedrooms;
+          }
+          if (params.listingType !== undefined) {
+            mergedListingType = params.listingType;
+          }
+          if (params.minPrice !== undefined) {
+            mergedMinPrice = params.minPrice;
+          }
+          if (params.maxPrice !== undefined) {
+            mergedMaxPrice = params.maxPrice;
+          }
+        }
+
+        const mergedCriteria = {
+          city: mergedCity,
+          petFriendly: mergedPetFriendly,
+          bedrooms: mergedBedrooms,
+          listingType: mergedListingType,
+          minPrice: mergedMinPrice,
+          maxPrice: mergedMaxPrice,
+        };
+
         const speech =
           params.userSpeech ||
           params.query ||
-          `${params.petFriendly ? "pet-friendly " : ""}properties in ${params.city || ""}`;
+          `${mergedPetFriendly ? "pet-friendly " : ""}${mergedBedrooms ? `${mergedBedrooms} BHK ` : ""}properties in ${mergedCity || ""}`;
 
         const res = await fetch(`${BASE_PATH}/api/properties/sales-search`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             userSpeech: speech,
-            transcriptHistory: transcript.slice(-6).map((m) => ({ role: m.role, text: m.text })),
+            transcriptHistory: transcriptRef.current.slice(-6).map((m) => ({ role: m.role, text: m.text })),
+            activeCriteria: mergedCriteria,
           }),
         });
 
@@ -191,10 +284,25 @@ export function FloatingSalesAgent() {
 
           if (data.missingCity) {
             setActiveSearchCity(null);
+            setActiveSearchCriteria((c) => ({ ...c, city: null }));
           } else {
-            const city = data.criteria?.city || params.city || null;
-            setActiveSearchCity(city);
-            setIsPetFriendlyFilter(Boolean(data.criteria?.petFriendly ?? params.petFriendly));
+            const resolvedCity = data.criteria?.city || mergedCity || null;
+            const resolvedPets = data.criteria?.petFriendly ?? mergedPetFriendly;
+            const resolvedBeds = data.criteria?.bedrooms ?? mergedBedrooms;
+            const resolvedType = data.criteria?.listingType ?? mergedListingType;
+
+            const updatedCriteria = {
+              city: resolvedCity,
+              petFriendly: resolvedPets,
+              bedrooms: resolvedBeds,
+              listingType: resolvedType,
+              minPrice: data.criteria?.minPrice ?? mergedMinPrice,
+              maxPrice: data.criteria?.maxPrice ?? mergedMaxPrice,
+            };
+
+            setActiveSearchCity(resolvedCity);
+            setIsPetFriendlyFilter(Boolean(resolvedPets));
+            setActiveSearchCriteria(updatedCriteria);
             setSearchResults(data.properties || []);
 
             // Re-sync back to Sarah over Agora RTM so she announces findings
@@ -204,9 +312,15 @@ export function FloatingSalesAgent() {
                 .map((p) => p.title)
                 .slice(0, 2)
                 .join(", ");
-              const cue = `[SEARCH_RESULT:city=${city || ""},count=${count},titles=${titles}]`;
+
+              const filterDescs: string[] = [];
+              if (resolvedPets) filterDescs.push("pet-friendly");
+              if (resolvedBeds) filterDescs.push(`${resolvedBeds} BHK`);
+              if (resolvedType) filterDescs.push(resolvedType);
+              const filterSummary = filterDescs.length > 0 ? filterDescs.join(" ") + " homes" : "properties";
+
+              const cue = `[SEARCH_RESULT:city=${resolvedCity || ""},count=${count},titles=${titles},filters=${filterSummary}]`;
               if (isAgentSpeaking) {
-                // Agent is actively speaking her initial sentence - queue cue until she finishes speaking
                 pendingSearchCueRef.current = cue;
               } else {
                 sendTextMessage(cue);
@@ -220,7 +334,7 @@ export function FloatingSalesAgent() {
         setIsSearchingProperties(false);
       }
     },
-    [transcript, isCallActive, sendTextMessage, isAgentSpeaking]
+    [isCallActive, sendTextMessage, isAgentSpeaking]
   );
 
   // Dispatch queued search result cue only AFTER Sarah finishes speaking her initial turn
@@ -240,10 +354,11 @@ export function FloatingSalesAgent() {
     prevIsAgentSpeakingRef.current = isAgentSpeaking;
   }, [isAgentSpeaking, isCallActive, sendTextMessage]);
 
-  // Clean up pending cues on call termination
+  // Clean up pending cues and search deduplication on call termination
   useEffect(() => {
     if (!isCallActive) {
       pendingSearchCueRef.current = null;
+      processedSearchTurnsRef.current.clear();
     }
   }, [isCallActive]);
 
@@ -251,21 +366,26 @@ export function FloatingSalesAgent() {
     triggerSearchRef.current = executePropertySearch;
   });
 
-  // Real-time transcript listener for rapid tag / spoken confirmation extraction while Sarah is speaking
+  // Real-time transcript listener for rapid tag extraction while Sarah is speaking
   useEffect(() => {
     if (!transcript || transcript.length === 0) return;
     const latest = transcript[transcript.length - 1];
     if (!latest || !latest.text) return;
 
     const tag = detectAssistantSearchIntent(latest.text);
-    if (tag && tag.city) {
-      const searchKey = `search_${tag.city.toLowerCase()}`;
+    if (tag) {
+      const criteriaSig = `${tag.city || ""}_${tag.pets}_${tag.bedrooms}_${tag.listingType || ""}_${tag.reset || ""}`;
+      const searchKey = `realtime_${latest.id || transcript.length}_${criteriaSig}`;
       if (processedSearchTurnsRef.current.has(searchKey)) return;
       processedSearchTurnsRef.current.add(searchKey);
       const searchParams: PropertySearchParams = {
         city: tag.city,
         petFriendly: tag.pets,
         bedrooms: tag.bedrooms,
+        listingType: tag.listingType,
+        minPrice: tag.minPrice,
+        maxPrice: tag.maxPrice,
+        reset: tag.reset,
         query: tag.query,
       };
       setTimeout(() => {
@@ -492,15 +612,12 @@ export function FloatingSalesAgent() {
                 isSearching={isSearchingProperties}
                 activeCity={activeSearchCity}
                 isPetFriendlyFilter={isPetFriendlyFilter}
+                activeBedrooms={activeSearchCriteria.bedrooms}
+                activeListingType={activeSearchCriteria.listingType}
+                activeMaxPrice={activeSearchCriteria.maxPrice}
                 properties={searchResults}
                 availableCities={availableCities}
                 onClose={handleCollapseSearch}
-                onCitySelect={(city) =>
-                  executePropertySearch({ city, petFriendly: isPetFriendlyFilter })
-                }
-                onManualSearch={(query) =>
-                  executePropertySearch({ query, city: activeSearchCity || undefined })
-                }
               />
             </div>
 
@@ -674,16 +791,13 @@ export function FloatingSalesAgent() {
                           isSearching={isSearchingProperties}
                           activeCity={activeSearchCity}
                           isPetFriendlyFilter={isPetFriendlyFilter}
+                          activeBedrooms={activeSearchCriteria.bedrooms}
+                          activeListingType={activeSearchCriteria.listingType}
+                          activeMaxPrice={activeSearchCriteria.maxPrice}
                           properties={searchResults}
                           availableCities={availableCities}
                           onClose={() => setMobileTab("chat")}
                           isMobileTab={true}
-                          onCitySelect={(city) =>
-                            executePropertySearch({ city, petFriendly: isPetFriendlyFilter })
-                          }
-                          onManualSearch={(query) =>
-                            executePropertySearch({ query, city: activeSearchCity || undefined })
-                          }
                         />
                       </div>
                     )}

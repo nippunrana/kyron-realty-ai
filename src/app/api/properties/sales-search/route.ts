@@ -7,12 +7,13 @@ import { refactorSalesSearchQuery } from "@/lib/sales-search-agent";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { userSpeech = "", transcriptHistory = [] } = body;
+    const { userSpeech = "", transcriptHistory = [], activeCriteria } = body;
 
-    // 1. Refactor user intent using the second Gemini session
+    // 1. Refactor user intent using the second Gemini session with active criteria context
     const criteria = await refactorSalesSearchQuery({
       userSpeech,
       conversationHistory: transcriptHistory,
+      activeCriteria,
     });
 
     // 2. Fetch all available cities across active properties
