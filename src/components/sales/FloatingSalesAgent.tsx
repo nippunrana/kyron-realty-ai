@@ -113,6 +113,15 @@ export function FloatingSalesAgent() {
         query: params.query,
       });
     },
+    onUIAction: (action) => {
+      if (action === "open_search_hub") {
+        setIsSearchHubOpen(true);
+        setMobileTab("search");
+      } else if (action === "close_search_hub") {
+        setIsSearchHubOpen(false);
+        setMobileTab("chat");
+      }
+    },
     onAgentTurnComplete: (currentTranscript) => {
       // 1. Assistant Turn: Check for search intent in recent messages
       const recent = currentTranscript.slice(-3);
@@ -149,15 +158,6 @@ export function FloatingSalesAgent() {
             });
           }
         }
-      }
-    },
-    onUIAction: (action) => {
-      if (action === "open_search_hub") {
-        setIsSearchHubOpen(true);
-        setMobileTab("search");
-      } else if (action === "close_search_hub") {
-        setIsSearchHubOpen(false);
-        setMobileTab("chat");
       }
     },
   });
@@ -427,6 +427,16 @@ export function FloatingSalesAgent() {
           </div>
         </div>
       )}
+
+      {/* ========================================================================= */}
+      {/* 50% BLACK FOCUS OVERLAY (Click-barrier behind active search & chat pod)   */}
+      {/* ========================================================================= */}
+      <div
+        aria-hidden="true"
+        className={`fixed inset-0 bg-black/50 z-30 transition-opacity duration-300 pointer-events-auto ${
+          isSearchHubOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
+      />
 
       {/* ========================================================================= */}
       {/* FLOATING SALES AGENT WIDGET                                              */}

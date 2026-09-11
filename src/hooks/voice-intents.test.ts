@@ -235,3 +235,39 @@ describe("detectAssistantSearchIntent", () => {
     );
   });
 });
+
+describe("search hub open and close intents", () => {
+  test("user close command routes to close_search_hub", () => {
+    assert.equal(detectUserModalIntent("can you please close the search"), "close_search_hub");
+    assert.equal(detectUserModalIntent("hide the listings for now"), "close_search_hub");
+    assert.equal(detectUserModalIntent("minimize the search results"), "close_search_hub");
+  });
+
+  test("user open command routes to open_search_hub", () => {
+    assert.equal(detectUserModalIntent("show the search again"), "open_search_hub");
+    assert.equal(detectUserModalIntent("bring back the listings"), "open_search_hub");
+    assert.equal(detectUserModalIntent("reopen the property search"), "open_search_hub");
+  });
+
+  test("assistant CLOSE_SEARCH tag routes to close_search_hub", () => {
+    assert.deepEqual(
+      detectAssistantModalIntent("I'll close the search for you right now [UI:CLOSE_SEARCH]."),
+      { action: "close_search_hub", source: "tag" }
+    );
+  });
+
+  test("assistant OPEN_SEARCH tag routes to open_search_hub", () => {
+    assert.deepEqual(
+      detectAssistantModalIntent("Here are the property listings back on your screen [UI:OPEN_SEARCH]."),
+      { action: "open_search_hub", source: "tag" }
+    );
+  });
+
+  test("assistant spoken close fallback routes to close_search_hub", () => {
+    assert.deepEqual(
+      detectAssistantModalIntent("I've closed the search panel for you."),
+      { action: "close_search_hub", source: "regex" }
+    );
+  });
+});
+

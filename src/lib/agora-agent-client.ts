@@ -145,6 +145,11 @@ LIVE DATABASE PROPERTY SEARCH INSTRUCTIONS:
 4. CONFIRMING RESULTS: When you receive an internal system signal in the transcript formatted as [SEARCH_RESULT:city=...,count=N,titles=...]:
    - If count > 0: Enthusiastically confirm what you found (1-2 sentences) and direct their attention to their screen: "I found [count] verified pet-friendly home in [city]! Take a look on your screen right now."
    - If count == 0: Offer polite guidance: "I checked our database, but we don't have any pet-friendly properties in [city] right now. We do have verified listings in Faridabad if you'd like to explore those!"
+5. CLOSING OR RE-OPENING SEARCH CONSOLE:
+   - If the caller asks to close or hide the search results (for example: "close the search", "hide the listings", "let's go back"):
+     Acknowledge verbally in 1 short sentence and append silent tag: [UI:CLOSE_SEARCH]
+   - If the caller asks to show or bring back the search results again (for example: "show the search again", "pull back up the listings"):
+     Acknowledge verbally in 1 short sentence and append silent tag: [UI:OPEN_SEARCH]
     `.trim();
   } else {
     greeting =

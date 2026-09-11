@@ -7,7 +7,6 @@ import { BASE_PATH } from "@/lib/base-path";
 import {
   Search,
   Sparkles,
-  ChevronRight,
   X,
   Building2,
   Bed,
@@ -147,16 +146,15 @@ export function GsapSearchHub({
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
-            {/* Collapse / Close Button */}
+            {/* Close Button (Small Cross) */}
             <button
               type="button"
               onClick={onClose}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold text-slate-500 hover:text-slate-800 hover:bg-slate-200/70 border border-slate-200/60 transition-colors cursor-pointer"
-              title={isMobileTab ? "Close search tab" : "Collapse search panel"}
-              aria-label="Collapse search"
+              className="p-1.5 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-200/80 border border-slate-200/80 transition-colors cursor-pointer"
+              title={isMobileTab ? "Close search tab" : "Close search"}
+              aria-label={isMobileTab ? "Close search tab" : "Close search"}
             >
-              <span className="text-[11px] hidden sm:inline">Collapse</span>
-              {isMobileTab ? <X className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+              <X className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>

@@ -114,6 +114,10 @@ function parseUITag(text: string): UIAction | null {
   return action;
 }
 
+const USER_OPEN_SEARCH =
+  /(pull|bring|open|show|display|reopen|pull back|bring back).*(search|listings|properties|search bar|search hub|search panel|search results)/i;
+const USER_CLOSE_SEARCH =
+  /(close|hide|dismiss|minimize|shut).*(search|listings|properties|search bar|search hub|search panel|search results)/i;
 const USER_OPEN_CORE =
   /(pull|bring|open|show|display|pop).*(core specs|core details|\d+ core)/i;
 const USER_OPEN_PHOTOS =
@@ -128,6 +132,10 @@ const USER_CLOSE = /(close|hide|dismiss|minimize|shut).*(card|modal|pop[- ]?up|r
 const USER_APPROVE =
   /(all is done|all done|everything is done|all set|looks good|all looks good|look good|we can proceed|proceed further|let's proceed|let's move on|that's right|confirmed|continue|ready for photos|move on to photos)/i;
 
+const ASSISTANT_OPEN_SEARCH =
+  /(pull|bring|open|show|display|reopen|pull back|bring back).*(search|listings|properties|search bar|search hub|search panel|search results).*(screen|for you|back up|take a look|right now)/i;
+const ASSISTANT_CLOSE_SEARCH =
+  /(close|closed|hide|dismiss|minimiz|shut).*(search|listings|properties|search bar|search hub|search panel|search results)/i;
 const ASSISTANT_OPEN_CORE =
   /(pull|bring|open|show|display).*(core specs|core details|\d+ core).*(screen|for you|back up|take a look|right now)/i;
 const ASSISTANT_OPEN_HYPER_LOCAL =
@@ -152,6 +160,8 @@ const ASSISTANT_END_CALL =
 
 /** Verbal review-card commands from the owner: open wins over close/approve. */
 export function detectUserModalIntent(text: string): UIAction | null {
+  if (USER_OPEN_SEARCH.test(text)) return "open_search_hub";
+  if (USER_CLOSE_SEARCH.test(text)) return "close_search_hub";
   if (USER_OPEN_CORE.test(text)) return "open_core_modal";
   if (USER_OPEN_PHOTOS.test(text)) return "open_upload_modal";
   if (USER_OPEN_FINAL.test(text)) return "open_final_modal";
@@ -173,6 +183,8 @@ export function detectAssistantModalIntent(text: string): AssistantIntent | null
   if (ASSISTANT_END_CALL.test(text)) return { action: "end_call", source: "regex" };
   const tagged = parseUITag(text);
   if (tagged) return { action: tagged, source: "tag" };
+  if (ASSISTANT_CLOSE_SEARCH.test(text)) return { action: "close_search_hub", source: "regex" };
+  if (ASSISTANT_OPEN_SEARCH.test(text)) return { action: "open_search_hub", source: "regex" };
   if (ASSISTANT_CLOSE.test(text)) return { action: "close_review_modal", source: "regex" };
   if (ASSISTANT_TRIGGER_DEPLOY.test(text)) return { action: "trigger_deploy", source: "regex" };
   if (ASSISTANT_OPEN_CORE.test(text)) return { action: "open_core_modal", source: "regex" };
