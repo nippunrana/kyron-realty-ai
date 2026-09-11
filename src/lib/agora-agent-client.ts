@@ -4,7 +4,9 @@ import {
   generateAgoraAgentCombinedToken,
   getAgoraAppId,
   getAgoraCredentials,
+  buildAgoraCloudAuthHeader,
 } from "./agora-token";
+export { buildAgoraCloudAuthHeader };
 import { db } from "@/db";
 import { properties, voiceSessions, users } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
@@ -44,32 +46,7 @@ export interface AgoraAgentSessionResult {
   message?: string;
 }
 
-/**
- * Authorization header for the Agora Conversational AI REST API:
- * - Basic customer credentials or API key when explicitly configured.
- * - Otherwise, dynamically generates Token Auth (`agora token=<AccessToken2>`)
- *   using AGORA_APP_ID and AGORA_APP_CERTIFICATE.
- */
-export function buildAgoraCloudAuthHeader(channelName?: string, agentUid: number | string = 999001): string {
-  const customerId = process.env.AGORA_CUSTOMER_ID?.trim();
-  const customerSecret = process.env.AGORA_CUSTOMER_SECRET?.trim();
-  if (customerId && customerSecret) {
-    return `Basic ${Buffer.from(`${customerId}:${customerSecret}`).toString("base64")}`;
-  }
 
-  const apiKey = (process.env.AGORA_CONVERSATIONAL_AI_API_KEY || process.env.AGORA_API_KEY || "").trim();
-  if (apiKey && apiKey !== "your_agora_conversational_ai_api_key_here") {
-    if (apiKey.startsWith("Basic ") || apiKey.startsWith("Bearer ")) return apiKey;
-    return apiKey.includes(":") ? `Basic ${Buffer.from(apiKey).toString("base64")}` : `Basic ${apiKey}`;
-  }
-
-  try {
-    const { token } = generateAgoraAgentCombinedToken(channelName || "", Number(agentUid) || 999001);
-    return `agora token=${token}`;
-  } catch {
-    return "";
-  }
-}
 
 /**
  * Starts an Agora Conversational AI Voice Agent session for a specific property listing.

@@ -152,3 +152,38 @@ export function generateAgoraAgentCombinedToken(
   }
 }
 
+/**
+ * Authorization header for the Agora Conversational AI REST API:
+ * 1. Primary: Dynamic Token Auth (`agora token=<AccessToken2>`) generated on the fly from
+ *    AGORA_APP_ID and AGORA_APP_CERTIFICATE (modern 2-variable setup).
+ * 2. Fallback: Legacy Basic customer credentials or API key if certificate is absent.
+ */
+export function buildAgoraCloudAuthHeader(channelName?: string, agentUid: number | string = 999001): string {
+  // 1. Primary: Token Auth using App ID + App Certificate (2-variable setup)
+  try {
+    const { token } = generateAgoraAgentCombinedToken(channelName || "", Number(agentUid) || 999001);
+    if (token) {
+      return `agora token=${token}`;
+    }
+  } catch {
+    // If App ID / Certificate not configured, fall through to legacy credentials
+  }
+
+  // 2. Fallback: Customer ID + Secret (Basic Auth)
+  const customerId = process.env.AGORA_CUSTOMER_ID?.trim();
+  const customerSecret = process.env.AGORA_CUSTOMER_SECRET?.trim();
+  if (customerId && customerSecret) {
+    return `Basic ${Buffer.from(`${customerId}:${customerSecret}`).toString("base64")}`;
+  }
+
+  // 3. Fallback: Dedicated API Key
+  const apiKey = (process.env.AGORA_CONVERSATIONAL_AI_API_KEY || process.env.AGORA_API_KEY || "").trim();
+  if (apiKey && apiKey !== "your_agora_conversational_ai_api_key_here") {
+    if (apiKey.startsWith("Basic ") || apiKey.startsWith("Bearer ")) return apiKey;
+    return apiKey.includes(":") ? `Basic ${Buffer.from(apiKey).toString("base64")}` : `Basic ${apiKey}`;
+  }
+
+  return "";
+}
+
+
