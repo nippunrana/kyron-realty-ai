@@ -27,16 +27,27 @@ const getPropertyBySlug = cache(async (slug: string) => {
       city: properties.city,
       state: properties.state,
       zipCode: properties.zipCode,
+      country: properties.country,
       listingType: properties.listingType,
       propertyType: properties.propertyType,
       price: properties.price,
+      securityDeposit: properties.securityDeposit,
+      minLeaseMonths: properties.minLeaseMonths,
+      hoaFeeMonthly: properties.hoaFeeMonthly,
       bedrooms: properties.bedrooms,
       bathrooms: properties.bathrooms,
       sqft: properties.sqft,
+      floorNumber: properties.floorNumber,
+      storeys: properties.storeys,
+      rentScope: properties.rentScope,
+      washrooms: properties.washrooms,
+      furnishingStatus: properties.furnishingStatus,
+      yearBuilt: properties.yearBuilt,
       availableDate: properties.availableDate,
       coverImageUrl: properties.coverImageUrl,
       images: properties.images,
       amenities: properties.amenities,
+      features: properties.features,
       qrCodeSvg: properties.qrCodeSvg,
       shareUrl: properties.shareUrl,
       knowledgeBase: properties.knowledgeBase,
@@ -90,14 +101,27 @@ export default async function PublicListingPage({ params }: ListingPageProps) {
   }
 
   // 2. Buyer-facing knowledge only. The agent script, tone, greeting, contact
-  // email and hyper-local data stay server-side.
+  // email, and internal prompts stay server-side.
   const { knowledgeBase: kb, ...publicProperty } = property;
   const knowledgeBase = {
     synthesizedSalesPitch: kb?.synthesizedSalesPitch ?? null,
-    faqs: kb?.faqs ?? [],
+    neighborhoodSummary: kb?.neighborhoodSummary ?? null,
+    schoolDistrictInfo: kb?.schoolDistrictInfo ?? null,
     petPolicyDetail: kb?.petPolicyDetail ?? null,
     parkingDetail: kb?.parkingDetail ?? null,
     utilitiesDetail: kb?.utilitiesDetail ?? null,
+    washroomDetail: kb?.washroomDetail ?? null,
+    applicationProcess: kb?.applicationProcess ?? null,
+    faqs: kb?.faqs ?? [],
+    hyperLocal: kb?.kbData
+      ? {
+          resolvedLocality: kb.kbData.resolvedLocality ?? null,
+          transit: kb.kbData.transit ?? null,
+          neighborhood: kb.kbData.neighborhood ?? null,
+          nearbyDistances: kb.kbData.nearbyDistances ?? [],
+          distancesMeasured: kb.kbData.distancesMeasured ?? false,
+        }
+      : null,
   };
 
   // 3. Fetch Media
