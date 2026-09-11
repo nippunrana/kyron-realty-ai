@@ -160,6 +160,7 @@ export function FloatingSalesAgent() {
   const currentListingSlugRef = useRef<string | null>(null);
   const retargetInFlightRef = useRef(false);
   const processedSearchTurnsRef = useRef<Set<string>>(new Set());
+  const lastSearchCueRef = useRef<string | null>(null);
   const triggerSearchRef = useRef<((params: PropertySearchParams) => Promise<void>) | null>(null);
 
   const {
@@ -178,7 +179,14 @@ export function FloatingSalesAgent() {
   } = useAgoraVoiceAgent({
     onSearchRequest: (params) => {
       const criteriaSig = `${params.city || ""}_${params.pets}_${params.bedrooms}_${params.listingType || ""}_${params.reset || ""}`;
-      const searchKey = `req_${transcript.length}_${criteriaSig}`;
+      // Scoped to how many times the CALLER has spoken, never to the transcript length.
+      // One of Sarah's turns reaches this handler more than once - the tagless TTS delivery
+      // and the tagged one both carry the same intent - and the transcript has grown between
+      // them, so a length-keyed guard reads them as two different searches and announces the
+      // same result twice. The caller's turn count is the thing that actually identifies
+      // "this request", and it still lets her search again the moment they ask again.
+      const callerTurns = transcript.reduce((n, m) => (m.role === "user" ? n + 1 : n), 0);
+      const searchKey = `req_${callerTurns}_${criteriaSig}`;
       if (processedSearchTurnsRef.current.has(searchKey)) return;
       processedSearchTurnsRef.current.add(searchKey);
       executePropertySearch({
@@ -359,6 +367,11 @@ export function FloatingSalesAgent() {
               const filterSummary = filterDescs.length > 0 ? filterDescs.join(" ") + " homes" : "properties";
 
               const cue = `[SEARCH_RESULT:city=${resolvedCity || ""},count=${count},filters=${filterSummary},results=${results}]`;
+              // Sarah repeating an announcement word-for-word to a caller is the one failure
+              // they always notice, so an identical cue back-to-back is dropped regardless of
+              // what upstream produced it.
+              if (lastSearchCueRef.current === cue) return;
+              lastSearchCueRef.current = cue;
               // The search finishes while Sarah is still speaking her acknowledgment beat.
               // APPEND hands the queueing to the Agora gateway, which knows when her
               // interaction actually ends; the client's own speaking flag does not, because
@@ -380,6 +393,7 @@ export function FloatingSalesAgent() {
   useEffect(() => {
     if (!isCallActive) {
       processedSearchTurnsRef.current.clear();
+      lastSearchCueRef.current = null;
     }
   }, [isCallActive]);
 
@@ -527,6 +541,18 @@ export function FloatingSalesAgent() {
       document.removeEventListener("click", handleGlobalClick, true);
     };
   }, [isCallActive]);
+
+  // Listen for global open requests from buttons like "Talk to Sarah"
+  useEffect(() => {
+    const handleOpenSalesAgent = () => {
+      setIsOpen(true);
+    };
+
+    window.addEventListener("open-sales-agent", handleOpenSalesAgent);
+    return () => {
+      window.removeEventListener("open-sales-agent", handleOpenSalesAgent);
+    };
+  }, []);
 
   // Microphone pre-flight check before initiating billed Agora session
   const handleStartCall = useCallback(async () => {

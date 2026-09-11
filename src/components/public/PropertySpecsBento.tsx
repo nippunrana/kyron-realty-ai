@@ -13,7 +13,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
-interface PropertySpecsBentoProps {
+export interface PropertySpecsBentoProps {
   bedrooms: number | null;
   bathrooms: string | number | null;
   washrooms?: number | null;
@@ -44,18 +44,22 @@ export function PropertySpecsBento({
   hoaFeeMonthly,
   listingType,
 }: PropertySpecsBentoProps) {
-  // Format helpers
-  const spec = (value: unknown, unit: string) =>
-    value === null || value === undefined || value === "" ? "Not listed" : `${value} ${unit}`;
+  const bathValue = bathrooms ?? washrooms;
 
-  const availability = availableDate
+  const availabilityText = availableDate
     ? (() => {
         const d = new Date(availableDate);
-        return !isNaN(d.getTime())
-          ? d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })
-          : String(availableDate);
+        if (!isNaN(d.getTime())) {
+          return `Available ${d.toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+            timeZone: "UTC",
+          })}`;
+        }
+        return `Available ${String(availableDate)}`;
       })()
-    : "Immediate";
+    : "Available Immediately";
 
   const formatFloor = (floor?: number | null, total?: number | null) => {
     if (floor === undefined || floor === null) return total ? `${total} Storeys` : null;
@@ -82,153 +86,86 @@ export function PropertySpecsBento({
   const furnishingLabel = formatFurnishing(furnishingStatus);
 
   return (
-    <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/90 shadow-xs space-y-6">
-      <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-        <h3 className="text-base sm:text-lg font-extrabold text-slate-900 tracking-tight">
-          Property Specifications & Key Facts
-        </h3>
-        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-          Verified Specs
-        </span>
+    <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-800">
+      {/* Bedrooms */}
+      {bedrooms !== null && bedrooms !== undefined && (
+        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-50 hover:bg-slate-100/80 border border-slate-200/80 transition-colors whitespace-nowrap shadow-2xs">
+          <Bed className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+          <span>
+            {bedrooms} {bedrooms === 1 ? "Bed" : "Beds"}
+          </span>
+        </div>
+      )}
+
+      {/* Bathrooms */}
+      {bathValue !== null && bathValue !== undefined && bathValue !== "" && (
+        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-50 hover:bg-slate-100/80 border border-slate-200/80 transition-colors whitespace-nowrap shadow-2xs">
+          <Bath className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+          <span>
+            {bathValue} {bathValue === 1 || bathValue === "1" ? "Bath" : "Baths"}
+          </span>
+        </div>
+      )}
+
+      {/* Carpet Area */}
+      {sqft !== null && sqft !== undefined && sqft > 0 && (
+        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-50 hover:bg-slate-100/80 border border-slate-200/80 transition-colors whitespace-nowrap shadow-2xs">
+          <Maximize className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+          <span>{Number(sqft).toLocaleString("en-IN")} sqft</span>
+        </div>
+      )}
+
+      {/* Availability - Full text without truncation */}
+      <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50/70 hover:bg-emerald-50 border border-emerald-200/70 text-emerald-900 transition-colors whitespace-nowrap shadow-2xs">
+        <CalendarCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+        <span>{availabilityText}</span>
       </div>
 
-      {/* Primary 4-Pillar Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
-        <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-            <Bed className="w-5 h-5" />
-          </div>
-          <div className="min-w-0">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-              Bedrooms
-            </span>
-            <span className="text-sm font-extrabold text-slate-900 truncate block">
-              {spec(bedrooms, "Beds")}
-            </span>
-          </div>
+      {/* Furnishing */}
+      {furnishingLabel && (
+        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-50 hover:bg-slate-100/80 border border-slate-200/80 transition-colors whitespace-nowrap shadow-2xs">
+          <Armchair className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+          <span>{furnishingLabel}</span>
         </div>
+      )}
 
-        <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-            <Bath className="w-5 h-5" />
-          </div>
-          <div className="min-w-0">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-              {washrooms && !bathrooms ? "Washrooms" : "Bathrooms"}
-            </span>
-            <span className="text-sm font-extrabold text-slate-900 truncate block">
-              {spec(bathrooms ?? washrooms, "Baths")}
-            </span>
-          </div>
+      {/* Floor Level */}
+      {floorLabel && (
+        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-50 hover:bg-slate-100/80 border border-slate-200/80 transition-colors whitespace-nowrap shadow-2xs">
+          <Layers className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+          <span>{floorLabel}</span>
         </div>
+      )}
 
-        <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-            <Maximize className="w-5 h-5" />
-          </div>
-          <div className="min-w-0">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-              Carpet Area
-            </span>
-            <span className="text-sm font-extrabold text-slate-900 truncate block">
-              {spec(sqft, "sqft")}
-            </span>
-          </div>
+      {/* Min Lease */}
+      {listingType === "rent" && minLeaseMonths && (
+        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-50 hover:bg-slate-100/80 border border-slate-200/80 transition-colors whitespace-nowrap shadow-2xs">
+          <Clock className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+          <span>{minLeaseMonths} Mo Lease</span>
         </div>
+      )}
 
-        <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-            <Clock className="w-5 h-5" />
-          </div>
-          <div className="min-w-0">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-              Availability
-            </span>
-            <span className="text-sm font-extrabold text-slate-900 truncate block">
-              {availability}
-            </span>
-          </div>
+      {/* Year Built */}
+      {yearBuilt && (
+        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-50 hover:bg-slate-100/80 border border-slate-200/80 transition-colors whitespace-nowrap shadow-2xs">
+          <Building className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+          <span>Built {yearBuilt}</span>
         </div>
-      </div>
+      )}
 
-      {/* Secondary Structural & Lease Facts */}
-      {(floorLabel || furnishingLabel || yearBuilt || securityDeposit || minLeaseMonths || hoaFeeMonthly) && (
-        <div className="pt-4 border-t border-slate-100 grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {floorLabel && (
-            <div className="p-3.5 rounded-2xl bg-slate-50/70 border border-slate-100 flex items-center gap-2.5">
-              <Layers className="w-4 h-4 text-slate-400 shrink-0" />
-              <div>
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                  Floor Level
-                </span>
-                <span className="text-xs font-bold text-slate-800">{floorLabel}</span>
-              </div>
-            </div>
-          )}
+      {/* Security Deposit */}
+      {securityDeposit && (
+        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-50 hover:bg-slate-100/80 border border-slate-200/80 transition-colors whitespace-nowrap shadow-2xs">
+          <ShieldCheck className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+          <span>Deposit ₹{Number(securityDeposit).toLocaleString("en-IN")}</span>
+        </div>
+      )}
 
-          {furnishingLabel && (
-            <div className="p-3.5 rounded-2xl bg-slate-50/70 border border-slate-100 flex items-center gap-2.5">
-              <Armchair className="w-4 h-4 text-slate-400 shrink-0" />
-              <div>
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                  Furnishing
-                </span>
-                <span className="text-xs font-bold text-slate-800">{furnishingLabel}</span>
-              </div>
-            </div>
-          )}
-
-          {yearBuilt && (
-            <div className="p-3.5 rounded-2xl bg-slate-50/70 border border-slate-100 flex items-center gap-2.5">
-              <Building className="w-4 h-4 text-slate-400 shrink-0" />
-              <div>
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                  Year Built
-                </span>
-                <span className="text-xs font-bold text-slate-800">{yearBuilt}</span>
-              </div>
-            </div>
-          )}
-
-          {listingType === "rent" && minLeaseMonths && (
-            <div className="p-3.5 rounded-2xl bg-slate-50/70 border border-slate-100 flex items-center gap-2.5">
-              <CalendarCheck className="w-4 h-4 text-slate-400 shrink-0" />
-              <div>
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                  Min. Lease
-                </span>
-                <span className="text-xs font-bold text-slate-800">{minLeaseMonths} Months</span>
-              </div>
-            </div>
-          )}
-
-          {securityDeposit && (
-            <div className="p-3.5 rounded-2xl bg-slate-50/70 border border-slate-100 flex items-center gap-2.5">
-              <ShieldCheck className="w-4 h-4 text-slate-400 shrink-0" />
-              <div>
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                  Security Deposit
-                </span>
-                <span className="text-xs font-bold text-slate-800">
-                  ₹{Number(securityDeposit).toLocaleString("en-IN")}
-                </span>
-              </div>
-            </div>
-          )}
-
-          {hoaFeeMonthly && Number(hoaFeeMonthly) > 0 && (
-            <div className="p-3.5 rounded-2xl bg-slate-50/70 border border-slate-100 flex items-center gap-2.5">
-              <Coins className="w-4 h-4 text-slate-400 shrink-0" />
-              <div>
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                  HOA / Maintenance
-                </span>
-                <span className="text-xs font-bold text-slate-800">
-                  ₹{Number(hoaFeeMonthly).toLocaleString("en-IN")}/mo
-                </span>
-              </div>
-            </div>
-          )}
+      {/* HOA / Maintenance */}
+      {hoaFeeMonthly && Number(hoaFeeMonthly) > 0 && (
+        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-50 hover:bg-slate-100/80 border border-slate-200/80 transition-colors whitespace-nowrap shadow-2xs">
+          <Coins className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+          <span>₹{Number(hoaFeeMonthly).toLocaleString("en-IN")}/mo HOA</span>
         </div>
       )}
     </div>

@@ -164,10 +164,21 @@ export function buildPropertyPrompt(input: PropertyPromptInput): {
     ? facts.concessionRules.map((r) => `- Only if: ${r.condition} -> You may offer: ${r.concession}`).join("\n")
     : "- None authorised. Do not offer any discount or concession on this home.";
 
+  // The price is the first thing anyone wants confirmed out loud on a listing page, and
+  // leaving it to a follow-up question makes her sound evasive about the one number that
+  // decides everything else. It is required in the opening beat on both entry paths.
+  const priceBeat =
+    facts.price > 0
+      ? `Your opening beat MUST name this home and say what it costs, out loud: "${facts.title}" at ${priceLine}. Say the figure in natural speech - "sixty-four thousand a month", not "64000". Never make them ask for the price.`
+      : `This home has no verified price. Say so plainly in your opening beat and offer to have the owner confirm it. Never quote or estimate a figure.`;
+
   const openingBeat =
     entry === "cold"
-      ? `THE CALLER STARTED THIS CALL ON THIS PAGE. They are looking at this home right now and you know nothing about them yet. Open warmly and usefully - offer to answer anything about this home - then work the discovery questions in naturally. Do not pretend to remember a conversation that never happened.`
-      : `THE CALLER JUST OPENED THIS PAGE FROM YOUR SEARCH CONSOLE, mid-conversation. Your very first sentence must show you were listening: connect this home to something they actually said. Never re-introduce yourself and never re-ask anything already recorded above. Then continue.`;
+      ? `THE CALLER STARTED THIS CALL ON THIS PAGE. They are looking at this home right now and you know nothing about them yet. Open warmly and usefully - offer to answer anything about this home - then work the discovery questions in naturally. Do not pretend to remember a conversation that never happened.
+${priceBeat}`
+      : `THE CALLER JUST OPENED THIS PAGE FROM YOUR SEARCH CONSOLE, mid-conversation. Your very first sentence must show you were listening: connect this home to something they actually said. Never re-introduce yourself and never re-ask anything already recorded above.
+${priceBeat}
+Then continue: give them one concrete reason this home is worth their time, drawn from the verified facts above, and move into the conversation.`;
 
   const journeyText = visits.length
     ? visits.map((v, i) => `${i + 1}. ${v.title}: ${v.notes}`).join("\n")

@@ -2,30 +2,22 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import {
   Building2,
-  PhoneCall,
-  QrCode,
   Share2,
-  Calendar,
-  MapPin,
   Sparkles,
-  ShieldCheck,
   CheckCircle2,
   Camera,
   BadgeCheck,
 } from "lucide-react";
-import { VoiceSalesAgentModal } from "@/components/voice/VoiceSalesAgentModal";
-import { TourBookingForm } from "./TourBookingForm";
 import { ShareListingModal } from "./ShareListingModal";
-import { TourBookingModal } from "./TourBookingModal";
 import { PropertySpecsBento } from "./PropertySpecsBento";
 import { PropertyCommuteExplorer } from "./PropertyCommuteExplorer";
 import { PropertyPoliciesFaqSection } from "./PropertyPoliciesFaqSection";
 import { SarahVoiceConciergeCard } from "./SarahVoiceConciergeCard";
 import { PublicListingFooter } from "./PublicListingFooter";
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
-import { defaultTourDateTime } from "@/lib/listing-helpers";
 import { BASE_PATH } from "@/lib/base-path";
 import { formatPropertyTypeLabel } from "@/lib/property-types";
 import type { PublicListingClientProps } from "@/lib/public-listing-types";
@@ -37,18 +29,17 @@ export function PublicListingClient({
   shareUrl,
 }: PublicListingClientProps) {
   const [activeImageIdx, setActiveImageIdx] = useState(0);
-  const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
-  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [failedImageUrls, setFailedImageUrls] = useState<Record<string, boolean>>({});
   const { copied, copy: copyShareUrl } = useCopyToClipboard();
 
-  // Tour Booking Form State
-  const [bookName, setBookName] = useState("");
-  const [bookPhone, setBookPhone] = useState("");
-  const [bookDate, setBookDate] = useState(() => defaultTourDateTime(14));
-  const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
-  const [bookingSuccess, setBookingSuccess] = useState(false);
+  const sarahAvatarUrl = `${BASE_PATH}/images/salesagent.webp`;
+
+  const handleOpenSarah = () => {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("open-sales-agent"));
+    }
+  };
 
   const images =
     Array.isArray(property.images) && property.images.length > 0
@@ -62,43 +53,11 @@ export function PublicListingClient({
 
   const currentHeroImage = images[activeImageIdx] || images[0];
 
-  const handleDirectTourBooking = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmittingBooking(true);
-
-    try {
-      const res = await fetch(`${BASE_PATH}/api/leads/capture`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          propertySlug: property.slug,
-          name: bookName,
-          phone: bookPhone,
-          scheduledStart: bookDate,
-          tourType: "in_person",
-        }),
-      });
-
-      const json = await res.json();
-      if (json.success) {
-        setBookingSuccess(true);
-        setTimeout(() => {
-          setIsBookingModalOpen(false);
-          setBookingSuccess(false);
-        }, 2500);
-      }
-    } catch (err) {
-      console.error("Booking error:", err);
-    } finally {
-      setIsSubmittingBooking(false);
-    }
-  };
-
   const locationSummary = [property.city, property.state].filter(Boolean).join(", ") || property.address || "";
   const whatsAppText = encodeURIComponent(
     `🏡 Check out this property: ${property.title}${locationSummary ? ` in ${locationSummary}` : ""}!\n` +
     `Price: ₹${Number(property.price).toLocaleString("en-IN")}${property.listingType === "rent" ? "/mo" : ""}\n\n` +
-    `Talk with our 24/7 AI Voice Agent for instant answers & tour booking:\n${shareUrl}`
+    `Talk with our 24/7 AI Voice Agent for instant answers:\n${shareUrl}`
   );
   const whatsAppUrl = `https://api.whatsapp.com/send?text=${whatsAppText}`;
 
@@ -146,12 +105,20 @@ export function PublicListingClient({
             </button>
 
             <button
-              onClick={() => setIsVoiceModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs font-extrabold transition-all shadow-md shadow-blue-600/20 cursor-pointer"
+              onClick={handleOpenSarah}
+              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs font-extrabold transition-all shadow-md shadow-blue-600/20 cursor-pointer"
             >
-              <PhoneCall className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Talk to Voice Agent</span>
-              <span className="sm:hidden">Talk Voice</span>
+              <div className="relative w-4 h-4 rounded-full overflow-hidden shrink-0 ring-1 ring-white/50">
+                <Image
+                  src={sarahAvatarUrl}
+                  alt="Sarah"
+                  fill
+                  sizes="16px"
+                  unoptimized={true}
+                  className="object-cover"
+                />
+              </div>
+              <span>Talk to Sarah</span>
             </button>
           </div>
         </div>
@@ -179,63 +146,34 @@ export function PublicListingClient({
                 <img
                   src={currentHeroImage}
                   alt={property.title}
-                  onError={() => setFailedImageUrls((prev) => ({ ...prev, [currentHeroImage]: true }))}
-                  className="w-full h-full object-cover transition-transform duration-500 hover:scale-102"
+                  className="w-full h-full object-cover select-none"
                 />
               )}
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-black/20 pointer-events-none" />
 
-              {/* Floating Top Badges */}
-              <div className="absolute top-4 left-4 flex items-center gap-2 flex-wrap">
-                <span className="px-3 py-1 rounded-xl bg-slate-950/80 backdrop-blur-md text-white text-xs font-bold uppercase tracking-wider border border-white/20">
+              {/* Status & Category Badges */}
+              <div className="absolute top-4 left-4 flex flex-wrap items-center gap-2">
+                <span className="px-3 py-1 rounded-full bg-slate-900/80 backdrop-blur-md border border-white/15 text-white text-xs font-bold uppercase tracking-wider">
                   {property.listingType === "rent" ? "For Rent" : "For Sale"}
                 </span>
-                <span className="px-3 py-1 rounded-xl bg-emerald-600/90 backdrop-blur-md text-white text-xs font-bold uppercase tracking-wider flex items-center gap-1">
-                  <BadgeCheck className="w-3.5 h-3.5" />
+                <span className="px-3 py-1 rounded-full bg-blue-600/90 backdrop-blur-md text-white text-xs font-bold">
                   {formatPropertyTypeLabel(property.propertyType)}
                 </span>
               </div>
 
-              {/* Top-Right Voice Status Pill */}
-              <div className="absolute top-4 right-4">
-                <button
-                  type="button"
-                  onClick={() => setIsVoiceModalOpen(true)}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-600/95 hover:bg-blue-600 active:bg-blue-700 backdrop-blur-md text-white text-xs font-bold shadow-lg shadow-blue-600/30 transition-transform hover:scale-103 cursor-pointer"
-                >
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <span>24/7 AI Voice Concierge</span>
-                </button>
-              </div>
-
-              {/* Bottom Image Overlay: Title & Address */}
-              <div className="absolute bottom-4 inset-x-4 sm:inset-x-6 text-white">
-                <div className="flex items-center gap-1.5 text-xs text-slate-200 mb-1">
-                  <MapPin className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                  <span className="truncate">
-                    {[
-                      property.address,
-                      property.unitNumber ? `Unit ${property.unitNumber}` : null,
-                      [property.city, property.state].filter(Boolean).join(", "),
-                      property.zipCode,
-                    ]
-                      .filter(Boolean)
-                      .join(" • ")}
-                  </span>
-                </div>
-                <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold tracking-tight leading-tight">
-                  {property.title}
-                </h1>
+              {/* Verified Verification Badge */}
+              <div className="absolute bottom-4 left-4 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/95 backdrop-blur-md text-slate-900 text-xs font-extrabold shadow-lg">
+                <BadgeCheck className="w-4 h-4 text-blue-600" />
+                <span>Verified by Kyron Realty AI</span>
               </div>
             </div>
 
-            {/* Thumbnail Column (4 cols) */}
-            <div className="lg:col-span-4 flex flex-row lg:flex-col gap-3 overflow-x-auto lg:overflow-visible pb-1 lg:pb-0">
-              {images.slice(0, 3).map((img: string, idx: number) => (
+            {/* Thumbnail Grid Strip (4 cols) */}
+            <div className="lg:col-span-4 grid grid-cols-2 gap-3.5">
+              {images.slice(0, 4).map((img, idx) => (
                 <button
                   key={idx}
                   onClick={() => setActiveImageIdx(idx)}
-                  className={`relative flex-1 min-w-[140px] lg:min-w-0 aspect-16/10 rounded-2xl overflow-hidden border-2 transition-all cursor-pointer ${
+                  className={`relative aspect-4/3 rounded-2xl overflow-hidden border-2 transition-all cursor-pointer ${
                     activeImageIdx === idx
                       ? "border-blue-600 shadow-md ring-2 ring-blue-500/20"
                       : "border-slate-200/80 opacity-70 hover:opacity-100"
@@ -263,10 +201,10 @@ export function PublicListingClient({
 
         {/* 2-Column Main Body Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* Left Column: Specs, Voice Pitch, About, Amenities, Commute Map, Policies & FAQs (8 cols) */}
+          {/* Left Column: Price & Specs Header, Voice Pitch, Commute Map, Amenities, Policies & FAQs (8 cols) */}
           <div className="lg:col-span-8 space-y-8">
             {/* Primary Price & Conversion Action Header */}
-            <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/90 shadow-xs">
+            <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/90 shadow-xs space-y-5">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                   <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">
@@ -280,43 +218,47 @@ export function PublicListingClient({
                   </div>
                 </div>
 
-                {/* Direct Action Buttons */}
+                {/* Direct Action Button */}
                 <div className="flex items-center gap-2.5">
                   <button
-                    onClick={() => setIsVoiceModalOpen(true)}
-                    className="flex-1 sm:flex-none px-5 py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-extrabold text-xs sm:text-sm shadow-md shadow-blue-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer group"
+                    onClick={handleOpenSarah}
+                    className="px-5 py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-extrabold text-xs sm:text-sm shadow-md shadow-blue-600/25 transition-all flex items-center justify-center gap-2.5 cursor-pointer group"
                   >
-                    <PhoneCall className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                    <span>Talk with Sarah (Voice AI)</span>
-                  </button>
-
-                  <button
-                    onClick={() => setIsBookingModalOpen(true)}
-                    className="flex-1 sm:flex-none px-5 py-3.5 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    <Calendar className="w-4 h-4" />
-                    <span>Book Tour</span>
+                    <div className="relative w-6 h-6 rounded-full overflow-hidden shrink-0 ring-2 ring-white/40">
+                      <Image
+                        src={sarahAvatarUrl}
+                        alt="Sarah"
+                        fill
+                        sizes="24px"
+                        unoptimized={true}
+                        className="object-cover"
+                      />
+                      <span className="absolute bottom-0 right-0 w-1.5 h-1.5 rounded-full bg-emerald-400 ring-1 ring-white" />
+                    </div>
+                    <span>Talk to Sarah</span>
                   </button>
                 </div>
               </div>
-            </div>
 
-            {/* Key Specifications Bento */}
-            <PropertySpecsBento
-              bedrooms={property.bedrooms}
-              bathrooms={property.bathrooms}
-              washrooms={property.washrooms}
-              sqft={property.sqft}
-              availableDate={property.availableDate}
-              floorNumber={property.floorNumber}
-              storeys={property.storeys}
-              furnishingStatus={property.furnishingStatus}
-              yearBuilt={property.yearBuilt}
-              securityDeposit={property.securityDeposit}
-              minLeaseMonths={property.minLeaseMonths}
-              hoaFeeMonthly={property.hoaFeeMonthly}
-              listingType={property.listingType}
-            />
+              {/* Integrated Key Specifications Pill Strip */}
+              <div className="pt-4 border-t border-slate-100">
+                <PropertySpecsBento
+                  bedrooms={property.bedrooms}
+                  bathrooms={property.bathrooms}
+                  washrooms={property.washrooms}
+                  sqft={property.sqft}
+                  availableDate={property.availableDate}
+                  floorNumber={property.floorNumber}
+                  storeys={property.storeys}
+                  furnishingStatus={property.furnishingStatus}
+                  yearBuilt={property.yearBuilt}
+                  securityDeposit={property.securityDeposit}
+                  minLeaseMonths={property.minLeaseMonths}
+                  hoaFeeMonthly={property.hoaFeeMonthly}
+                  listingType={property.listingType}
+                />
+              </div>
+            </div>
 
             {/* Sarah AI Voice Elevator Pitch Feature Callout */}
             {knowledgeBase?.synthesizedSalesPitch && (
@@ -335,10 +277,20 @@ export function PublicListingClient({
                     </p>
                     <div className="pt-2 flex items-center gap-3">
                       <button
-                        onClick={() => setIsVoiceModalOpen(true)}
-                        className="px-4 py-2 rounded-xl bg-white text-blue-700 font-extrabold text-xs hover:bg-blue-50 transition-colors shadow-sm cursor-pointer"
+                        onClick={handleOpenSarah}
+                        className="px-4 py-2 rounded-xl bg-white text-blue-700 font-extrabold text-xs hover:bg-blue-50 transition-colors shadow-sm cursor-pointer flex items-center gap-2"
                       >
-                        Ask Sarah Live Questions &rarr;
+                        <div className="relative w-4 h-4 rounded-full overflow-hidden shrink-0">
+                          <Image
+                            src={sarahAvatarUrl}
+                            alt="Sarah"
+                            fill
+                            sizes="16px"
+                            unoptimized={true}
+                            className="object-cover"
+                          />
+                        </div>
+                        <span>Talk to Sarah &rarr;</span>
                       </button>
                     </div>
                   </div>
@@ -346,26 +298,12 @@ export function PublicListingClient({
               </div>
             )}
 
-            {/* About this Property & Narrative */}
-            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/90 shadow-xs space-y-4">
-              <h2 className="text-base sm:text-lg font-extrabold text-slate-900 tracking-tight">
-                About this Property
-              </h2>
-              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed whitespace-pre-line">
-                {property.description}
-              </p>
-
-              {knowledgeBase?.neighborhoodSummary && (
-                <div className="pt-4 border-t border-slate-100">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                    Neighborhood Highlights
-                  </span>
-                  <p className="text-xs sm:text-sm text-slate-700 leading-relaxed italic">
-                    &ldquo;{knowledgeBase.neighborhoodSummary}&rdquo;
-                  </p>
-                </div>
-              )}
-            </div>
+            {/* Interactive Location & Commute Explorer (Hyper-Local Intelligence) */}
+            <PropertyCommuteExplorer
+              hyperLocal={knowledgeBase?.hyperLocal}
+              propertyAddress={property.address}
+              city={property.city || undefined}
+            />
 
             {/* Verified Amenities & Unique Features */}
             {((property.amenities && property.amenities.length > 0) ||
@@ -394,13 +332,6 @@ export function PublicListingClient({
               </div>
             )}
 
-            {/* Interactive Location & Commute Explorer */}
-            <PropertyCommuteExplorer
-              hyperLocal={knowledgeBase?.hyperLocal}
-              propertyAddress={property.address}
-              city={property.city || undefined}
-            />
-
             {/* Verified Building Policies & FAQs */}
             <PropertyPoliciesFaqSection
               petPolicyDetail={knowledgeBase?.petPolicyDetail}
@@ -412,112 +343,50 @@ export function PublicListingClient({
             />
           </div>
 
-          {/* Right Sidebar Column: Voice Concierge Card & Tour Booking (4 cols) */}
+          {/* Right Sidebar Column: Voice Concierge Card (4 cols) */}
           <div className="lg:col-span-4 space-y-6 lg:sticky lg:top-20">
             {/* Voice Concierge Hero Card (Voice-First Prominence) */}
             <SarahVoiceConciergeCard
-              onStartCall={() => setIsVoiceModalOpen(true)}
+              onStartCall={handleOpenSarah}
               propertyTitle={property.title}
             />
-
-            {/* In-Person / Video Tour Booking Card */}
-            <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-xs">
-              <div className="flex items-center gap-2 text-xs font-bold text-blue-700 uppercase tracking-wider mb-1">
-                <Calendar className="w-4 h-4" />
-                <span>Schedule a Walkthrough</span>
-              </div>
-              <h3 className="text-base font-extrabold text-slate-900 mb-1">
-                Private In-Person Tour
-              </h3>
-              <p className="text-xs text-slate-500 mb-4 leading-relaxed">
-                Tour this property with our property manager or via scheduled walkthrough.
-              </p>
-
-              <TourBookingForm
-                name={bookName}
-                phone={bookPhone}
-                date={bookDate}
-                onNameChange={setBookName}
-                onPhoneChange={setBookPhone}
-                onDateChange={setBookDate}
-                onSubmit={handleDirectTourBooking}
-                isSubmitting={isSubmittingBooking}
-                success={bookingSuccess}
-                successTitle="Your Viewing Request is Confirmed!"
-                submitLabel="Confirm Viewing Appointment"
-                busyLabel="Booking Tour..."
-              />
-
-              {/* FUD Shield */}
-              <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-center gap-1.5 text-[11px] text-slate-500">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Zero fees • Instant automated confirmation</span>
-              </div>
-            </div>
           </div>
         </div>
       </main>
 
-      {/* Clean Modern Footer */}
-      <PublicListingFooter />
-
-      {/* Floating Bottom Sticky Action Bar */}
-      <div className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200/90 py-3 px-4 shadow-xl">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
-          <div className="hidden sm:block min-w-0">
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block truncate">
-              {property.title}
+      {/* Sticky Bottom Bar on Mobile */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-20 bg-white/95 backdrop-blur-md border-t border-slate-200/90 p-4 shadow-lg">
+        <div className="max-w-md mx-auto flex items-center justify-between gap-4">
+          <div>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+              {property.listingType === "rent" ? "Rent" : "Price"}
             </span>
             <span className="text-base font-extrabold text-slate-900">
               ₹{Number(property.price).toLocaleString("en-IN")}
-              {property.listingType === "rent" ? "/mo" : ""}
+              {property.listingType === "rent" && <span className="text-xs font-normal text-slate-500">/mo</span>}
             </span>
           </div>
 
-          <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+          <div className="flex items-center gap-3">
             <button
-              onClick={() => setIsShareModalOpen(true)}
-              className="p-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold transition-colors cursor-pointer"
-              title="Show QR Code"
+              onClick={handleOpenSarah}
+              className="px-5 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-extrabold text-xs sm:text-sm shadow-lg shadow-blue-600/25 transition-all flex items-center justify-center gap-2.5 cursor-pointer"
             >
-              <QrCode className="w-5 h-5" />
-            </button>
-
-            <button
-              onClick={() => setIsBookingModalOpen(true)}
-              className="flex-1 sm:flex-none px-4 py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs"
-            >
-              <Calendar className="w-4 h-4" />
-              <span>Book Viewing</span>
-            </button>
-
-            <button
-              onClick={() => setIsVoiceModalOpen(true)}
-              className="flex-1 sm:flex-none px-5 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-extrabold text-xs sm:text-sm shadow-lg shadow-blue-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer animate-pulse"
-            >
-              <PhoneCall className="w-4 h-4" />
-              <span>Talk with Sarah</span>
+              <div className="relative w-5 h-5 rounded-full overflow-hidden shrink-0 ring-1 ring-white/40">
+                <Image
+                  src={sarahAvatarUrl}
+                  alt="Sarah"
+                  fill
+                  sizes="20px"
+                  unoptimized={true}
+                  className="object-cover"
+                />
+              </div>
+              <span>Talk to Sarah</span>
             </button>
           </div>
         </div>
       </div>
-
-      {/* Voice Sales Agent Modal */}
-      {isVoiceModalOpen && (
-        <VoiceSalesAgentModal
-          onClose={() => setIsVoiceModalOpen(false)}
-          property={{
-            id: property.id,
-            title: property.title,
-            slug: property.slug,
-            price: property.price,
-            listingType: property.listingType,
-            address: property.address,
-            city: property.city || undefined,
-            coverImageUrl: currentHeroImage,
-          }}
-        />
-      )}
 
       {/* Share & QR Modal */}
       {isShareModalOpen && (
@@ -530,26 +399,8 @@ export function PublicListingClient({
         />
       )}
 
-      {/* Tour Booking Modal */}
-      {isBookingModalOpen && (
-        <TourBookingModal propertyTitle={property.title} onClose={() => setIsBookingModalOpen(false)}>
-          <TourBookingForm
-            name={bookName}
-            phone={bookPhone}
-            date={bookDate}
-            onNameChange={setBookName}
-            onPhoneChange={setBookPhone}
-            onDateChange={setBookDate}
-            onSubmit={handleDirectTourBooking}
-            isSubmitting={isSubmittingBooking}
-            success={bookingSuccess}
-            successTitle="Viewing Confirmed!"
-            successNote="We will reach out to confirm your visit."
-            submitLabel="Submit Viewing Request"
-            busyLabel="Booking..."
-          />
-        </TourBookingModal>
-      )}
+      {/* Public Listing Footer */}
+      <PublicListingFooter />
     </div>
   );
 }

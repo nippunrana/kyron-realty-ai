@@ -99,6 +99,30 @@ describe("the owner's floor price never reaches the prompt", () => {
   });
 });
 
+describe("the opening beat always states what the home costs", () => {
+  for (const entry of ["handover", "cold"] as const) {
+    test(`on a ${entry}, the home and its rent are both named`, () => {
+      const { systemPrompt } = promptFor({ budgetMax: 50000 }, entry);
+      assert.match(systemPrompt, /opening beat MUST name this home and say what it costs/);
+      assert.match(systemPrompt, /"Green Valley Residency" at ₹50,000 per month/);
+      assert.match(systemPrompt, /Never make them ask for the price/);
+    });
+  }
+
+  test("an unpriced home says so instead of guessing a figure", () => {
+    const { systemPrompt } = buildPropertyPrompt({
+      facts: { ...FACTS, price: 0 },
+      requirements: emptyRequirements(),
+      fit: checkPropertyFit(emptyRequirements(), { ...HOME, price: 0 }),
+      visits: [],
+      searchSummary: "",
+      entry: "cold",
+    });
+    assert.match(systemPrompt, /This home has no verified price/);
+    assert.match(systemPrompt, /Never quote or estimate a figure/);
+  });
+});
+
 describe("the two ways a caller arrives", () => {
   test("a handover must open by referring back to what they said", () => {
     const { systemPrompt } = promptFor({ budgetMax: 50000 }, "handover");
