@@ -113,11 +113,52 @@ describe("stripUITags", () => {
   test("removes tags and re-attaches punctuation", () => {
     assert.equal(stripUITags(LINES.openPhotos), "I've opened your photo upload window on your screen. Add photos from your computer, or scan the QR code to send them straight from your phone.");
     assert.equal(stripUITags("Done [UI:CLOSE]"), "Done");
+    assert.equal(stripUITags("Your listing is live! Take care![UI:CLOSE_CALL]"), "Your listing is live! Take care!");
   });
 
   test("leaves untagged text byte-for-byte alone", () => {
     const text = "Rent is 95,000 , right ?";
     assert.equal(stripUITags(text), text);
+  });
+});
+
+describe("mapTranscriptionsToMessages system cue isolation", () => {
+  test("filters out internal [DEPLOY_CONFIRMED] and [DEPLOY_FAILED] cues", async () => {
+    const { mapTranscriptionsToMessages } = await import("./voice-transcript.ts");
+    const rawItems = [
+      {
+        turn_id: 1,
+        text: "This looks good, deploy it.",
+        uid: "user-123",
+      },
+      {
+        turn_id: 2,
+        text: "[DEPLOY_CONFIRMED] The listing was successfully published and saved to the database. Deliver your warm, celebratory closing remarks and sign off with [UI:CLOSE_CALL] now.",
+        uid: "user-123",
+      },
+      {
+        turn_id: 3,
+        text: "Your listing is successfully published and live! Your 24/7 AI voice sales agent is active. Take care![UI:CLOSE_CALL]",
+        uid: "agent-999",
+      },
+      {
+        turn_id: 4,
+        text: "[DEPLOY_FAILED] Database connection timed out.",
+        uid: "user-123",
+      },
+    ];
+
+    const messages = mapTranscriptionsToMessages(rawItems, (item) => item.uid === "user-123");
+
+    // Must only have 2 messages: user speech and clean assistant speech (both system cues stripped)
+    assert.equal(messages.length, 2);
+    assert.equal(messages[0].text, "This looks good, deploy it.");
+    assert.equal(messages[0].role, "user");
+    assert.equal(
+      messages[1].text,
+      "Your listing is successfully published and live! Your 24/7 AI voice sales agent is active. Take care!"
+    );
+    assert.equal(messages[1].role, "assistant");
   });
 });
 

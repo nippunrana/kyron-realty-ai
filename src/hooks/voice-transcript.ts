@@ -1,5 +1,5 @@
 import type { VoiceMessage } from "./voice-agent-types";
-import { stripUITags } from "./voice-intents";
+import { stripUITags } from "./voice-intents.ts";
 
 export const formatTimestamp = (ms?: number) =>
   new Date(ms ?? Date.now()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
