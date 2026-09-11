@@ -13,6 +13,7 @@ const TAG_ACTIONS: Record<string, UIAction> = {
   OPEN_PHOTOS: "open_upload_modal",
   OPEN_FINAL: "open_final_modal",
   CLOSE: "close_review_modal",
+  CLOSE_CALL: "close_call",
 };
 
 export type AssistantIntentSource = "tag" | "regex";

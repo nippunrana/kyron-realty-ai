@@ -47,7 +47,9 @@ export type UIAction =
   | "open_hyper_local"
   | "close_hyper_local"
   /** Elena winding up an off-topic call. Terminal - the studio hangs up on it. */
-  | "end_call";
+  | "end_call"
+  /** Elena delivering her closing remarks after deploy. Studio hangs up gracefully on it. */
+  | "close_call";
 
 export interface UseAgoraVoiceAgentOptions {
   onCallEnd?: (transcript: VoiceMessage[]) => void;

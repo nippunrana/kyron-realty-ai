@@ -58,6 +58,13 @@ describe("tags are the primary signal", () => {
     assert.equal(detectAssistantModalIntent("Here it is [ ui: open_core ].")?.action, "open_core_modal");
   });
 
+  test("CLOSE_CALL tag maps to close_call action", () => {
+    assert.equal(
+      detectAssistantModalIntent("Congratulations, your 24/7 AI sales agent is now deployed! Goodbye! [UI:CLOSE_CALL]")?.action,
+      "close_call"
+    );
+  });
+
   test("the last tag in a turn wins", () => {
     assert.equal(
       detectAssistantModalIntent("I've minimized the card [UI:CLOSE]. And here's the photo window [UI:OPEN_PHOTOS].")?.action,

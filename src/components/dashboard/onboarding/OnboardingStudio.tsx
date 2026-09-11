@@ -8,7 +8,7 @@ import { ReviewSpecsModal } from "./ReviewSpecsModal";
 import { ImageUploadModal } from "./ImageUploadModal";
 import type { HyperLocalKbData } from "@/db/schema";
 import { TelemetryHUD, type TelemetryLogEvent } from "./TelemetryHUD";
-import { areCoreSpecsVerified, getCoreSpecStatus } from "./inspector-specs";
+import { areCoreSpecsVerified } from "./inspector-specs";
 import {
   captureEntryLayout,
   fadeBackdrop,
@@ -171,8 +171,6 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
     },
   }));
   const [pillLabels, setPillLabels] = useState<PillLabels>({});
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [activePipelineStep, setActivePipelineStep] = useState<string | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
   const [pipelineError, setPipelineError] = useState<string | null>(null);
   const [isTurnSyncing, setIsTurnSyncing] = useState(false);
@@ -236,6 +234,8 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
   }, [isTurnSyncing, advanceEntryStage]);
 
   const voiceControlRef = useRef<VoiceControlState | null>(null);
+  const isDeployClosingRef = useRef(false);
+  const deployClosingResolveRef = useRef<(() => void) | null>(null);
   const handleVoiceStateSync = useCallback((state: VoiceControlState) => {
     voiceControlRef.current = state;
     setVoiceControl(state);
@@ -803,6 +803,15 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
         return;
       }
 
+      if (action === "close_call") {
+        addTelemetryLog("INTENT", "Elena delivered closing sign-off for deployment", null, undefined, "success");
+        if (deployClosingResolveRef.current) {
+          deployClosingResolveRef.current();
+          deployClosingResolveRef.current = null;
+        }
+        return;
+      }
+
       if (action === "open_core_modal") {
         if (onboardingStageRef.current === "core") {
           if (!isTurnSyncingRef.current || areCoreSpecsVerified(dataRef.current.property, dataRef.current.knowledgeBase)) {
@@ -886,6 +895,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
     isExtractionBusyRef.current = true;
     setIsTurnSyncing(true);
     isTurnSyncingRef.current = true;
+    setPipelineError(null);
     const sequenceId = ++turnSequenceRef.current;
     const startTime = Date.now();
 
@@ -1186,6 +1196,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
       // Never invoke console.error on AbortError to prevent Next.js Turbopack dev error overlay
       if (!isAborted) {
         console.error("[Turn Extraction Client Error]:", err);
+        setPipelineError(err.message || "Turn extraction encountered an issue.");
       }
     } finally {
       // If new turns arrived while this extraction was in flight, execute the latest coalesced snapshot
@@ -1210,6 +1221,16 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
   const handleTurnExtraction = (slidingWindow: TurnMessage[]) => {
     if (!slidingWindow || slidingWindow.length === 0) return;
 
+    if (isDeployClosingRef.current) {
+      setTimeout(() => {
+        if (deployClosingResolveRef.current) {
+          deployClosingResolveRef.current();
+          deployClosingResolveRef.current = null;
+        }
+      }, 1500);
+      return;
+    }
+
     const windowToRun = failedTurnBufferRef.current.length > 0
       ? mergeTurnWindows(failedTurnBufferRef.current, slidingWindow)
       : slidingWindow;
@@ -1232,159 +1253,12 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
     }));
   };
 
-  // Conversational Extraction Handler (invoked at call completion with owner dialogue)
-  const handleSendMessage = async (text: string) => {
-    if (!text || !text.trim()) return;
-    if (conductTerminatedRef.current) {
-      addTelemetryLog(
-        "INTENT",
-        "Skipped end-of-call synthesis (call ended by the conduct guardrail)",
-        null,
-        undefined,
-        "warn"
-      );
-      return;
-    }
-
-    const startTime = Date.now();
-    addTelemetryLog("DISCONNECT-SYNTHESIS", "Initiated end-of-call full transcript synthesis", {
-      transcriptLength: text.length,
-    });
-
-    setIsProcessing(true);
-    setPipelineError(null);
-    setActivePipelineStep("Synthesizing voice intelligence & knowledge base...");
-
-    try {
-      const res = await fetch(`${BASE_PATH}/api/onboarding/extract`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          conversationText: text,
-          markdown: dataRef.current.knowledgeBase.rawScrapedMarkdown || "",
-          existingImages: dataRef.current.property.images,
-          currentPropertyState: dataRef.current,
-        }),
-      });
-
-      const json = await res.json();
-      const elapsedMs = Date.now() - startTime;
-
-      if (!json.success || !json.data) {
-        throw new Error(json.error || "Knowledge-base synthesis failed.");
-      }
-
-      const synthUsage = json.data?.usage || json.usage;
-      if (synthUsage) {
-        setSessionUsage((prev) => ({
-          ...prev,
-          promptTokens: prev.promptTokens + (synthUsage.promptTokens || 0),
-          candidateTokens: prev.candidateTokens + (synthUsage.candidateTokens || 0),
-          totalTokens: prev.totalTokens + (synthUsage.totalTokens || 0),
-          totalCostUsd: Number((prev.totalCostUsd + (synthUsage.costUsd || 0)).toFixed(6)),
-        }));
-      }
-      const tokenInfo = synthUsage ? ` - ${synthUsage.totalTokens} tok (${synthUsage.costFormatted})` : "";
-
-      addTelemetryLog(
-        "DISCONNECT-SYNTHESIS",
-        `Full transcript synthesis completed (${elapsedMs}ms)${tokenInfo}`,
-        {
-          availableDate: json.data.property?.availableDate,
-          features: json.data.property?.features,
-          pillLabels: json.data.knowledgeBase?.pillLabels,
-          detectedDiscrepancies: json.data.detectedDiscrepancies,
-          usage: synthUsage,
-        },
-        elapsedMs,
-        "success"
-      );
-
-      if (json.data.knowledgeBase?.pillLabels && Object.keys(json.data.knowledgeBase.pillLabels).length > 0) {
-        setPillLabels((pl) => ({ ...pl, ...json.data.knowledgeBase.pillLabels }));
-      }
-
-      setData((prev) => {
-        const newProp = json.data.property || {};
-        const newKb = json.data.knowledgeBase || {};
-        const newMatrix = json.data.negotiationMatrix || {};
-        const verified = getCoreSpecStatus(prev.property);
-
-        return {
-          property: {
-            ...prev.property,
-            title: newProp.title || prev.property.title,
-            slug: newProp.slug || prev.property.slug,
-            description: newProp.description || prev.property.description,
-            // Protect live-verified specs: do not let end-of-call synthesis clobber them
-            listingType: verified.listingType ? prev.property.listingType : newProp.listingType,
-            propertyType: prev.property.propertyType || newProp.propertyType || "",
-            floorNumber: prev.property.floorNumber ?? newProp.floorNumber ?? null,
-            storeys: prev.property.storeys ?? newProp.storeys ?? null,
-            rentScope: prev.property.rentScope || newProp.rentScope || "",
-            washrooms: prev.property.washrooms ?? newProp.washrooms ?? null,
-            furnishingStatus: prev.property.furnishingStatus || newProp.furnishingStatus || "",
-            price: verified.price ? prev.property.price : (newProp.price || 0),
-            securityDeposit: newProp.securityDeposit || prev.property.securityDeposit,
-            minLeaseMonths: newProp.minLeaseMonths || prev.property.minLeaseMonths,
-            hoaFeeMonthly: newProp.hoaFeeMonthly || prev.property.hoaFeeMonthly,
-            address: verified.address ? prev.property.address : (newProp.address || ""),
-            unitNumber: newProp.unitNumber || prev.property.unitNumber,
-            city: prev.property.city?.trim() ? prev.property.city : (newProp.city || ""),
-            state: prev.property.state?.trim() ? prev.property.state : (newProp.state || ""),
-            zipCode: prev.property.zipCode?.trim() ? prev.property.zipCode : (newProp.zipCode || ""),
-            country: "India",
-            bedrooms: verified.bedrooms ? prev.property.bedrooms : (newProp.bedrooms || 0),
-            bathrooms: verified.bathrooms ? prev.property.bathrooms : (newProp.bathrooms || 0),
-            sqft: verified.sqft ? prev.property.sqft : (newProp.sqft || 0),
-            yearBuilt: newProp.yearBuilt || prev.property.yearBuilt,
-            availableDate: newProp.availableDate || prev.property.availableDate,
-            amenities: (newProp.amenities && newProp.amenities.length > 0) ? newProp.amenities : prev.property.amenities,
-            features: (newProp.features && newProp.features.length > 0) ? newProp.features : prev.property.features,
-            coverImageUrl: newProp.coverImageUrl || prev.property.coverImageUrl,
-            images: (newProp.images && newProp.images.length > 0) ? newProp.images : prev.property.images,
-          },
-          knowledgeBase: {
-            ...prev.knowledgeBase,
-            rawScrapedMarkdown: newKb.rawScrapedMarkdown || prev.knowledgeBase.rawScrapedMarkdown,
-            synthesizedSalesPitch: newKb.synthesizedSalesPitch || prev.knowledgeBase.synthesizedSalesPitch,
-            neighborhoodSummary: newKb.neighborhoodSummary || prev.knowledgeBase.neighborhoodSummary,
-            schoolDistrictInfo: newKb.schoolDistrictInfo || prev.knowledgeBase.schoolDistrictInfo,
-            petPolicyDetail: newKb.petPolicyDetail || prev.knowledgeBase.petPolicyDetail,
-            parkingDetail: newKb.parkingDetail || prev.knowledgeBase.parkingDetail,
-            utilitiesDetail: newKb.utilitiesDetail || prev.knowledgeBase.utilitiesDetail,
-            applicationProcess: newKb.applicationProcess || prev.knowledgeBase.applicationProcess,
-            faqs: (newKb.faqs && newKb.faqs.length > 0) ? newKb.faqs : prev.knowledgeBase.faqs,
-            agentTone: newKb.agentTone || prev.knowledgeBase.agentTone,
-            greetingMessage: newKb.greetingMessage || prev.knowledgeBase.greetingMessage,
-            contactEmail: newKb.contactEmail || prev.knowledgeBase.contactEmail || "",
-            unknownFallbackPolicy: newKb.unknownFallbackPolicy || prev.knowledgeBase.unknownFallbackPolicy,
-            kbData: hyperLocalDataRef.current || prev.knowledgeBase.kbData,
-          },
-          negotiationMatrix: {
-            ...prev.negotiationMatrix,
-            targetPrice: newMatrix.targetPrice || prev.negotiationMatrix.targetPrice,
-            minFloorPrice: newMatrix.minFloorPrice || prev.negotiationMatrix.minFloorPrice,
-            maxAllowedDiscountPct: newMatrix.maxAllowedDiscountPct || prev.negotiationMatrix.maxAllowedDiscountPct,
-            concessionRules: (newMatrix.concessionRules && newMatrix.concessionRules.length > 0) ? newMatrix.concessionRules : prev.negotiationMatrix.concessionRules,
-            notesForAgent: newMatrix.notesForAgent || prev.negotiationMatrix.notesForAgent,
-          },
-        };
-      });
-    } catch (err) {
-      console.error("Chat update error:", err);
-      setPipelineError(err instanceof Error ? err.message : "The knowledge-base synthesis failed.");
-    } finally {
-      setIsProcessing(false);
-      setActivePipelineStep(null);
-    }
-  };
-
   // Publish Handler
   const handlePublish = async () => {
     setIsPublishing(true);
+    isDeployClosingRef.current = true;
     try {
-      const res = await fetch(`${BASE_PATH}/api/properties/create`, {
+      const publishPromise = fetch(`${BASE_PATH}/api/properties/create`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1400,9 +1274,43 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
           negotiationMatrix: data.negotiationMatrix,
           draftId: draftIdRef.current,
         }),
-      });
+      }).then((res) => res.json());
 
-      const json = await res.json();
+      if (voiceControlRef.current?.isCallActive && voiceControlRef.current?.sendTextMessage) {
+        addTelemetryLog(
+          "INTENT",
+          "Deploy initiated: Alerting Elena Vance to deliver closing remarks",
+          null,
+          undefined,
+          "info"
+        );
+
+        try {
+          await voiceControlRef.current.sendTextMessage(
+            "[DEPLOY_ALERT] The owner has clicked Deploy to publish this listing. Please deliver your final closing congratulations and sign-off now."
+          );
+
+          await new Promise<void>((resolve) => {
+            deployClosingResolveRef.current = resolve;
+            setTimeout(() => {
+              if (deployClosingResolveRef.current === resolve) {
+                deployClosingResolveRef.current = null;
+                resolve();
+              }
+            }, 10000);
+          });
+        } catch (msgErr) {
+          console.warn("Deploy alert message warning:", msgErr);
+        }
+
+        try {
+          await voiceControlRef.current.endCall();
+        } catch (endErr) {
+          console.warn("Call disconnect error on deploy:", endErr);
+        }
+      }
+
+      const json = await publishPromise;
       if (json.success) {
         setShowFinalModal(false);
         setShowUploadModal(false);
@@ -1419,6 +1327,8 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
       alert("An unexpected error occurred while publishing.");
     } finally {
       setIsPublishing(false);
+      isDeployClosingRef.current = false;
+      deployClosingResolveRef.current = null;
     }
   };
 
@@ -1507,13 +1417,12 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
             }}
             ownerName={user?.name || ""}
             ownerEmail={user?.email || ""}
-            onSendMessage={handleSendMessage}
             onTurnExtraction={handleTurnExtraction}
             onUIAction={handleUIAction}
             onLogEvent={addTelemetryLog}
             onVoiceStateSync={handleVoiceStateSync}
-            isProcessing={isProcessing}
-            activePipelineStep={activePipelineStep}
+            isProcessing={isTurnSyncing}
+            activePipelineStep={isTurnSyncing ? "Extracting live specifications..." : null}
             pipelineError={pipelineError}
           />
         </div>
@@ -1541,7 +1450,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
               }
             }}
             isPublishing={isPublishing}
-            isExtracting={isProcessing}
+            isExtracting={isTurnSyncing}
             isTurnSyncing={isTurnSyncing}
             isEnrichingLocation={isEnrichingLocation}
             hyperLocalData={hyperLocalData}

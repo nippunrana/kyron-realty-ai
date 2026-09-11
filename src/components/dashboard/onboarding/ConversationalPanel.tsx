@@ -26,12 +26,13 @@ export interface VoiceControlState {
   isCallActive: boolean;
   isMuted: boolean;
   toggleMute: () => void;
-  /** Lets the studio hang up itself when the conduct guardrail trips. */
+  /** Lets the studio hang up itself when the conduct guardrail trips or upon deploy completion. */
   endCall: () => Promise<void>;
+  /** Sends a text/prompt message to Elena Vance over Agora RTM. */
+  sendTextMessage: (text: string) => void | Promise<void>;
 }
 
 interface ConversationalPanelProps {
-  onSendMessage: (text: string) => Promise<void>;
   onTurnExtraction?: (slidingWindow: TurnMessage[]) => void;
   onUIAction?: (action: UIAction) => void;
   onLogEvent?: (category: "AGORA" | "INTENT", title: string, details?: any) => void;
@@ -51,7 +52,6 @@ interface ConversationalPanelProps {
 }
 
 export function ConversationalPanel({
-  onSendMessage,
   onTurnExtraction,
   onUIAction,
   onLogEvent,
@@ -70,21 +70,6 @@ export function ConversationalPanel({
   const [micError, setMicError] = useState<string | null>(null);
   const [isRequestingMic, setIsRequestingMic] = useState(false);
   const transcriptContainerRef = useRef<HTMLDivElement>(null);
-
-  const handleCallEnd = useCallback(
-    (finalTranscript: VoiceMessage[]) => {
-      // Preserve full question & confirmation context with explicit role labels
-      const formattedTranscript = finalTranscript
-        .filter((m) => m.text && m.text.trim())
-        .map((m) => `[${m.role === "assistant" ? "ELENA VANCE" : "OWNER"}]: ${m.text.trim()}`)
-        .join("\n\n");
-
-      if (formattedTranscript.trim()) {
-        onSendMessage(formattedTranscript);
-      }
-    },
-    [onSendMessage]
-  );
 
   const handleAgentTurnComplete = useCallback(
     (currentTranscript: VoiceMessage[]) => {
@@ -119,22 +104,23 @@ export function ConversationalPanel({
     startCall,
     toggleMute,
     endCall,
+    sendTextMessage,
   } = useAgoraVoiceAgent({
-    onCallEnd: handleCallEnd,
     onAgentTurnComplete: handleAgentTurnComplete,
     onUIAction,
     onLogEvent,
   });
 
-  // Synchronize active call and mute state to parent for modal controls
+  // Synchronize active call, mute, and text dispatch to parent
   useEffect(() => {
     onVoiceStateSync?.({
       isCallActive,
       isMuted,
       toggleMute,
       endCall,
+      sendTextMessage,
     });
-  }, [isCallActive, isMuted, toggleMute, endCall, onVoiceStateSync]);
+  }, [isCallActive, isMuted, toggleMute, endCall, sendTextMessage, onVoiceStateSync]);
 
   /**
    * Acquire the microphone before `startCall`, not during it. Agora asks for the mic at
