@@ -115,9 +115,9 @@ export default async function PublicListingPage({ params }: ListingPageProps) {
     faqs: kb?.faqs ?? [],
     hyperLocal: kb?.kbData
       ? {
-          resolvedLocality: kb.kbData.resolvedLocality ?? null,
-          transit: kb.kbData.transit ?? null,
-          neighborhood: kb.kbData.neighborhood ?? null,
+          resolvedLocality: kb.kbData.resolvedLocality ?? undefined,
+          transit: kb.kbData.transit ?? undefined,
+          neighborhood: kb.kbData.neighborhood ?? undefined,
           nearbyDistances: kb.kbData.nearbyDistances ?? [],
           distancesMeasured: kb.kbData.distancesMeasured ?? false,
         }

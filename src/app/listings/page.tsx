@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { Metadata } from "next";
 import { db } from "@/db";
 import { properties } from "@/db/schema";
@@ -33,8 +34,11 @@ export default async function ListingsPage() {
         bedrooms: properties.bedrooms,
         bathrooms: properties.bathrooms,
         sqft: properties.sqft,
+        furnishingStatus: properties.furnishingStatus,
         coverImageUrl: properties.coverImageUrl,
         images: properties.images,
+        amenities: properties.amenities,
+        features: properties.features,
         status: properties.status,
         knowledgeBase: properties.knowledgeBase,
       })
@@ -47,7 +51,17 @@ export default async function ListingsPage() {
       if (r.city && r.city.trim()) {
         citiesSet.add(r.city.trim());
       }
-      const kbData = r.knowledgeBase?.kbData;
+      const kb = r.knowledgeBase;
+      const kbData = kb?.kbData;
+      const petDetail = kb?.petPolicyDetail || "";
+      const features = (r.features as string[]) || [];
+      const amenities = (r.amenities as string[]) || [];
+      const isPetFriendly =
+        features.some((f) => /pet/i.test(f)) ||
+        amenities.some((a) => /pet/i.test(a)) ||
+        (petDetail.length > 0 && !/no pet|prohibited|not allowed/i.test(petDetail)) ||
+        /pet friendly|pets allowed/i.test(r.description || "");
+
       return {
         id: r.id,
         slug: r.slug,
@@ -62,8 +76,10 @@ export default async function ListingsPage() {
         bedrooms: r.bedrooms,
         bathrooms: r.bathrooms,
         sqft: r.sqft,
+        furnishingStatus: r.furnishingStatus || null,
         coverImageUrl: r.coverImageUrl,
         images: r.images,
+        isPetFriendly,
         status: r.status,
         searchTags: kbData?.searchTags || [],
         transit: kbData?.transit || null,
@@ -77,9 +93,17 @@ export default async function ListingsPage() {
   const availableCities = Array.from(citiesSet).sort();
 
   return (
-    <ListingsDiscoveryClient
-      initialProperties={initialProperties}
-      availableCities={availableCities}
-    />
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-8">
+          <div className="w-8 h-8 rounded-full border-2 border-blue-600 border-t-transparent animate-spin" />
+        </div>
+      }
+    >
+      <ListingsDiscoveryClient
+        initialProperties={initialProperties}
+        availableCities={availableCities}
+      />
+    </Suspense>
   );
 }

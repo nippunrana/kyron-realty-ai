@@ -9,6 +9,7 @@ import {
   Radio,
 } from "lucide-react";
 import { HeroVoiceSimulator } from "@/components/home/HeroVoiceSimulator";
+import { QuickListingSearchBar } from "@/components/home/QuickListingSearchBar";
 import { SpeedToLeadComparison } from "@/components/home/SpeedToLeadComparison";
 import { ThreeStepEngine } from "@/components/home/ThreeStepEngine";
 import { NegotiationSimulator } from "@/components/home/NegotiationSimulator";
@@ -46,6 +47,12 @@ export default function Home() {
 
           {/* Nav Anchors */}
           <nav className="hidden md:flex items-center gap-6 text-xs font-semibold text-slate-600">
+            <Link
+              href="/listings"
+              className="text-blue-600 font-bold hover:text-blue-700 transition-colors"
+            >
+              Explore Listings
+            </Link>
             <a href="#speed-to-lead" className="hover:text-blue-600 transition-colors">
               Speed-to-Lead
             </a>
@@ -61,7 +68,14 @@ export default function Home() {
           </nav>
 
           {/* Action CTAs */}
-          <div className="flex items-center gap-2.5 sm:gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Link
+              href="/listings"
+              className="md:hidden inline-flex items-center px-2.5 py-1.5 text-xs font-bold text-blue-600 hover:text-blue-700 transition-colors"
+            >
+              Listings
+            </Link>
+
             <button
               type="button"
               onClick={() => setIsCallModalOpen(true)}
@@ -100,6 +114,11 @@ export default function Home() {
         {/* 1. Hero & Interactive Voice Simulator */}
         <HeroVoiceSimulator onOpenCallModal={() => setIsCallModalOpen(true)} />
 
+        {/* Quick Discovery Bar */}
+        <div className="w-full max-w-6xl mx-auto px-4 sm:px-6">
+          <QuickListingSearchBar />
+        </div>
+
         {/* 2. Speed-to-Lead Comparison */}
         <SpeedToLeadComparison />
 
@@ -135,7 +154,10 @@ export default function Home() {
             <span>— 24/7 Autonomous Voice AI for High-Ticket Real Estate & Flat Leasing.</span>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-4">
+            <Link href="/listings" className="font-bold text-blue-600 hover:text-blue-700 transition-colors">
+              Explore All Listings
+            </Link>
             <span className="flex items-center gap-1 text-slate-600 font-medium">
               <Radio className="w-3 h-3 text-emerald-600" />
               Agora SD-RTN Conversational AI

@@ -31,13 +31,21 @@ export function LegalLayout({
               Kyron Realty AI
             </span>
           </Link>
-          <Link
-            href="/"
-            className="flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-blue-700"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Back to home
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link
+              href="/listings"
+              className="text-xs font-semibold text-slate-600 hover:text-blue-700 transition-colors"
+            >
+              Explore Listings
+            </Link>
+            <Link
+              href="/"
+              className="flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-blue-700"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Back to home
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -62,6 +70,9 @@ export function LegalLayout({
         <div className="mx-auto flex max-w-4xl flex-col items-center justify-between gap-3 px-4 text-xs text-slate-500 sm:flex-row sm:px-6">
           <span>&copy; {new Date().getFullYear()} Egnitech. All rights reserved.</span>
           <div className="flex items-center gap-4">
+            <Link href="/listings" className="hover:text-blue-700 font-medium">
+              Explore Listings
+            </Link>
             <Link href="/privacy" className="hover:text-blue-700">
               Privacy Policy
             </Link>

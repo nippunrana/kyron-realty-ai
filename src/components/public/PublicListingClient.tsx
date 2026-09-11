@@ -23,65 +23,12 @@ import { PropertySpecsBento } from "./PropertySpecsBento";
 import { PropertyCommuteExplorer } from "./PropertyCommuteExplorer";
 import { PropertyPoliciesFaqSection } from "./PropertyPoliciesFaqSection";
 import { SarahVoiceConciergeCard } from "./SarahVoiceConciergeCard";
+import { PublicListingFooter } from "./PublicListingFooter";
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
 import { defaultTourDateTime } from "@/lib/listing-helpers";
 import { BASE_PATH } from "@/lib/base-path";
 import { formatPropertyTypeLabel } from "@/lib/property-types";
-
-interface PublicProperty {
-  id: number;
-  slug: string;
-  status: string;
-  title: string;
-  description: string | null;
-  address: string;
-  unitNumber?: string | null;
-  city?: string | null;
-  state?: string | null;
-  zipCode?: string | null;
-  country?: string | null;
-  listingType: string;
-  propertyType: string;
-  price: string;
-  securityDeposit?: string | null;
-  minLeaseMonths?: number | null;
-  hoaFeeMonthly?: string | null;
-  bedrooms: number | null;
-  bathrooms: string | null;
-  sqft: number | null;
-  floorNumber?: number | null;
-  storeys?: number | null;
-  rentScope?: string | null;
-  washrooms?: number | null;
-  furnishingStatus?: string | null;
-  yearBuilt?: number | null;
-  availableDate: string | Date | null;
-  coverImageUrl?: string | null;
-  images?: string[] | null;
-  amenities?: string[] | null;
-  features?: string[] | null;
-  qrCodeSvg?: string | null;
-}
-
-interface PublicKnowledgeBase {
-  synthesizedSalesPitch?: string | null;
-  neighborhoodSummary?: string | null;
-  schoolDistrictInfo?: string | null;
-  petPolicyDetail?: string | null;
-  parkingDetail?: string | null;
-  utilitiesDetail?: string | null;
-  washroomDetail?: string | null;
-  applicationProcess?: string | null;
-  faqs?: Array<{ question: string; answer: string; category: string }>;
-  hyperLocal?: any;
-}
-
-interface PublicListingClientProps {
-  property: PublicProperty;
-  knowledgeBase: PublicKnowledgeBase;
-  media: Array<{ id: number; url: string; mediaType?: string }>;
-  shareUrl: string;
-}
+import type { PublicListingClientProps } from "@/lib/public-listing-types";
 
 export function PublicListingClient({
   property,
@@ -173,9 +120,20 @@ export function PublicListingClient({
               </span>
             </Link>
             <span className="text-slate-300 text-xs shrink-0">/</span>
-            <span className="text-xs font-semibold text-slate-600 truncate max-w-[140px] sm:max-w-xs">
-              {locationSummary}
-            </span>
+            <Link
+              href="/listings"
+              className="text-xs font-semibold text-slate-600 hover:text-blue-600 transition-colors shrink-0"
+            >
+              All Listings
+            </Link>
+            {locationSummary && (
+              <>
+                <span className="text-slate-300 text-xs shrink-0">/</span>
+                <span className="text-xs font-semibold text-slate-500 truncate max-w-[120px] sm:max-w-xs">
+                  {locationSummary}
+                </span>
+              </>
+            )}
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
@@ -499,6 +457,9 @@ export function PublicListingClient({
           </div>
         </div>
       </main>
+
+      {/* Clean Modern Footer */}
+      <PublicListingFooter />
 
       {/* Floating Bottom Sticky Action Bar */}
       <div className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200/90 py-3 px-4 shadow-xl">

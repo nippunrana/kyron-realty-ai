@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, useTransition } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   Building2,
   PhoneCall,
@@ -15,7 +16,7 @@ import {
   X,
   Sparkles,
   Train,
-  ShieldCheck,
+  PawPrint,
 } from "lucide-react";
 import { VoiceSalesAgentModal } from "@/components/voice/VoiceSalesAgentModal";
 import { BASE_PATH } from "@/lib/base-path";
@@ -35,8 +36,10 @@ export interface DiscoveryPropertyItem {
   bedrooms: number | null;
   bathrooms: string | number | null;
   sqft: number | null;
+  furnishingStatus?: string | null;
   coverImageUrl: string | null;
   images: unknown;
+  isPetFriendly?: boolean;
   status: string;
   searchTags?: string[];
   transit?: {
@@ -61,15 +64,24 @@ export function ListingsDiscoveryClient({
   initialProperties,
   availableCities,
 }: ListingsDiscoveryClientProps) {
+  const searchParams = useSearchParams();
+  const initialCity = searchParams?.get("city") || "all";
+  const initialType = (searchParams?.get("listingType") as "all" | "rent" | "sale") || "all";
+  const initialPetFriendly =
+    searchParams?.get("petFriendly") === "true" || searchParams?.get("petFriendly") === "1";
+  const initialQuery = searchParams?.get("query") || "";
+
   const [propertiesList, setPropertiesList] = useState<DiscoveryPropertyItem[]>(initialProperties);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCity, setSelectedCity] = useState("all");
-  const [selectedType, setSelectedType] = useState<"all" | "rent" | "sale">("all");
+  const [searchQuery, setSearchQuery] = useState(initialQuery);
+  const [selectedCity, setSelectedCity] = useState(initialCity);
+  const [selectedType, setSelectedType] = useState<"all" | "rent" | "sale">(initialType);
   const [selectedBedrooms, setSelectedBedrooms] = useState<string>("all");
+  const [isPetFriendly, setIsPetFriendly] = useState<boolean>(initialPetFriendly);
+  const [selectedFurnishing, setSelectedFurnishing] = useState<string>("all");
   const [voiceModalProperty, setVoiceModalProperty] = useState<DiscoveryPropertyItem | null>(null);
   const [, startTransition] = useTransition();
 
-  // Dynamic search fetch when query/city/type changes
+  // Dynamic search fetch when query/city/type/petFriendly changes
   useEffect(() => {
     const controller = new AbortController();
 
@@ -79,6 +91,7 @@ export function ListingsDiscoveryClient({
         if (searchQuery.trim()) params.set("query", searchQuery.trim());
         if (selectedCity !== "all") params.set("city", selectedCity);
         if (selectedType !== "all") params.set("listingType", selectedType);
+        if (isPetFriendly) params.set("petFriendly", "true");
 
         const res = await fetch(`${BASE_PATH}/api/properties/search?${params.toString()}`, {
           signal: controller.signal,
@@ -103,24 +116,35 @@ export function ListingsDiscoveryClient({
       clearTimeout(timer);
       controller.abort();
     };
-  }, [searchQuery, selectedCity, selectedType]);
+  }, [searchQuery, selectedCity, selectedType, isPetFriendly]);
 
-  // Client-side bedroom filter
+  // Client-side filtering for bedrooms, pet-friendly and furnishing
   const displayedProperties = useMemo(() => {
     return propertiesList.filter((prop) => {
       if (selectedBedrooms !== "all") {
         const minBeds = parseInt(selectedBedrooms, 10);
         if ((prop.bedrooms ?? 0) < minBeds) return false;
       }
+      if (selectedFurnishing !== "all") {
+        const furnishing = (prop.furnishingStatus || "").toLowerCase();
+        if (selectedFurnishing === "bare_shell" && !furnishing.includes("bare")) return false;
+        if (selectedFurnishing === "semi_furnished" && !furnishing.includes("semi")) return false;
+        if (selectedFurnishing === "fully_furnished" && !furnishing.includes("fully")) return false;
+      }
+      if (isPetFriendly && !prop.isPetFriendly) {
+        return false;
+      }
       return true;
     });
-  }, [propertiesList, selectedBedrooms]);
+  }, [propertiesList, selectedBedrooms, selectedFurnishing, isPetFriendly]);
 
   const handleResetFilters = () => {
     setSearchQuery("");
     setSelectedCity("all");
     setSelectedType("all");
     setSelectedBedrooms("all");
+    setIsPetFriendly(false);
+    setSelectedFurnishing("all");
   };
 
   return (
@@ -253,6 +277,36 @@ export function ListingsDiscoveryClient({
                 <option value="4">4+ Bedrooms</option>
               </select>
             </div>
+
+            {/* Furnishing Dropdown */}
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="relative">
+                <select
+                  value={selectedFurnishing}
+                  onChange={(e) => setSelectedFurnishing(e.target.value)}
+                  className="py-2.5 px-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer"
+                >
+                  <option value="all">Any Furnishing</option>
+                  <option value="fully_furnished">Fully Furnished</option>
+                  <option value="semi_furnished">Semi-Furnished</option>
+                  <option value="bare_shell">Bare Shell</option>
+                </select>
+              </div>
+            </div>
+
+            {/* 1-Click Pet-Friendly Toggle */}
+            <button
+              type="button"
+              onClick={() => setIsPetFriendly((prev) => !prev)}
+              className={`inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer border shrink-0 ${
+                isPetFriendly
+                  ? "bg-emerald-600 text-white border-emerald-600 shadow-sm shadow-emerald-600/20"
+                  : "bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200"
+              }`}
+            >
+              <PawPrint className="w-3.5 h-3.5" />
+              <span>Pet-Friendly</span>
+            </button>
           </div>
 
           {/* City Filter Pills */}
@@ -297,7 +351,12 @@ export function ListingsDiscoveryClient({
             {displayedProperties.length} {displayedProperties.length === 1 ? "Property" : "Properties"} Available
             {selectedCity !== "all" && ` in ${selectedCity}`}
           </h2>
-          {(searchQuery || selectedCity !== "all" || selectedType !== "all" || selectedBedrooms !== "all") && (
+          {(searchQuery ||
+            selectedCity !== "all" ||
+            selectedType !== "all" ||
+            selectedBedrooms !== "all" ||
+            selectedFurnishing !== "all" ||
+            isPetFriendly) && (
             <button
               type="button"
               onClick={handleResetFilters}
@@ -365,6 +424,12 @@ export function ListingsDiscoveryClient({
                         <span className="px-2.5 py-0.5 rounded-lg bg-emerald-500/90 text-white text-[10px] font-bold uppercase">
                           {formatPropertyTypeLabel(prop.propertyType)}
                         </span>
+                        {prop.isPetFriendly && (
+                          <span className="px-2 py-0.5 rounded-lg bg-teal-600/90 backdrop-blur-md text-white text-[10px] font-bold flex items-center gap-1">
+                            <PawPrint className="w-2.5 h-2.5" />
+                            <span>Pet Friendly</span>
+                          </span>
+                        )}
                       </div>
 
                       {/* Live Voice Badge */}
@@ -492,20 +557,28 @@ export function ListingsDiscoveryClient({
       )}
 
       {/* Footer */}
-      <footer className="w-full border-t border-slate-200/80 bg-white/60 backdrop-blur-sm py-6 mt-12">
+      <footer className="w-full border-t border-slate-200/80 bg-white/60 backdrop-blur-sm py-8 mt-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
           <div className="flex items-center gap-2">
             <Building2 className="w-4 h-4 text-blue-600" />
             <span className="font-semibold text-slate-800">Kyron Realty AI</span>
-            <span>— Voice-First Real Estate Discovery</span>
+            <span>— Voice-First Real Estate Intelligence</span>
           </div>
 
-          <div className="flex items-center gap-4 text-[11px]">
-            <div className="flex items-center gap-1.5 text-emerald-600 font-medium">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Agora Conversational Gateway</span>
-            </div>
-            <span>•</span>
+          <div className="flex items-center gap-4 text-xs flex-wrap">
+            <Link href="/" className="hover:text-blue-600 transition-colors">
+              Home
+            </Link>
+            <Link href="/listings" className="text-blue-600 font-bold transition-colors">
+              All Listings
+            </Link>
+            <Link href="/privacy" className="hover:text-blue-600 transition-colors">
+              Privacy Policy
+            </Link>
+            <Link href="/terms" className="hover:text-blue-600 transition-colors">
+              Terms
+            </Link>
+            <span className="text-slate-300">•</span>
             <span>&copy; {new Date().getFullYear()} Kyron Realty AI</span>
           </div>
         </div>
