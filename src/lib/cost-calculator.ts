@@ -95,14 +95,3 @@ export function calculateSessionCostBreakdown(params: {
     totalCostInr: Number((totalCostUsd * USD_TO_INR).toFixed(2)),
   };
 }
-
-/**
- * Formats a USD amount with optional INR subtitle
- */
-export function formatUsd(amount: number, decimals: number = 2): string {
-  return `$${amount.toFixed(decimals)}`;
-}
-
-export function formatInr(amount: number, decimals: number = 2): string {
-  return `₹${amount.toFixed(decimals)}`;
-}

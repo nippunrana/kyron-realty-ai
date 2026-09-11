@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useSyncExternalStore } from "react";
 import {
   PhoneCall,
   Sparkles,
@@ -21,29 +21,51 @@ interface DashboardUsageWidgetProps {
 }
 
 const PREF_KEY = "kyron_cost_mode_pref";
+let prefListeners: Array<() => void> = [];
+
+function subscribePref(callback: () => void) {
+  prefListeners.push(callback);
+  if (typeof window !== "undefined") {
+    window.addEventListener("storage", callback);
+  }
+  return () => {
+    prefListeners = prefListeners.filter((l) => l !== callback);
+    if (typeof window !== "undefined") {
+      window.removeEventListener("storage", callback);
+    }
+  };
+}
+
+function getPrefSnapshot(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return localStorage.getItem(PREF_KEY) === "commercial";
+  } catch {
+    return false;
+  }
+}
+
+function getPrefServerSnapshot(): boolean {
+  return false;
+}
+
+function setPrefStore(commercial: boolean): void {
+  try {
+    localStorage.setItem(PREF_KEY, commercial ? "commercial" : "free");
+  } catch {}
+  prefListeners.forEach((l) => l());
+}
 
 export function DashboardUsageWidget({ stats, sessions }: DashboardUsageWidgetProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [commercialMode, setCommercialMode] = useState(false);
-
-  // Restore user preference from localStorage after hydration
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(PREF_KEY);
-      if (stored === "commercial") setCommercialMode(true);
-    } catch {
-      // localStorage unavailable (SSR edge case) — ignore
-    }
-  }, []);
+  const commercialMode = useSyncExternalStore(
+    subscribePref,
+    getPrefSnapshot,
+    getPrefServerSnapshot,
+  );
 
   const handleToggle = () => {
-    const next = !commercialMode;
-    setCommercialMode(next);
-    try {
-      localStorage.setItem(PREF_KEY, next ? "commercial" : "free");
-    } catch {
-      // ignore
-    }
+    setPrefStore(!getPrefSnapshot());
   };
 
   return (
