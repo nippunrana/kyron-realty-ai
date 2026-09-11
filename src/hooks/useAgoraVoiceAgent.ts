@@ -456,6 +456,17 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
           }
         });
 
+        // Every time the gateway cuts the agent off mid-turn, whatever the cause (caller
+        // barge-in or an INTERRUPTED-priority message we sent). The only direct evidence of
+        // an unwanted interruption - without it, a clipped sentence is indistinguishable
+        // from the agent simply finishing early.
+        // Logged to the console as well as the HUD: the sales agent does not pass onLogEvent,
+        // and this is the surface where an unwanted interruption has to be diagnosable.
+        ai.on(AgoraVoiceAIEvents.AGENT_INTERRUPTED, (_agentUserId: string, event: any) => {
+          console.warn("[Agora Voice Agent] Agent interrupted mid-turn:", event);
+          onLogEventRef.current?.("AGORA", "Agent interrupted mid-turn", event);
+        });
+
         // Cloud Gateway Pipeline Error Handler
         ai.on(AgoraVoiceAIEvents.AGENT_ERROR, (agentUserId: string, error: any) => {
           console.warn(`[AgoraVoiceAI Agent Error] (${agentUserId}):`, error);
@@ -577,7 +588,10 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
   }, [teardownResources]);
 
   // Send Text Message in active session (routed via RTM to Agora agent)
-  const sendTextMessage = useCallback(async (text: string) => {
+  const sendTextMessage = useCallback(async (
+    text: string,
+    options?: { priority?: "interrupted" | "append" }
+  ) => {
     const trimmed = text.trim();
     if (!trimmed) return;
 
@@ -605,9 +619,17 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
         "agora-agent-client-toolkit"
       );
 
+      // INTERRUPTED tells the Cloud Gateway to abandon the agent's current interaction and
+      // answer this message now - correct for a cue the caller is waiting on, wrong for a
+      // background result that arrives while the agent is mid-sentence. APPEND makes the
+      // gateway hold the message until the current interaction ends. See the priority table
+      // in https://docs.agora.io/en/conversational-ai/rest-api/agent/speak.
       await voiceAiRef.current.sendText(String(agentUidRef.current), {
         messageType: ChatMessageType.TEXT,
-        priority: ChatMessagePriority.INTERRUPTED,
+        priority:
+          options?.priority === "append"
+            ? ChatMessagePriority.APPEND
+            : ChatMessagePriority.INTERRUPTED,
         responseInterruptable: true,
         text: trimmed,
       });

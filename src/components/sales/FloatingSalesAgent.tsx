@@ -9,7 +9,6 @@ import { BASE_PATH } from "@/lib/base-path";
 import { useAgoraVoiceAgent } from "@/hooks/useAgoraVoiceAgent";
 import { GsapSearchHub, type SearchHubProperty } from "./GsapSearchHub";
 import { SalesDialogueStream } from "./SalesDialogueStream";
-import { detectAssistantSearchIntent } from "@/hooks/voice-intents";
 import {
   Mic,
   MicOff,
@@ -62,6 +61,13 @@ interface PropertySearchParams {
   reset?: "filters" | "all";
   query?: string;
   userSpeech?: string;
+  /**
+   * Whether this search reports its results back to Sarah as a [SEARCH_RESULT:] cue.
+   * False for the speculative search fired off the caller's own speech: that one exists
+   * to open the hub early, and Sarah has not acknowledged anything yet to announce.
+   * Her own [SEARCH:] tag is what earns the single spoken result.
+   */
+  announce?: boolean;
 }
 
 export function FloatingSalesAgent() {
@@ -112,8 +118,6 @@ export function FloatingSalesAgent() {
   const [availableCities, setAvailableCities] = useState<string[]>([]);
   const processedSearchTurnsRef = useRef<Set<string>>(new Set());
   const triggerSearchRef = useRef<((params: PropertySearchParams) => Promise<void>) | null>(null);
-  const pendingSearchCueRef = useRef<string | null>(null);
-  const prevIsAgentSpeakingRef = useRef<boolean>(false);
 
   const {
     callState,
@@ -154,32 +158,10 @@ export function FloatingSalesAgent() {
       }
     },
     onAgentTurnComplete: (currentTranscript) => {
-      // 1. Assistant Turn: Check for search intent in recent messages
-      const recent = currentTranscript.slice(-3);
-      for (const msg of recent) {
-        if (!msg.text) continue;
-        const tag = detectAssistantSearchIntent(msg.text);
-        if (tag) {
-          const criteriaSig = `${tag.city || ""}_${tag.pets}_${tag.bedrooms}_${tag.listingType || ""}_${tag.reset || ""}`;
-          const searchKey = `assistant_${msg.id || currentTranscript.length}_${criteriaSig}`;
-          if (!processedSearchTurnsRef.current.has(searchKey)) {
-            processedSearchTurnsRef.current.add(searchKey);
-            triggerSearchRef.current?.({
-              city: tag.city,
-              petFriendly: tag.pets,
-              bedrooms: tag.bedrooms,
-              listingType: tag.listingType,
-              minPrice: tag.minPrice,
-              maxPrice: tag.maxPrice,
-              reset: tag.reset,
-              query: tag.query,
-            });
-            break;
-          }
-        }
-      }
+      // Sarah's own [SEARCH:] tag is handled once by onSearchRequest, which fires from the
+      // same transcript stream a turn earlier. Re-scanning it here only duplicated the search.
 
-      // 2. User Turn Fast-Path: If user provides city or refinement speech, trigger search in parallel
+      // User Turn Fast-Path: If user provides city or refinement speech, trigger search in parallel
       const lastMsg = currentTranscript[currentTranscript.length - 1];
       if (lastMsg && lastMsg.role === "user" && lastMsg.text) {
         const cityMatch = lastMsg.text.match(/\b(faridabad|delhi|gurugram|gurgaon|noida|bangalore|bengaluru|mumbai|pune|hyderabad|chennai|kolkata)\b/i);
@@ -192,6 +174,7 @@ export function FloatingSalesAgent() {
             triggerSearchRef.current?.({
               city,
               userSpeech: lastMsg.text,
+              announce: false,
             });
           }
         }
@@ -306,7 +289,7 @@ export function FloatingSalesAgent() {
             setSearchResults(data.properties || []);
 
             // Re-sync back to Sarah over Agora RTM so she announces findings
-            if (isCallActive && data.properties) {
+            if (isCallActive && data.properties && params.announce !== false) {
               const count = data.properties.length;
               const titles = (data.properties as SearchHubProperty[])
                 .map((p) => p.title)
@@ -320,11 +303,11 @@ export function FloatingSalesAgent() {
               const filterSummary = filterDescs.length > 0 ? filterDescs.join(" ") + " homes" : "properties";
 
               const cue = `[SEARCH_RESULT:city=${resolvedCity || ""},count=${count},titles=${titles},filters=${filterSummary}]`;
-              if (isAgentSpeaking) {
-                pendingSearchCueRef.current = cue;
-              } else {
-                sendTextMessage(cue);
-              }
+              // The search finishes while Sarah is still speaking her acknowledgment beat.
+              // APPEND hands the queueing to the Agora gateway, which knows when her
+              // interaction actually ends; the client's own speaking flag does not, because
+              // it flips false during the gateway's "thinking" phase.
+              sendTextMessage(cue, { priority: "append" });
             }
           }
         }
@@ -334,30 +317,12 @@ export function FloatingSalesAgent() {
         setIsSearchingProperties(false);
       }
     },
-    [isCallActive, sendTextMessage, isAgentSpeaking]
+    [isCallActive, sendTextMessage]
   );
 
-  // Dispatch queued search result cue only AFTER Sarah finishes speaking her initial turn
-  useEffect(() => {
-    // Detect speaking transition from true -> false
-    if (prevIsAgentSpeakingRef.current && !isAgentSpeaking) {
-      if (pendingSearchCueRef.current && isCallActive) {
-        const cue = pendingSearchCueRef.current;
-        pendingSearchCueRef.current = null;
-        // 250ms buffer after speech ends so Agora gateway cleanly finishes TTS playback before receiving the cue
-        const timer = setTimeout(() => {
-          sendTextMessage(cue);
-        }, 250);
-        return () => clearTimeout(timer);
-      }
-    }
-    prevIsAgentSpeakingRef.current = isAgentSpeaking;
-  }, [isAgentSpeaking, isCallActive, sendTextMessage]);
-
-  // Clean up pending cues and search deduplication on call termination
+  // Clean up search deduplication on call termination
   useEffect(() => {
     if (!isCallActive) {
-      pendingSearchCueRef.current = null;
       processedSearchTurnsRef.current.clear();
     }
   }, [isCallActive]);
@@ -365,34 +330,6 @@ export function FloatingSalesAgent() {
   useEffect(() => {
     triggerSearchRef.current = executePropertySearch;
   });
-
-  // Real-time transcript listener for rapid tag extraction while Sarah is speaking
-  useEffect(() => {
-    if (!transcript || transcript.length === 0) return;
-    const latest = transcript[transcript.length - 1];
-    if (!latest || !latest.text) return;
-
-    const tag = detectAssistantSearchIntent(latest.text);
-    if (tag) {
-      const criteriaSig = `${tag.city || ""}_${tag.pets}_${tag.bedrooms}_${tag.listingType || ""}_${tag.reset || ""}`;
-      const searchKey = `realtime_${latest.id || transcript.length}_${criteriaSig}`;
-      if (processedSearchTurnsRef.current.has(searchKey)) return;
-      processedSearchTurnsRef.current.add(searchKey);
-      const searchParams: PropertySearchParams = {
-        city: tag.city,
-        petFriendly: tag.pets,
-        bedrooms: tag.bedrooms,
-        listingType: tag.listingType,
-        minPrice: tag.minPrice,
-        maxPrice: tag.maxPrice,
-        reset: tag.reset,
-        query: tag.query,
-      };
-      setTimeout(() => {
-        executePropertySearch(searchParams);
-      }, 0);
-    }
-  }, [transcript, executePropertySearch]);
 
   const desktopSearchWingRef = useRef<HTMLDivElement>(null);
 

@@ -35,7 +35,15 @@ export interface UseAgoraVoiceAgentReturn {
   ) => Promise<void>;
   toggleMute: () => void;
   endCall: () => Promise<void>;
-  sendTextMessage: (text: string) => void;
+  /**
+   * Sends a text message to the agent over RTM. Defaults to `interrupted` priority, which
+   * stops the agent mid-sentence to answer. Pass `append` for background cues the agent
+   * should announce only after it finishes its current interaction.
+   */
+  sendTextMessage: (
+    text: string,
+    options?: { priority?: "interrupted" | "append" }
+  ) => void;
 }
 
 export type UIAction =
