@@ -1363,17 +1363,23 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
         if (voiceControlRef.current?.isCallActive && voiceControlRef.current?.sendTextMessage) {
           try {
             await voiceControlRef.current.sendTextMessage(
-              "[DEPLOY_CONFIRMED] The listing was successfully published and saved to the database. Deliver your warm, celebratory closing remarks and sign off with [UI:CLOSE_CALL] now."
+              "[DEPLOY_CONFIRMED] The listing was successfully published and saved to the database. Deliver your warm, celebratory closing remarks and sign off with [UI:CLOSE_CALL] now.",
+              { priority: "append" }
             );
 
             await new Promise<void>((resolve) => {
               deployClosingResolveRef.current = resolve;
+              // Backstop for a [UI:CLOSE_CALL] that never arrives - it must never beat the
+              // close_call poll, because resolving here hangs up. Worst case is the append
+              // wait (Elena finishing the sentence she was mid-way through), plus generation,
+              // plus that poll's own 9s cap. 12s used to fit only because the cue interrupted
+              // her and closing remarks started instantly.
               setTimeout(() => {
                 if (deployClosingResolveRef.current === resolve) {
                   deployClosingResolveRef.current = null;
                   resolve();
                 }
-              }, 12000);
+              }, 20000);
             });
           } catch (msgErr) {
             console.warn("Deploy confirmation message warning:", msgErr);
@@ -1392,7 +1398,8 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
         if (voiceControlRef.current?.isCallActive && voiceControlRef.current?.sendTextMessage) {
           try {
             await voiceControlRef.current.sendTextMessage(
-              `[DEPLOY_FAILED] Failed to publish listing: ${errMsg}. Please inform the owner and let them know they can retry or check their details.`
+              `[DEPLOY_FAILED] Failed to publish listing: ${errMsg}. Please inform the owner and let them know they can retry or check their details.`,
+              { priority: "append" }
             );
           } catch (errAlert) {
             console.warn("Deploy failure alert warning:", errAlert);
@@ -1409,7 +1416,8 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
       if (voiceControlRef.current?.isCallActive && voiceControlRef.current?.sendTextMessage) {
         try {
           await voiceControlRef.current.sendTextMessage(
-            `[DEPLOY_FAILED] An unexpected error occurred while publishing. Please inform the owner and invite them to retry.`
+            `[DEPLOY_FAILED] An unexpected error occurred while publishing. Please inform the owner and invite them to retry.`,
+            { priority: "append" }
           );
         } catch (errAlert) {
           console.warn("Deploy exception alert warning:", errAlert);

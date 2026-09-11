@@ -23,6 +23,7 @@ For this project, all conversational AI voice capabilities must run strictly and
 - **Strictly Prohibited**: Browser SpeechSynthesis (`window.speechSynthesis`), browser speech recognition (`webkitSpeechRecognition`), client-side fake assistant reply scripts, and silent backend fake-success fallbacks.
 - **Approved Cloud Services**: Agora-managed cloud services and the ASR, TTS, and LLM vendors wired in `src/lib/agora-agent-client.ts` (selected by which API keys are present) are standard approved components. The restriction is on browser-local speech, not on cloud vendors.
 - **Fail-Fast Error Contract**: If Agora Cloud Gateway or RTC/RTM connection fails, the system must fail explicitly, mark the DB session as `failed`, and surface the error to the user immediately. Never fake success.
+- **Never Let the UI Interrupt a Speaking Agent**: A message the app sends to the agent because something finished on screen (a search returned, a record saved, a panel opened) must **never** cut the agent off mid-sentence. Send it with `append` priority so the Agora gateway holds it until the agent's current interaction ends. Only the human caller may interrupt the agent. See [voice-agent-and-agora.md](docs/built-systems/voice-agent-and-agora.md) for why client-side queueing is not an acceptable substitute.
 
 ---
 

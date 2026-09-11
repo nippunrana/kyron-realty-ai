@@ -28,8 +28,14 @@ export interface VoiceControlState {
   toggleMute: () => void;
   /** Lets the studio hang up itself when the conduct guardrail trips or upon deploy completion. */
   endCall: () => Promise<void>;
-  /** Sends a text/prompt message to Elena Vance over Agora RTM. */
-  sendTextMessage: (text: string) => void | Promise<void>;
+  /**
+   * Sends a text/prompt message to Elena Vance over Agora RTM. Studio-triggered cues pass
+   * `append` so they never cut her off mid-sentence; see the voice agent rules doc.
+   */
+  sendTextMessage: (
+    text: string,
+    options?: { priority?: "interrupted" | "append" }
+  ) => void | Promise<void>;
   voiceSessionId?: number | null;
   isAgentSpeaking?: boolean;
 }
