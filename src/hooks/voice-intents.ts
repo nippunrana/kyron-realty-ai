@@ -1,4 +1,4 @@
-import type { UIAction, ParsedSearchTag, ParsedBookTourTag } from "./voice-agent-types";
+import type { UIAction, ParsedSearchTag, ParsedBookTourTag, ParsedCallManagerTag } from "./voice-agent-types";
 
 /**
  * Silent screen-control tags. Elena ends the sentence that announces a card with one of
@@ -7,7 +7,7 @@ import type { UIAction, ParsedSearchTag, ParsedBookTourTag } from "./voice-agent
  * signal - the spoken-language patterns below are the fallback for a turn without one.
  */
 const UI_TAG = /\[\s*UI\s*:\s*([A-Z_]+)\s*\]/gi;
-const CONTROL_TAG = /\[\s*(UI|SEARCH|SEARCH_RESULT|OPEN_PROPERTY|PROPERTY_OPENED|CALENDAR_SELECT_DATE|BOOK_TOUR|TOUR_BOOKED)\s*:[^\]]+\]/gi;
+const CONTROL_TAG = /\[\s*(UI|SEARCH|SEARCH_RESULT|OPEN_PROPERTY|PROPERTY_OPENED|CALENDAR_SELECT_DATE|BOOK_TOUR|TOUR_BOOKED|CALL_MANAGER|MANAGER_CONNECTED|MANAGER_UNAVAILABLE)\s*:[^\]]+\]/gi;
 
 const TAG_ACTIONS: Record<string, UIAction> = {
   OPEN_CORE: "open_core_modal",
@@ -131,6 +131,33 @@ export function parseBookTourTag(text: string): ParsedBookTourTag | null {
   return result.date && result.time ? result : null;
 }
 
+const CALL_MANAGER_TAG = /\[\s*CALL_MANAGER\s*:\s*([^\]]+)\]/i;
+
+/** Extracts call manager parameters from silent [CALL_MANAGER:property_id=...,prospect_name=...] tags. */
+export function parseCallManagerTag(text: string): ParsedCallManagerTag | null {
+  const match = text.match(CALL_MANAGER_TAG);
+  if (!match) return null;
+  const raw = match[1];
+  const result: ParsedCallManagerTag = {};
+
+  const pairs = raw.split(",");
+  for (const pair of pairs) {
+    const [k, ...rest] = pair.split("=");
+    const v = rest.join("=").trim();
+    if (!k || !v) continue;
+    const keyLower = k.trim().toLowerCase();
+    if (keyLower === "property_id" || keyLower === "propertyid") {
+      const pid = parseInt(v, 10);
+      if (!isNaN(pid)) result.propertyId = pid;
+    } else if (keyLower === "prospect_name" || keyLower === "name") {
+      result.prospectName = v;
+    } else if (keyLower === "notes") {
+      result.notes = v;
+    }
+  }
+  return result;
+}
+
 const ASSISTANT_SEARCH_SPOKEN =
   /(?:let me check|let me search|checking|searching|looking for|looking up|pulling up|finding|find you)\b[\s\S]{1,80}?\b(?:in|around|near)\s+(?:the\s+)?([a-zA-Z\s]+?)(?:\s+(?:within|for|with|under|budget|right now|immediately)|[.,!?;]|$)/i;
 
@@ -181,7 +208,7 @@ export function detectAssistantSearchIntent(text: string): ParsedSearchTag | nul
 
 /** Removes screen-control and search tags so they never reach the owner's transcript or extractors. */
 export function stripUITags(text: string): string {
-  if (!/\[\s*(UI|SEARCH|SEARCH_RESULT|OPEN_PROPERTY|PROPERTY_OPENED|CALENDAR_SELECT_DATE|BOOK_TOUR|TOUR_BOOKED)\s*:/i.test(text)) return text;
+  if (!/\[\s*(UI|SEARCH|SEARCH_RESULT|OPEN_PROPERTY|PROPERTY_OPENED|CALENDAR_SELECT_DATE|BOOK_TOUR|TOUR_BOOKED|CALL_MANAGER|MANAGER_CONNECTED|MANAGER_UNAVAILABLE)\s*:/i.test(text)) return text;
   return text
     .replace(CONTROL_TAG, "")
     .replace(/\s+([.,!?;:])/g, "$1")

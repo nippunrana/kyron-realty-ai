@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { checkPropertyFit, emptyRequirements, type BuyerRequirements, type FitProperty } from "./property-fit.ts";
-import { buildPropertyPrompt, VIEWING_PIVOT_LINE, type PropertyPromptFacts } from "./sarah-property-prompt.ts";
+import { buildPropertyPrompt, buildObserverPrompt, VIEWING_PIVOT_LINE, type PropertyPromptFacts } from "./sarah-property-prompt.ts";
 import { emptyJourney } from "./sales-journey.ts";
 import { buildSalesSearchPrompt } from "./sarah-search-prompt.ts";
 import { summariseLocationValue, emptyLocationValue, type LocationInput } from "./location-value.ts";
@@ -310,5 +310,47 @@ describe("she speaks plainly enough for everyone on the call", () => {
     const { systemPrompt } = promptFor({ budgetMax: 46000 });
     assert.match(systemPrompt, /a short walk instead of a long trip to work/);
     assert.doesNotMatch(systemPrompt, /the errand that takes ten minutes/);
+  });
+});
+
+describe("three-way manager call & observer mode", () => {
+  test("when hasManagerPhone is true, escalation instructs the silent CALL_MANAGER tag", () => {
+    const factsWithPhone: PropertyPromptFacts = {
+      ...FACTS,
+      hasManagerPhone: true,
+      propertyId: 42,
+    };
+    const { systemPrompt } = buildPropertyPrompt({
+      facts: factsWithPhone,
+      requirements: emptyRequirements(),
+      fit: checkPropertyFit(emptyRequirements(), HOME),
+      location: emptyLocationValue(),
+      visits: [],
+      searchSummary: "",
+      entry: "cold",
+    });
+
+    assert.match(systemPrompt, /THREE-WAY CALL TO PROPERTY MANAGER/);
+    assert.match(systemPrompt, /\[CALL_MANAGER:property_id=42\]/);
+    assert.match(systemPrompt, /NEVER recite, invent, or give out any phone number/);
+  });
+
+  test("when hasManagerPhone is false, CALL_MANAGER is not offered", () => {
+    const { systemPrompt } = promptFor({});
+    assert.doesNotMatch(systemPrompt, /THREE-WAY CALL TO PROPERTY MANAGER/);
+    assert.doesNotMatch(systemPrompt, /\[CALL_MANAGER:/);
+  });
+
+  test("observer mode prompt enforces strict silence unless addressed by name", () => {
+    const { systemPrompt } = buildObserverPrompt({
+      propertyTitle: "Green Valley Residency",
+      prospectName: "Rahul Sharma",
+      facts: FACTS,
+    });
+
+    assert.match(systemPrompt, /PASSIVE OBSERVER MODE/);
+    assert.match(systemPrompt, /KEEP YOUR MOUTH SHUT/);
+    assert.match(systemPrompt, /SPEAK ONLY WHEN DIRECTLY ADDRESSED BY NAME/);
+    assert.match(systemPrompt, /ZERO NUMBER DISCLOSURE/);
   });
 });

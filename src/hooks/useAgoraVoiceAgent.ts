@@ -13,6 +13,7 @@ import type {
   VoiceMessage,
   ParsedSearchTag,
   ParsedBookTourTag,
+  ParsedCallManagerTag,
 } from "./voice-agent-types";
 import { formatTimestamp, isUserTranscriptionItem, mapTranscriptionsToMessages } from "./voice-transcript";
 import { startFrequencyVisualizer } from "./audio-visualizer";
@@ -23,12 +24,17 @@ import {
   parseOpenPropertyTag,
   parseCalendarSelectDateTag,
   parseBookTourTag,
+  parseCallManagerTag,
 } from "./voice-intents";
 
 export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgoraVoiceAgentReturn {
   const [callState, setCallState] = useState<CallState>("idle");
   const [isMuted, setIsMuted] = useState(false);
   const [isAgentSpeaking, setIsAgentSpeaking] = useState(false);
+  const [isManagerConnected, setIsManagerConnected] = useState(false);
+  const [isManagerSpeaking, setIsManagerSpeaking] = useState(false);
+  const [managerCallStatus, setManagerCallStatus] = useState<"idle" | "dialing" | "connected" | "declined" | "no_answer">("idle");
+  const [channelName, setChannelName] = useState<string>("");
   const [audioFrequencies, setAudioFrequencies] = useState<number[]>(new Array(16).fill(10));
   const [transcript, setTranscript] = useState<VoiceMessage[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -52,6 +58,7 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
   const onOpenPropertyRequestRef = useRef<((index: number) => void) | undefined>(options?.onOpenPropertyRequest);
   const onCalendarSelectDateRef = useRef<((date: string) => void) | undefined>(options?.onCalendarSelectDate);
   const onBookTourRequestRef = useRef<((booking: ParsedBookTourTag) => void) | undefined>(options?.onBookTourRequest);
+  const onCallManagerRequestRef = useRef<((data: ParsedCallManagerTag) => void) | undefined>(options?.onCallManagerRequest);
   const onLogEventRef = useRef<((category: "AGORA" | "INTENT", title: string, details?: any) => void) | undefined>(options?.onLogEvent);
   // Keep the latest callbacks reachable from long-lived SDK listeners without re-subscribing
   useEffect(() => {
@@ -62,6 +69,7 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
     onOpenPropertyRequestRef.current = options?.onOpenPropertyRequest;
     onCalendarSelectDateRef.current = options?.onCalendarSelectDate;
     onBookTourRequestRef.current = options?.onBookTourRequest;
+    onCallManagerRequestRef.current = options?.onCallManagerRequest;
     onLogEventRef.current = options?.onLogEvent;
   });
   const transcriptRef = useRef<VoiceMessage[]>([]);
@@ -142,6 +150,7 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
     const currentChannelName = channelNameRef.current;
     sessionIdRef.current = null;
     channelNameRef.current = null;
+    setChannelName("");
 
     if (currentSessionId && currentChannelName) {
       try {
@@ -223,6 +232,9 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
       processedAssistantTurnIntentsRef.current.clear();
       localMessagesRef.current = [];
       mappedRemoteRef.current = [];
+      setIsManagerConnected(false);
+      setIsManagerSpeaking(false);
+      setManagerCallStatus("idle");
       setTranscript([]);
       setErrorMessage(null);
       setCallState("connecting");
@@ -265,6 +277,7 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
         const { channelName, token, rtmToken, userUid, agentUid, sessionId, voiceSessionId: resVoiceSessionId } = sessionData;
         sessionIdRef.current = sessionId;
         channelNameRef.current = channelName;
+        setChannelName(channelName);
         voiceSessionIdRef.current = resVoiceSessionId ?? null;
         setVoiceSessionId(resVoiceSessionId ?? null);
         agentUidRef.current = Number(agentUid) || 999001;
@@ -461,6 +474,19 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
                 }
               }
 
+              // Assistant call manager action: silent [CALL_MANAGER:property_id=...,prospect_name=...] tag
+              const callManager = parseCallManagerTag(spokenText);
+              if (callManager) {
+                const turnId = item.turn_id !== undefined ? String(item.turn_id) : spokenText.slice(0, 40).toLowerCase();
+                const managerKey = `assistant_call_manager_${turnId}_${callManager.propertyId || ""}`;
+                if (!processedAssistantTurnIntentsRef.current.has(managerKey)) {
+                  processedAssistantTurnIntentsRef.current.add(managerKey);
+                  onLogEventRef.current?.("INTENT", `Detected Call Manager Intent: property ${callManager.propertyId}`, { text: spokenText, callManager });
+                  setManagerCallStatus("dialing");
+                  onCallManagerRequestRef.current?.(callManager);
+                }
+              }
+
               // Notify turn listeners when assistant turn finishes
               const isFinished = item.final === true || item.metadata?.final === true;
               if (isFinished) {
@@ -541,6 +567,8 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
                 setCallState("agent_speaking");
                 setIsAgentSpeaking(true);
               }
+            } else if (Number(volume.uid) === 888) {
+              setIsManagerSpeaking(volume.level > 10);
             }
           }
         });
@@ -550,15 +578,26 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
           if (mediaType === "audio") {
             await client.subscribe(user, mediaType);
             user.audioTrack?.play();
-            setIsAgentSpeaking(true);
-            setCallState("agent_speaking");
+            if (Number(user.uid) === 888) {
+              setIsManagerConnected(true);
+              setManagerCallStatus("connected");
+            } else {
+              setIsAgentSpeaking(true);
+              setCallState("agent_speaking");
+            }
           }
         });
 
-        client.on("user-unpublished", (_user, mediaType) => {
+        client.on("user-unpublished", (user, mediaType) => {
           if (mediaType === "audio") {
-            setIsAgentSpeaking(false);
-            setCallState("connected");
+            if (Number(user.uid) === 888) {
+              setIsManagerConnected(false);
+              setIsManagerSpeaking(false);
+              setManagerCallStatus("idle");
+            } else {
+              setIsAgentSpeaking(false);
+              setCallState("connected");
+            }
           }
         });
 
@@ -632,6 +671,9 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
     await teardownResources();
     setCallState("idle");
     setIsAgentSpeaking(false);
+    setIsManagerConnected(false);
+    setIsManagerSpeaking(false);
+    setManagerCallStatus("idle");
     setAudioFrequencies(new Array(16).fill(10));
 
     if (onCallEndRef.current && finalTranscript.some((m) => m.role === "user")) {
@@ -769,5 +811,9 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
     endCall,
     sendTextMessage,
     retargetAgent,
+    channelName,
+    isManagerConnected,
+    isManagerSpeaking,
+    managerCallStatus,
   };
 }

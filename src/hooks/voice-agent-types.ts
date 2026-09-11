@@ -71,6 +71,10 @@ export interface UseAgoraVoiceAgentReturn {
    * call's running memory. Resolves null when no call is active.
    */
   retargetAgent: (input: RetargetInput) => Promise<RetargetResult | null>;
+  channelName?: string;
+  isManagerConnected?: boolean;
+  isManagerSpeaking?: boolean;
+  managerCallStatus?: "idle" | "dialing" | "connected" | "declined" | "no_answer";
 }
 
 export type UIAction =
@@ -113,6 +117,12 @@ export interface ParsedBookTourTag {
   notes?: string;
 }
 
+export interface ParsedCallManagerTag {
+  propertyId?: number;
+  prospectName?: string;
+  notes?: string;
+}
+
 export interface UseAgoraVoiceAgentOptions {
   onCallEnd?: (transcript: VoiceMessage[]) => void;
   onAgentTurnComplete?: (transcript: VoiceMessage[]) => void;
@@ -124,5 +134,7 @@ export interface UseAgoraVoiceAgentOptions {
   onCalendarSelectDate?: (date: string) => void;
   /** Sarah asking to book a 1-hour tour slot. */
   onBookTourRequest?: (booking: ParsedBookTourTag) => void;
+  /** Sarah asking to call the property manager for a 3-way conversation. */
+  onCallManagerRequest?: (data: ParsedCallManagerTag) => void;
   onLogEvent?: (category: "AGORA" | "INTENT", title: string, details?: any) => void;
 }

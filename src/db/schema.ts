@@ -63,6 +63,7 @@ export const properties = pgTable("properties", {
   aiGrowthScore: integer("ai_growth_score"),
   onboardingSource: text("onboarding_source").default("conversational_wizard"), // 'voice_chat' | 'manual'
   sourceUrl: text("source_url"),
+  managerPhone: text("manager_phone"),
 
   // Consolidated AI Knowledge Base & Intelligence (RAG & Voice Brain)
   knowledgeBase: jsonb("knowledge_base").$type<PropertyKnowledgeBaseData>(),
@@ -158,6 +159,7 @@ export interface PropertyKnowledgeBaseData {
   agentTone?: string | null;
   greetingMessage?: string | null;
   contactEmail?: string | null;
+  contactPhone?: string | null;
 }
 
 export interface ConcessionRule {
@@ -293,6 +295,7 @@ export const users = pgTable("users", {
     .$defaultFn(() => crypto.randomUUID()),
   name: text("name"),
   email: text("email").unique(),
+  phone: text("phone"),
   emailVerified: timestamp("emailVerified", { mode: "date" }),
   image: text("image"),
   password: text("password"),

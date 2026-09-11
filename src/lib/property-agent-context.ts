@@ -4,7 +4,7 @@
  * (`/session/retarget`), so both entries describe the same home the same way.
  */
 import { db } from "@/db";
-import { properties } from "@/db/schema";
+import { properties, users } from "@/db/schema";
 import { and, eq, ne } from "drizzle-orm";
 import { computeFloorPrice } from "./listing-helpers";
 import { checkPropertyFit, type FitCheckResult, type FitProperty } from "./property-fit";
@@ -83,7 +83,11 @@ function buildLocationInput(kbData: NonNullable<PropertyRow["knowledgeBase"]>["k
 
 type PropertyRow = typeof properties.$inferSelect;
 
-function toFacts(row: PropertyRow, hasCalendarAccess = false): PropertyPromptFacts {
+function toFacts(
+  row: PropertyRow,
+  hasCalendarAccess = false,
+  hasManagerPhone = false
+): PropertyPromptFacts {
   const kb = row.knowledgeBase;
   const kbData = kb?.kbData;
   const rules = row.negotiationRules;
@@ -117,6 +121,8 @@ function toFacts(row: PropertyRow, hasCalendarAccess = false): PropertyPromptFac
     // Absent rules mean the owner authorised nothing, so nothing may be offered.
     allowNegotiation: rules?.allowNegotiation !== false && (rules?.concessionRules?.length || 0) > 0,
     hasCalendarAccess,
+    hasManagerPhone: hasManagerPhone || Boolean(row.managerPhone || kb?.contactPhone),
+    propertyId: row.id,
   };
 }
 
@@ -171,8 +177,20 @@ export async function buildPropertyAgentContext(
 
   if (!row) return null;
 
+  let hasManagerPhone = Boolean(row.managerPhone || row.knowledgeBase?.contactPhone);
+  if (!hasManagerPhone && row.ownerId) {
+    const [owner] = await db
+      .select({ phone: users.phone })
+      .from(users)
+      .where(eq(users.id, row.ownerId))
+      .limit(1);
+    if (owner?.phone?.trim()) {
+      hasManagerPhone = true;
+    }
+  }
+
   const calendarAccess = row.ownerId ? await getOwnerCalendarAccess(row.ownerId) : null;
-  const facts = toFacts(row, Boolean(calendarAccess));
+  const facts = toFacts(row, Boolean(calendarAccess), hasManagerPhone);
   const fit = checkPropertyFit(journey.requirements, toFitProperty(row, facts));
   const { greeting, systemPrompt } = buildPropertyPrompt({
     facts,

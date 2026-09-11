@@ -13,6 +13,7 @@ import {
   parseOpenPropertyTag,
   parseCalendarSelectDateTag,
   parseBookTourTag,
+  parseCallManagerTag,
   stripUITags,
 } from "./voice-intents.ts";
 
@@ -380,6 +381,32 @@ describe("calendar hub open, close, and booking intents", () => {
     );
     assert.equal(
       stripUITags("[TOUR_BOOKED:date=2026-09-18,time=15:00,name=Alex]"),
+      ""
+    );
+  });
+});
+
+describe("three-way manager call intent and tags", () => {
+  test("parseCallManagerTag extracts propertyId and prospectName", () => {
+    const tag = "Let me check with the manager [CALL_MANAGER:property_id=105,prospect_name=Rahul Sharma]";
+    const parsed = parseCallManagerTag(tag);
+    assert.deepEqual(parsed, {
+      propertyId: 105,
+      prospectName: "Rahul Sharma",
+    });
+  });
+
+  test("CALL_MANAGER tag is stripped from transcript so the caller never sees it", () => {
+    assert.equal(
+      stripUITags("Let me check if the property manager is available [CALL_MANAGER:property_id=105,prospect_name=Rahul]"),
+      "Let me check if the property manager is available"
+    );
+    assert.equal(
+      stripUITags("[MANAGER_CONNECTED:name=Mr. Sharma]"),
+      ""
+    );
+    assert.equal(
+      stripUITags("[MANAGER_UNAVAILABLE:reason=busy]"),
       ""
     );
   });

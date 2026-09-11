@@ -208,6 +208,10 @@ export function FloatingSalesAgent() {
     endCall,
     sendTextMessage,
     retargetAgent,
+    channelName,
+    isManagerConnected,
+    isManagerSpeaking,
+    managerCallStatus,
   } = useAgoraVoiceAgent({
     onSearchRequest: (params) => {
       const criteriaSig = `${params.city || ""}_${params.pets}_${params.bedrooms}_${params.listingType || ""}_${params.reset || ""}`;
@@ -284,7 +288,7 @@ export function FloatingSalesAgent() {
           setIsCalendarHubOpen(true);
           setMobileTab("calendar");
 
-          // Feed result back with APPEND priority so Sarah never gets interrupted mid-speech
+          // Report back to Sarah with APPEND priority so she finishes her sentence before confirming
           sendTextMessage(
             `[TOUR_BOOKED:date=${booking.date},time=${booking.time},name=${booking.name || "Guest"}]`,
             { priority: "append" }
@@ -292,6 +296,48 @@ export function FloatingSalesAgent() {
         }
       } catch (err) {
         console.error("[FloatingSalesAgent] Tour booking error:", err);
+      }
+    },
+    onCallManagerRequest: async (data) => {
+      const slug = getListingSlug(pathname);
+      let targetPropertyId = data.propertyId;
+      if (!targetPropertyId && slug) {
+        try {
+          const res = await fetch(`${BASE_PATH}/api/properties/${encodeURIComponent(slug)}`);
+          if (res.ok) {
+            const json = await res.json();
+            targetPropertyId = json.property?.id;
+          }
+        } catch {
+          // fallback
+        }
+      }
+      if (!targetPropertyId) return;
+
+      const callerTurns = transcript.reduce((n, m) => (m.role === "user" ? n + 1 : n), 0);
+      const callKey = `manager_call_${callerTurns}_${targetPropertyId}`;
+      if (processedSearchTurnsRef.current.has(callKey)) return;
+      processedSearchTurnsRef.current.add(callKey);
+
+      try {
+        const res = await fetch(`${BASE_PATH}/api/agora/telephony/dial-manager`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            propertyId: targetPropertyId,
+            channelName,
+            prospectName: data.prospectName,
+          }),
+        });
+        const resData = await res.json();
+        if (!resData.success) {
+          sendTextMessage(
+            `[MANAGER_UNAVAILABLE:reason=${encodeURIComponent(resData.error || "unavailable")}]`,
+            { priority: "append" }
+          );
+        }
+      } catch (e) {
+        console.error("[FloatingSalesAgent] Dial manager error:", e);
       }
     },
     onUIAction: (action) => {
@@ -922,16 +968,34 @@ export function FloatingSalesAgent() {
                       </div>
 
                       <div className="min-w-0">
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="text-xs font-extrabold text-slate-900 truncate">
                             Sarah
                           </span>
                           <span className="px-1.5 py-0.2 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-bold">
                             LIVE
                           </span>
+                          {isManagerConnected && (
+                            <span className="flex items-center gap-1 px-1.5 py-0.2 rounded-full bg-purple-50 text-purple-700 border border-purple-200 text-[9px] font-bold animate-pulse">
+                              <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                              Manager Connected
+                            </span>
+                          )}
+                          {!isManagerConnected && managerCallStatus === "dialing" && (
+                            <span className="flex items-center gap-1 px-1.5 py-0.2 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-[9px] font-bold">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" />
+                              Dialing Manager...
+                            </span>
+                          )}
                         </div>
                         <span className="text-[11px] font-semibold text-slate-500 block truncate">
-                          {isAgentSpeaking
+                          {isManagerConnected
+                            ? isManagerSpeaking
+                              ? "Property Manager is speaking..."
+                              : isAgentSpeaking
+                              ? "Sarah (Passive Observer)..."
+                              : "3-Way Call Active • Manager on Line"
+                            : isAgentSpeaking
                             ? "Sarah is speaking..."
                             : callState === "user_speaking"
                             ? "Listening hands-free..."

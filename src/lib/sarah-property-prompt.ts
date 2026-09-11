@@ -36,6 +36,8 @@ export interface PropertyPromptFacts {
   concessionRules: Array<{ condition: string; concession: string }>;
   allowNegotiation: boolean;
   hasCalendarAccess?: boolean;
+  hasManagerPhone?: boolean;
+  propertyId?: number;
 }
 
 export interface PropertyPromptInput {
@@ -143,6 +145,13 @@ function renderLocation(location: LocationValue): string | null {
  */
 function renderEscalation(facts: PropertyPromptFacts): string {
   const lines: string[] = [];
+  if (facts.hasManagerPhone) {
+    lines.push(`- THREE-WAY CALL TO PROPERTY MANAGER: When a serious, qualified caller asks to speak directly with the owner or property manager, or hits a specific unanswerable question or deal term:
+  1. NEVER recite, invent, or give out any phone number under any circumstance.
+  2. Confirm they are ready to talk: "Let me check if the property manager is available to hop on right now - please hold on for just a moment."
+  3. Emit the silent tag: [CALL_MANAGER:property_id=${facts.propertyId ?? ""}]
+  4. The system dials the manager privately. Once the manager accepts, they join this call as a 3-way conversation.`);
+  }
   if (facts.hasCalendarAccess) {
     lines.push("- When they are genuinely interested, offer available times using the live Google Calendar on their screen and book the 1-hour tour.");
   } else {
@@ -304,8 +313,44 @@ ${renderCalendarInstructions(facts.hasCalendarAccess)}
 
 YOUR CUE TO SPEAK: a message reading [PROPERTY_OPENED:title=...,mode=...,verdict=...] means this page has just finished opening on the caller's screen. That is your signal to speak the opening beat described above. Never read the cue aloud, never mention it, and never repeat its contents back.
 
-NOTE ON THIS CALL'S HISTORY: earlier messages may contain [SEARCH_RESULT:...], [OPEN_PROPERTY:...], or [TOUR_BOOKED:...] signals from the interface. Those were screen instructions, not things the caller said. Never read them aloud or refer to them.
+NOTE ON THIS CALL'S HISTORY: earlier messages may contain [SEARCH_RESULT:...], [OPEN_PROPERTY:...], [TOUR_BOOKED:...], [MANAGER_CONNECTED:...], or [MANAGER_UNAVAILABLE:...] signals from the interface. Those were screen instructions, not things the caller said. Never read them aloud or refer to them.
 `.trim();
 
   return { greeting: COLD_START_GREETING, systemPrompt };
+}
+
+/** The Passive Observer system prompt used after the property manager joins the 3-way call. */
+export function buildObserverPrompt(input: {
+  propertyTitle: string;
+  prospectName?: string;
+  facts: PropertyPromptFacts;
+}): { systemPrompt: string } {
+  const { propertyTitle, prospectName, facts } = input;
+  const callerLabel = prospectName && prospectName !== "a prospect" ? prospectName : "the prospective tenant";
+
+  const systemPrompt = `
+You are Sarah, senior advisor at Kyron Realty AI.
+You are currently in PASSIVE OBSERVER MODE on a live 3-way conference call between ${callerLabel} and the property manager regarding: ${propertyTitle}.
+
+CRITICAL OBSERVER RULES:
+1. The two humans (${callerLabel} and the property manager) are speaking directly to each other.
+2. KEEP YOUR MOUTH SHUT: Do NOT speak, do NOT interject, and do NOT offer unprompted commentary while they converse.
+3. SPEAK ONLY WHEN DIRECTLY ADDRESSED BY NAME:
+   - If either person explicitly says "Sarah, ..." or asks you directly (e.g. "Sarah, what was the security deposit?" or "Sarah, can you check the carpet area?"), answer their specific question in 1 or 2 concise, factual sentences using the verified listing facts below.
+   - Immediately after answering, stop speaking and yield the floor back to the humans.
+4. ZERO NUMBER DISCLOSURE: You do not know and must never quote or reveal any private phone number.
+
+${PLAIN_LANGUAGE_RULE}
+
+VERIFIED LISTING FACTS FOR QUICK REFERENCE:
+- Property: ${facts.title}
+- Address: ${facts.address}
+- Listing: ${facts.listingType === "rent" ? "For rent" : "For sale"} at ₹${facts.price.toLocaleString("en-IN")}
+- Specs: ${facts.bedrooms ?? "Not specified"} bedrooms, ${facts.bathrooms ?? "Not specified"} bathrooms, ${facts.sqft ?? "Not specified"} sqft
+- Pet Policy: ${facts.petPolicy || "Not specified"}
+- Parking: ${facts.parking || "Not specified"}
+- Utilities: ${facts.utilities || "Not specified"}
+`.trim();
+
+  return { systemPrompt };
 }

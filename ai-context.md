@@ -44,7 +44,7 @@ To prevent duplicate code or assuming features that do not yet exist:
 | **Legal Pages** | Built | [auth.md](docs/built-systems/auth.md) | `src/app/privacy/`, `src/app/terms/`, `src/components/legal/` | Public, unauthenticated by requirement — Google OAuth verification reads them |
 | **Sales Agent (Floating Presence)** | Built | [sales-agent.md](docs/built-systems/sales-agent.md) | `src/components/sales/FloatingSalesAgent.tsx`, `src/app/layout.tsx` | Global floating presence with dynamic page awareness, isolated from onboarding |
 | **Sales Agent Property-Page Mode** | Built | [sales-agent.md](docs/built-systems/sales-agent.md) | `src/lib/sarah-property-prompt.ts`, `src/lib/property-fit.ts`, `src/app/api/agora/session/retarget/` | Mid-call prompt swap onto one listing's KB, code-computed fit verdict, two-thread call memory |
-| **Three-Way Owner Call** | Roadmap | [sales-agent.md](docs/built-systems/sales-agent.md) | — | Dial the listing owner into a live sales call. Seam only; never scaffold it early |
+| **Three-Way Owner/Manager Call** | Built | [sales-agent.md](docs/built-systems/sales-agent.md) | `src/lib/agora-telephony.ts`, `src/app/api/agora/telephony/` | Dial manager/owner via Twilio+Agora SIP, private whisper, RTC bridge (UID 888), silent observer mode |
 
 ---
 

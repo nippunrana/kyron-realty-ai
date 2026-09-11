@@ -57,6 +57,13 @@
       "when": 1789023851071,
       "tag": "0007_sparkling_elektra",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1789148696635,
+      "tag": "0008_tearful_captain_marvel",
+      "breakpoints": true
     }
   ]
 }
