@@ -1,8 +1,19 @@
 "use client";
 
+import { useRef } from "react";
 import { X, ArrowRight, Loader2, Mic, Mail, CheckCircle2, Sparkles } from "lucide-react";
 import type { ExtractedPropertyPayload } from "@/lib/kb-extractor";
 import type { HyperLocalKbData } from "@/db/schema";
+import { formatCompositeAddress } from "@/lib/property-types";
+import {
+  diffSnapshot,
+  flashRows,
+  prefersReducedMotion,
+  queryByKey,
+  scrollContainerToElement,
+  tintValues,
+  useGSAP,
+} from "./spec-reveal";
 import { ModalMuteButton } from "./ModalMuteButton";
 import { CoreSpecsSection, SectionLabel } from "./review/CoreSpecsSection";
 import { ExtraSpecsSection } from "./review/ExtraSpecsSection";
@@ -77,6 +88,60 @@ export function ReviewSpecsModal({
   const copy = COPY[mode];
   const images = Array.isArray(property.images) ? property.images : [];
 
+  const modalBodyRef = useRef<HTMLDivElement>(null);
+  const snapshotRef = useRef<Record<string, string> | null>(null);
+
+  const reviewSnapshot: Record<string, string> = {
+    address: formatCompositeAddress(property) || "",
+    price: String(property.price ?? ""),
+    listingType: String(property.listingType ?? ""),
+    propertyType: String(property.propertyType ?? ""),
+    bedrooms: String(property.bedrooms ?? ""),
+    bathrooms: String(property.bathrooms ?? ""),
+    washrooms: `${property.washrooms ?? ""}:${knowledgeBase?.washroomDetail ?? ""}`,
+    sqft: String(property.sqft ?? ""),
+    furnishingStatus: String(property.furnishingStatus ?? ""),
+    parking: knowledgeBase?.parkingDetail ?? "",
+    petPolicy: knowledgeBase?.petPolicyDetail ?? "",
+    maintenanceFee: String(property.hoaFeeMonthly ?? ""),
+    utilities: knowledgeBase?.utilitiesDetail ?? "",
+    availableDate: property.availableDate ?? "",
+    features: (property.features || []).join(","),
+    metro: hyperLocalData?.transit?.nearestMetro ?? "",
+    highways: (hyperLocalData?.transit?.majorHighways || []).join(","),
+    landmarks: (hyperLocalData?.neighborhood?.landmarks || []).join(","),
+    schools: (hyperLocalData?.neighborhood?.topSchools || []).join(","),
+    hospitals: (hyperLocalData?.neighborhood?.topHospitals || []).join(","),
+  };
+
+  const reviewSignature = Object.entries(reviewSnapshot)
+    .map(([k, v]) => `${k}=${v}`)
+    .join("|");
+
+  // When Agora AI modifies any property fact mid-call, flash the card and tint the changed text.
+  useGSAP(
+    () => {
+      const diff = diffSnapshot(snapshotRef, reviewSnapshot);
+      if (!diff || prefersReducedMotion()) return;
+
+      const touched = [...diff.added, ...diff.changed];
+      if (!touched.length) return;
+
+      const rowTargets = queryByKey(modalBodyRef.current, "data-review-spec", touched);
+      const valueTargets = queryByKey(modalBodyRef.current, "data-review-value", touched);
+
+      if (rowTargets.length > 0) {
+        // Auto-scroll modal container if target is off-screen
+        scrollContainerToElement(modalBodyRef.current, rowTargets[0]);
+        flashRows(rowTargets);
+      }
+      if (valueTargets.length > 0) {
+        tintValues(valueTargets);
+      }
+    },
+    { dependencies: [reviewSignature], scope: modalBodyRef }
+  );
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/50 backdrop-blur-sm animate-in fade-in duration-200">
       <div
@@ -120,7 +185,7 @@ export function ReviewSpecsModal({
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-5 sm:px-7 py-5 space-y-5">
+        <div ref={modalBodyRef} className="flex-1 overflow-y-auto px-5 sm:px-7 py-5 space-y-5">
           <CoreSpecsSection property={property} knowledgeBase={knowledgeBase} />
 
           {!isCoreMode && (

@@ -174,7 +174,11 @@ export function NearbyPlacesSection({
               const hidden = row.names.length - PREVIEW_COUNT;
 
               return (
-                <div key={row.key} className="px-4 py-3 flex items-start gap-3">
+                <div
+                  key={row.key}
+                  data-review-spec={row.key}
+                  className="px-4 py-3 flex items-start gap-3"
+                >
                   <div className="flex items-center gap-2 w-28 sm:w-32 shrink-0 pt-0.5">
                     <Icon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                     <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
@@ -182,7 +186,7 @@ export function NearbyPlacesSection({
                     </span>
                   </div>
 
-                  <div className="flex flex-wrap gap-1.5 min-w-0 flex-1">
+                  <div data-review-value={row.key} className="flex flex-wrap gap-1.5 min-w-0 flex-1">
                     {shown.map((name) =>
                       row.measurable ? (
                         <PlaceChip

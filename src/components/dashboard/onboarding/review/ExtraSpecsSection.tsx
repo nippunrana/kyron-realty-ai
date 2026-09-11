@@ -24,18 +24,20 @@ export function ExtraSpecsSection({ property, knowledgeBase }: ExtraSpecsSection
   const hasHoa = Boolean(property.hoaFeeMonthly && Number(property.hoaFeeMonthly) > 0);
   const features = property.features || [];
 
-  const cells: Array<{ label: string; value: string }> = [
-    { label: "Parking", value: value(knowledgeBase?.parkingDetail) },
+  const cells: Array<{ key: string; label: string; value: string }> = [
+    { key: "parking", label: "Parking", value: value(knowledgeBase?.parkingDetail) },
     isRent
-      ? { label: "Pets", value: value(knowledgeBase?.petPolicyDetail) }
+      ? { key: "petPolicy", label: "Pets", value: value(knowledgeBase?.petPolicyDetail) }
       : {
+          key: "maintenanceFee",
           label: "Maintenance fee",
           value: hasHoa
             ? `₹${Number(property.hoaFeeMonthly).toLocaleString("en-IN")}/month`
             : NOT_SPECIFIED,
         },
-    { label: "Utilities", value: value(knowledgeBase?.utilitiesDetail) },
+    { key: "utilities", label: "Utilities", value: value(knowledgeBase?.utilitiesDetail) },
     {
+      key: "availableDate",
       label: isRent ? "Move-in from" : "Occupancy",
       value: value(property.availableDate),
     },
@@ -53,11 +55,16 @@ export function ExtraSpecsSection({ property, knowledgeBase }: ExtraSpecsSection
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
         {cells.map((cell) => (
-          <div key={cell.label} className="rounded-2xl border border-slate-200 bg-white p-3.5">
+          <div
+            key={cell.label}
+            data-review-spec={cell.key}
+            className="rounded-2xl border border-slate-200 bg-white p-3.5"
+          >
             <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
               {cell.label}
             </p>
             <p
+              data-review-value={cell.key}
               className={`mt-1 text-sm font-semibold ${
                 cell.value === NOT_SPECIFIED ? "text-slate-400" : "text-slate-900"
               }`}
@@ -69,7 +76,7 @@ export function ExtraSpecsSection({ property, knowledgeBase }: ExtraSpecsSection
       </div>
 
       {features.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 px-0.5">
+        <div data-review-spec="features" className="flex flex-wrap gap-1.5 px-0.5">
           {features.map((feature) => (
             <span
               key={feature}

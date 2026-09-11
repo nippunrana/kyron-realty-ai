@@ -45,6 +45,7 @@ export function CoreSpecsSection({ property, knowledgeBase }: CoreSpecsSectionPr
   const cells = commercial
     ? [
         {
+          key: "washrooms",
           icon: Bath,
           label: "Washrooms",
           value: status.washrooms
@@ -56,6 +57,7 @@ export function CoreSpecsSection({ property, knowledgeBase }: CoreSpecsSectionPr
             : PENDING,
         },
         {
+          key: "furnishingStatus",
           icon: Sofa,
           label: "Furnishing",
           value: property.furnishingStatus
@@ -63,6 +65,7 @@ export function CoreSpecsSection({ property, knowledgeBase }: CoreSpecsSectionPr
             : PENDING,
         },
         {
+          key: "sqft",
           icon: Maximize2,
           label: "Carpet area",
           value: status.sqft ? `${Number(property.sqft).toLocaleString("en-IN")} sqft` : PENDING,
@@ -70,16 +73,19 @@ export function CoreSpecsSection({ property, knowledgeBase }: CoreSpecsSectionPr
       ]
     : [
         {
+          key: "bedrooms",
           icon: Bed,
           label: "Bedrooms",
           value: status.bedrooms ? (isStudio ? "Studio" : `${property.bedrooms}`) : PENDING,
         },
         {
+          key: "bathrooms",
           icon: Bath,
           label: "Bathrooms",
           value: status.bathrooms ? `${property.bathrooms}` : PENDING,
         },
         {
+          key: "sqft",
           icon: Maximize2,
           label: "Size",
           value: status.sqft ? `${Number(property.sqft).toLocaleString("en-IN")} sqft` : PENDING,
@@ -96,40 +102,46 @@ export function CoreSpecsSection({ property, knowledgeBase }: CoreSpecsSectionPr
 
       {/* Dark anchor: the three facts a buyer asks for first. */}
       <div className="rounded-2xl bg-slate-900 text-white p-4 sm:p-5">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Address</p>
-        <p className="mt-1 text-base sm:text-lg font-bold leading-snug break-words">{fullAddress}</p>
+        <div data-review-spec="address" className="rounded-xl p-1 -m-1 transition-shadow">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Address</p>
+          <p data-review-value="address" className="mt-1 text-base sm:text-lg font-bold leading-snug break-words">{fullAddress}</p>
+        </div>
 
         <div className="mt-3.5 pt-3.5 border-t border-white/10 flex flex-wrap items-baseline gap-x-6 gap-y-2">
-          <div>
+          <div data-review-spec="price" className="rounded-xl p-1 -m-1 transition-shadow">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
               {isRent ? "Rent" : "Price"}
             </p>
-            <p className="text-lg font-bold tabular-nums">{price}</p>
+            <p data-review-value="price" className="text-lg font-bold tabular-nums">{price}</p>
           </div>
-          <div>
+          <div data-review-spec="listingType" className="rounded-xl p-1 -m-1 transition-shadow">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
               Listing
             </p>
-            <p className="text-lg font-bold">{listingLabel}</p>
+            <p data-review-value="listingType" className="text-lg font-bold">{listingLabel}</p>
           </div>
-          <div className="min-w-0">
+          <div data-review-spec="propertyType" className="min-w-0 rounded-xl p-1 -m-1 transition-shadow">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
               <Building2 className="w-3 h-3" />
               Property type
             </p>
-            <p className="text-lg font-bold break-words">{typeLabel}</p>
+            <p data-review-value="propertyType" className="text-lg font-bold break-words">{typeLabel}</p>
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-3 gap-2.5">
-        {cells.map(({ icon: Icon, label, value }) => (
-          <div key={label} className="rounded-2xl border border-slate-200 bg-white p-3.5">
+        {cells.map(({ key, icon: Icon, label, value }) => (
+          <div
+            key={label}
+            data-review-spec={key}
+            className="rounded-2xl border border-slate-200 bg-white p-3.5"
+          >
             <div className="flex items-center gap-1.5 text-slate-400">
               <Icon className="w-3.5 h-3.5" />
               <span className="text-[11px] font-semibold uppercase tracking-wider">{label}</span>
             </div>
-            <p className="mt-1.5 text-sm font-bold text-slate-900">{value}</p>
+            <p data-review-value={key} className="mt-1.5 text-sm font-bold text-slate-900">{value}</p>
           </div>
         ))}
       </div>

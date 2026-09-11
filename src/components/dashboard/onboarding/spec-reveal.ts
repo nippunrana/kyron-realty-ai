@@ -137,4 +137,27 @@ export function tintValues(targets: HTMLElement[]) {
   });
 }
 
+/**
+ * Safely scrolls an internal container to bring a target element into view without
+ * causing viewport-level window scroll shifts.
+ */
+export function scrollContainerToElement(
+  container: HTMLElement | null,
+  target: HTMLElement | null,
+  behavior: ScrollBehavior = "smooth"
+) {
+  if (!container || !target) return;
+  const containerRect = container.getBoundingClientRect();
+  const targetRect = target.getBoundingClientRect();
+
+  const isAbove = targetRect.top < containerRect.top;
+  const isBelow = targetRect.bottom > containerRect.bottom;
+
+  if (isAbove || isBelow) {
+    const delta = targetRect.top - containerRect.top;
+    const newScrollTop = Math.max(0, container.scrollTop + delta - 24);
+    container.scrollTo({ top: newScrollTop, behavior });
+  }
+}
+
 export { useGSAP };
