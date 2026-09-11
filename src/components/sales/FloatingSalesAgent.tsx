@@ -664,33 +664,43 @@ export function FloatingSalesAgent() {
                     </div>
                   )}
 
-                  {/* Mobile Search View or Dialogue Stream Body */}
-                  {mobileTab === "search" ? (
-                    <div className="md:hidden flex-1 overflow-hidden flex flex-col">
-                      <GsapSearchHub
-                        isOpen={true}
-                        isSearching={isSearchingProperties}
-                        activeCity={activeSearchCity}
-                        isPetFriendlyFilter={isPetFriendlyFilter}
-                        properties={searchResults}
-                        availableCities={availableCities}
-                        onClose={() => setMobileTab("chat")}
-                        isMobileTab={true}
-                        onCitySelect={(city) =>
-                          executePropertySearch({ city, petFriendly: isPetFriendlyFilter })
-                        }
-                        onManualSearch={(query) =>
-                          executePropertySearch({ query, city: activeSearchCity || undefined })
-                        }
+                  {/* Body: Mobile Search Tab (mobile-only) and Dialogue Stream (always on desktop, toggleable on mobile) */}
+                  <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+                    {/* Mobile Search View (visible only on screens < md when mobileTab === 'search') */}
+                    {mobileTab === "search" && (
+                      <div className="md:hidden flex-1 overflow-hidden flex flex-col min-h-0">
+                        <GsapSearchHub
+                          isOpen={true}
+                          isSearching={isSearchingProperties}
+                          activeCity={activeSearchCity}
+                          isPetFriendlyFilter={isPetFriendlyFilter}
+                          properties={searchResults}
+                          availableCities={availableCities}
+                          onClose={() => setMobileTab("chat")}
+                          isMobileTab={true}
+                          onCitySelect={(city) =>
+                            executePropertySearch({ city, petFriendly: isPetFriendlyFilter })
+                          }
+                          onManualSearch={(query) =>
+                            executePropertySearch({ query, city: activeSearchCity || undefined })
+                          }
+                        />
+                      </div>
+                    )}
+
+                    {/* Dialogue Stream: ALWAYS visible on desktop (md:flex), hidden on mobile when mobileTab === 'search' */}
+                    <div
+                      className={`flex-1 overflow-hidden flex flex-col min-h-0 ${
+                        mobileTab === "search" ? "hidden md:flex" : "flex"
+                      }`}
+                    >
+                      <SalesDialogueStream
+                        transcript={transcript}
+                        isAgentSpeaking={isAgentSpeaking}
+                        callState={callState}
                       />
                     </div>
-                  ) : (
-                    <SalesDialogueStream
-                      transcript={transcript}
-                      isAgentSpeaking={isAgentSpeaking}
-                      callState={callState}
-                    />
-                  )}
+                  </div>
 
                 {/* Exit Confirmation View (Inline) or Bottom Bar */}
                 {showExitConfirm ? (
