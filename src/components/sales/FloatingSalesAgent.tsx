@@ -6,6 +6,7 @@ import Image from "next/image";
 import { BASE_PATH } from "@/lib/base-path";
 import { useAgoraVoiceAgent } from "@/hooks/useAgoraVoiceAgent";
 import { GsapSearchHub, type SearchHubProperty } from "./GsapSearchHub";
+import { SalesDialogueStream } from "./SalesDialogueStream";
 import { parseSearchTag } from "@/hooks/voice-intents";
 import {
   Mic,
@@ -13,7 +14,6 @@ import {
   PhoneOff,
   X,
   Radio,
-  Volume2,
   AlertCircle,
   Sparkles,
   AlertTriangle,
@@ -348,171 +348,263 @@ export function FloatingSalesAgent() {
         {/* LIGHT-MODE VOICE POD (Expanded)                                           */}
         {/* ========================================================================= */}
         {isOpen && (
-          <div className="mb-3 w-[90vw] sm:w-[340px] max-w-[360px] bg-white/95 border border-slate-200/90 rounded-3xl shadow-2xl shadow-slate-900/15 backdrop-blur-xl text-slate-900 overflow-hidden flex flex-col animate-in fade-in slide-in-from-bottom-5 duration-200">
-            {/* Header */}
-            <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/70 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="relative w-10 h-10 rounded-2xl overflow-hidden ring-2 ring-blue-500/20 shadow-sm shrink-0">
-                  <Image
-                    src={avatarUrl}
-                    alt="Sarah AI Sales Advisor"
-                    fill
-                    sizes="40px"
-                    unoptimized={true}
-                    className="object-cover"
-                  />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-bold text-slate-900 tracking-tight">Sarah</h3>
-                    {isCallActive ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-bold">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        <span>Live Voice</span>
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-slate-600 text-[10px] font-medium">
-                        <span>Ready</span>
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[11px] text-slate-500 font-medium">
-                    AI Sales &amp; Leasing Associate
-                  </p>
-                </div>
-              </div>
-
-              <button
-                onClick={handleRequestDisconnect}
-                className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
-                aria-label="Close or disconnect voice assistant"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Body: Voice Arena */}
-            <div className="p-6 flex flex-col items-center text-center">
-              {/* Context Badge */}
-              <div className="mb-4 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50/80 border border-blue-200/60 text-blue-700 text-[11px] font-medium">
-                <Radio className="w-3 h-3 text-blue-600 animate-pulse" />
-                <span>Viewing: {context.pageTitle}</span>
-              </div>
-
-              {/* Central Voice Avatar with Animated Pulse Rings */}
-              <div className="relative mb-5 flex items-center justify-center">
-                {/* Outer pulsing ripples when active */}
-                {isCallActive && (
-                  <>
-                    <span className={`absolute inset-0 -m-3 rounded-full opacity-40 animate-ping ${isAgentSpeaking ? "bg-blue-400" : "bg-emerald-400"}`} />
-                    <span className={`absolute inset-0 -m-1.5 rounded-full opacity-30 animate-pulse ${isAgentSpeaking ? "bg-blue-500" : "bg-emerald-500"}`} />
-                  </>
-                )}
-
-                <div
-                  className={`relative w-24 h-24 rounded-full overflow-hidden shadow-xl transition-all duration-300 ${
-                    isAgentSpeaking
-                      ? "ring-4 ring-blue-500 shadow-blue-500/20 scale-105"
-                      : isCallActive
-                      ? "ring-4 ring-emerald-500 shadow-emerald-500/20"
-                      : "ring-4 ring-slate-100 shadow-slate-200"
-                  }`}
-                >
-                  <Image
-                    src={avatarUrl}
-                    alt="Sarah AI Sales Advisor"
-                    fill
-                    sizes="96px"
-                    unoptimized={true}
-                    className="object-cover"
-                  />
-                </div>
-              </div>
-
-              {/* Dynamic Status Text */}
-              <div className="mb-4 min-h-[38px] flex flex-col items-center justify-center">
-                {isRequestingMic ? (
-                  <p className="text-xs font-semibold text-blue-600 animate-pulse">
-                    Requesting microphone permission...
-                  </p>
-                ) : callState === "connecting" ? (
-                  <div className="flex items-center gap-2 text-xs font-semibold text-blue-600">
-                    <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
-                    <span>Connecting to Sarah via Agora...</span>
-                  </div>
-                ) : isAgentSpeaking ? (
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-blue-600">
-                    <Volume2 className="w-3.5 h-3.5 animate-bounce" />
-                    <span>Sarah is speaking...</span>
-                  </div>
-                ) : isCallActive ? (
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    <span>Listening... Speak naturally</span>
-                  </div>
-                ) : (
-                  <p className="text-xs text-slate-500 font-medium">
-                    Tap below to start voice conversation
-                  </p>
-                )}
-              </div>
-
-              {/* Real-time Frequency Visualizer (when active) */}
-              {isCallActive && !showExitConfirm && (
-                <div className="flex items-center justify-center gap-1 h-7 mb-4 px-4 py-1 rounded-xl bg-slate-50 border border-slate-100 w-full">
-                  {audioFrequencies.slice(0, 14).map((freq, idx) => {
-                    const heightPercent = Math.min(100, Math.max(15, (freq / 255) * 100));
-                    return (
+          <div
+            className={`mb-3 bg-white/95 border border-slate-200/90 rounded-3xl shadow-2xl shadow-slate-900/15 backdrop-blur-xl text-slate-900 overflow-hidden flex flex-col animate-in fade-in slide-in-from-bottom-5 duration-200 transition-all ${
+              isCallActive
+                ? "w-[92vw] sm:w-[380px] max-w-[400px] h-[520px] max-h-[82vh]"
+                : "w-[90vw] sm:w-[340px] max-w-[360px]"
+            }`}
+          >
+            {isCallActive ? (
+              /* ========================================================================= */
+              /* 1. ACTIVE CALL VIEW: Compact Persona Bar + Live Dialogue Stream + Controls */
+              /* ========================================================================= */
+              <>
+                {/* Compact Sticky Header */}
+                <div className="px-4 py-3 border-b border-slate-100 bg-gradient-to-r from-slate-50/90 via-white to-slate-50/90 flex items-center justify-between gap-3 shrink-0 shadow-2xs">
+                  {/* Left: Avatar + Speaking Beacon + Identity */}
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div
+                      className={`relative w-10 h-10 rounded-2xl overflow-hidden p-0.5 shrink-0 transition-all duration-300 ${
+                        isAgentSpeaking
+                          ? "bg-gradient-to-tr from-emerald-500 via-teal-400 to-blue-500 shadow-md shadow-emerald-500/25 ring-2 ring-emerald-400/40"
+                          : "bg-gradient-to-tr from-blue-600 to-indigo-500 shadow-sm"
+                      }`}
+                    >
+                      <div className="w-full h-full rounded-[14px] overflow-hidden bg-slate-100 relative">
+                        <Image
+                          src={avatarUrl}
+                          alt="Sarah AI Sales Advisor"
+                          fill
+                          sizes="40px"
+                          unoptimized={true}
+                          className="object-cover"
+                        />
+                      </div>
                       <span
-                        key={idx}
-                        style={{ height: `${heightPercent}%` }}
-                        className={`w-1 rounded-full transition-all duration-75 ${
-                          isAgentSpeaking ? "bg-blue-500" : "bg-emerald-500"
+                        className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-white ${
+                          isAgentSpeaking ? "bg-emerald-500 animate-pulse" : "bg-blue-600"
                         }`}
                       />
-                    );
-                  })}
-                </div>
-              )}
+                    </div>
 
-              {/* Error or Permission Alert */}
-              {(permissionError || errorMessage) && !showExitConfirm && (
-                <div className="mb-4 p-2.5 rounded-xl bg-red-50 border border-red-200 text-[11px] text-red-700 flex items-start gap-1.5 text-left w-full">
-                  <AlertCircle className="w-3.5 h-3.5 text-red-600 shrink-0 mt-0.5" />
-                  <span className="leading-tight">{permissionError || errorMessage}</span>
-                </div>
-              )}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-extrabold text-slate-900 truncate">
+                          Sarah
+                        </span>
+                        <span className="px-1.5 py-0.2 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-bold">
+                          LIVE
+                        </span>
+                      </div>
+                      <span className="text-[11px] font-semibold text-slate-500 block truncate">
+                        {isAgentSpeaking
+                          ? "Sarah is speaking..."
+                          : callState === "user_speaking"
+                          ? "Listening hands-free..."
+                          : callState === "connecting"
+                          ? "Connecting..."
+                          : isMuted
+                          ? "Microphone muted"
+                          : "Listening • Speak naturally"}
+                      </span>
+                    </div>
+                  </div>
 
-              {/* Exit Confirmation View (Inline) */}
-              {showExitConfirm ? (
-                <div className="w-full p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-center animate-in fade-in duration-150 mb-2">
-                  <p className="text-xs font-bold text-slate-900 mb-1">
-                    Are you sure you want to close this call?
-                  </p>
-                  <p className="text-[11px] text-slate-500 mb-3">
-                    Ending the call will stop the Agora voice session.
-                  </p>
-                  <div className="flex items-center gap-2">
+                  {/* Center: Live Soundwave (Visible on sm+ screens) */}
+                  <div className="hidden sm:flex items-center gap-0.5 h-4 px-2 py-1 rounded-lg bg-slate-100/80 shrink-0">
+                    {audioFrequencies.slice(0, 8).map((freq, i) => (
+                      <div
+                        key={i}
+                        className={`w-1 rounded-full transition-all duration-75 ${
+                          isAgentSpeaking
+                            ? "bg-emerald-500"
+                            : callState === "user_speaking"
+                            ? "bg-blue-600"
+                            : "bg-slate-300"
+                        }`}
+                        style={{
+                          height: `${Math.max(
+                            25,
+                            Math.min(
+                              100,
+                              isAgentSpeaking || callState === "user_speaking" ? freq : 25
+                            )
+                          )}%`,
+                        }}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Right: Mute & Close */}
+                  <div className="flex items-center gap-1.5 shrink-0">
                     <button
                       type="button"
-                      onClick={handleConfirmDisconnect}
-                      className="flex-1 py-2 px-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs transition-colors cursor-pointer"
+                      onClick={toggleMute}
+                      className={`p-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                        isMuted
+                          ? "bg-amber-500 text-white shadow-sm"
+                          : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                      }`}
+                      title={isMuted ? "Unmute Microphone" : "Mute Microphone"}
                     >
-                      Yes, End Call
+                      {isMuted ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
                     </button>
+
                     <button
                       type="button"
-                      onClick={() => setShowExitConfirm(false)}
-                      className="flex-1 py-2 px-3 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-semibold text-xs transition-colors cursor-pointer"
+                      onClick={handleRequestDisconnect}
+                      className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                      aria-label="Close or disconnect voice assistant"
+                      title="Close or disconnect"
                     >
-                      Keep Talking
+                      <X className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
-              ) : (
-                /* Controls: Start or Disconnect */
-                <div className="w-full flex items-center gap-2">
-                  {!isCallActive ? (
+
+                {/* Live Dialogue Stream Body */}
+                <SalesDialogueStream
+                  transcript={transcript}
+                  isAgentSpeaking={isAgentSpeaking}
+                  callState={callState}
+                />
+
+                {/* Exit Confirmation View (Inline) or Bottom Bar */}
+                {showExitConfirm ? (
+                  <div className="p-3.5 bg-slate-50 border-t border-slate-200 text-center animate-in fade-in duration-150 shrink-0">
+                    <p className="text-xs font-bold text-slate-900 mb-1">
+                      Are you sure you want to end this call?
+                    </p>
+                    <p className="text-[11px] text-slate-500 mb-2.5">
+                      Ending the call will stop the Agora voice session.
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleConfirmDisconnect}
+                        className="flex-1 py-1.5 px-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs transition-colors cursor-pointer"
+                      >
+                        Yes, End Call
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowExitConfirm(false)}
+                        className="flex-1 py-1.5 px-3 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-semibold text-xs transition-colors cursor-pointer"
+                      >
+                        Keep Talking
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="px-4 py-2.5 bg-white border-t border-slate-100 flex items-center justify-between shrink-0">
+                    <div className="flex items-center gap-1 text-[10px] text-slate-400">
+                      <Sparkles className="w-3 h-3 text-blue-500" />
+                      <span>Agora SD-RTN • Hands-free</span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleRequestDisconnect}
+                      className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-bold text-xs shadow-sm shadow-red-600/20 transition-all flex items-center gap-1.5 cursor-pointer"
+                      title="End Conversation / Disconnect"
+                    >
+                      <PhoneOff className="w-3.5 h-3.5" />
+                      <span>Disconnect</span>
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : (
+              /* ========================================================================= */
+              /* 2. IDLE WELCOMING CARD: Persona Info + Start Button                       */
+              /* ========================================================================= */
+              <>
+                {/* Header */}
+                <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/70 flex items-center justify-between shrink-0">
+                  <div className="flex items-center gap-3">
+                    <div className="relative w-10 h-10 rounded-2xl overflow-hidden ring-2 ring-blue-500/20 shadow-sm shrink-0">
+                      <Image
+                        src={avatarUrl}
+                        alt="Sarah AI Sales Advisor"
+                        fill
+                        sizes="40px"
+                        unoptimized={true}
+                        className="object-cover"
+                      />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-bold text-slate-900 tracking-tight">Sarah</h3>
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-slate-600 text-[10px] font-medium">
+                          <span>Ready</span>
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 font-medium">
+                        AI Sales &amp; Leasing Associate
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleRequestDisconnect}
+                    className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                    aria-label="Close voice assistant"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Body: Voice Arena */}
+                <div className="p-6 flex flex-col items-center text-center">
+                  {/* Context Badge */}
+                  <div className="mb-4 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50/80 border border-blue-200/60 text-blue-700 text-[11px] font-medium">
+                    <Radio className="w-3 h-3 text-blue-600 animate-pulse" />
+                    <span>Viewing: {context.pageTitle}</span>
+                  </div>
+
+                  {/* Central Voice Avatar */}
+                  <div className="relative mb-5 flex items-center justify-center">
+                    <div className="relative w-24 h-24 rounded-full overflow-hidden shadow-xl ring-4 ring-slate-100 shadow-slate-200">
+                      <Image
+                        src={avatarUrl}
+                        alt="Sarah AI Sales Advisor"
+                        fill
+                        sizes="96px"
+                        unoptimized={true}
+                        className="object-cover"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Dynamic Status Text */}
+                  <div className="mb-4 min-h-[38px] flex flex-col items-center justify-center">
+                    {isRequestingMic ? (
+                      <p className="text-xs font-semibold text-blue-600 animate-pulse">
+                        Requesting microphone permission...
+                      </p>
+                    ) : callState === "connecting" ? (
+                      <div className="flex items-center gap-2 text-xs font-semibold text-blue-600">
+                        <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+                        <span>Connecting to Sarah via Agora...</span>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-500 font-medium">
+                        Tap below to start voice conversation
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Error or Permission Alert */}
+                  {(permissionError || errorMessage) && (
+                    <div className="mb-4 p-2.5 rounded-xl bg-red-50 border border-red-200 text-[11px] text-red-700 flex items-start gap-1.5 text-left w-full">
+                      <AlertCircle className="w-3.5 h-3.5 text-red-600 shrink-0 mt-0.5" />
+                      <span className="leading-tight">{permissionError || errorMessage}</span>
+                    </div>
+                  )}
+
+                  {/* Start Button */}
+                  <div className="w-full flex items-center gap-2">
                     <button
                       type="button"
                       disabled={isRequestingMic || callState === "connecting"}
@@ -522,43 +614,16 @@ export function FloatingSalesAgent() {
                       <Mic className="w-4 h-4" />
                       <span>{callState === "connecting" ? "Connecting..." : "Start Conversation"}</span>
                     </button>
-                  ) : (
-                    <>
-                      {/* Mute toggle */}
-                      <button
-                        type="button"
-                        onClick={toggleMute}
-                        className={`p-3 rounded-2xl border transition-colors cursor-pointer ${
-                          isMuted
-                            ? "bg-amber-500 text-white border-amber-600"
-                            : "bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200"
-                        }`}
-                        title={isMuted ? "Unmute microphone" : "Mute microphone"}
-                      >
-                        {isMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                      </button>
-
-                      {/* Disconnect Button (triggers confirmation prompt) */}
-                      <button
-                        type="button"
-                        onClick={handleRequestDisconnect}
-                        className="flex-1 py-3 px-4 rounded-2xl bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-red-600/25 transition-all cursor-pointer"
-                        title="Disconnect call to stop billing minutes"
-                      >
-                        <PhoneOff className="w-4 h-4" />
-                        <span>Disconnect</span>
-                      </button>
-                    </>
-                  )}
+                  </div>
                 </div>
-              )}
-            </div>
 
-            {/* Footer Note */}
-            <div className="px-5 py-2.5 border-t border-slate-100 bg-slate-50/70 text-center text-[10px] text-slate-400 flex items-center justify-center gap-1">
-              <Sparkles className="w-3 h-3 text-blue-500" />
-              <span>Sub-300ms real-time voice • Agora &amp; Gemini</span>
-            </div>
+                {/* Footer Note */}
+                <div className="px-5 py-2.5 border-t border-slate-100 bg-slate-50/70 text-center text-[10px] text-slate-400 flex items-center justify-center gap-1 shrink-0">
+                  <Sparkles className="w-3 h-3 text-blue-500" />
+                  <span>Sub-300ms real-time voice • Agora &amp; Gemini</span>
+                </div>
+              </>
+            )}
           </div>
         )}
 
