@@ -865,8 +865,10 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
           return;
         }
 
-        // Close upload modal if it was open
+        // Close upload modal if it was open and advance to final review stage
         setShowUploadModal(false);
+        setOnboardingStage("final_review");
+        onboardingStageRef.current = "final_review";
         openFullReview();
       } else if (action === "open_review_modal") {
         if (onboardingStageRef.current === "core") {
@@ -1104,6 +1106,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
         setShowCoreModal(true);
       }
 
+      const wasFinalGateReleasedThisTurn = pendingFinalModalOpenRef.current;
       // In-Flight Sync Gate: Final Review Card (guarantees newly spoken details have landed with 0 blanks!)
       if (pendingFinalModalOpenRef.current && (onboardingStageRef.current === "additional_specs" || onboardingStageRef.current === "photos" || onboardingStageRef.current === "final_review")) {
         setFinalGate(false);
@@ -1156,9 +1159,17 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
             // Leaves a latched open-gate alone: the card the owner has not seen yet is still
             // coming, and cancelling it here would leave them with nothing to approve.
             confirmFullReview();
-          } else {
+          } else if (!wasFinalGateReleasedThisTurn && showFinalModalRef.current) {
             setShowFinalModal(false);
             setFinalGate(false);
+          } else {
+            addTelemetryLog(
+              "INTENT",
+              "Ignored close_final because final review modal was just opened or is not actively visible",
+              null,
+              undefined,
+              "info"
+            );
           }
         } else if (action === "open") {
           if (onboardingStageRef.current === "core") {

@@ -322,6 +322,13 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
               const turnKey = `user_turn_${turnId}`;
               if (isFinished && !processedTurnIdsRef.current.has(turnKey as any)) {
                 processedTurnIdsRef.current.add(turnKey as any);
+
+                // Synthetic system control cues (e.g. [DEPLOY_CONFIRMED]) transmitted to agent
+                // are echoed by Agora RTC as user turns; ignore them so they never trigger intents or extractions.
+                if (spokenText.trim().startsWith("[")) {
+                  return;
+                }
+
                 onLogEventRef.current?.("AGORA", `User speech finalized (Turn #${item.turn_id ?? "turn"})`, {
                   text: spokenText,
                   final: true,
