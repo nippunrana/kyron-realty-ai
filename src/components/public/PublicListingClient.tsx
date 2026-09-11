@@ -8,9 +8,8 @@ import {
   Share2,
   Sparkles,
   CheckCircle2,
-  Camera,
-  BadgeCheck,
 } from "lucide-react";
+import { PropertyImageGallery } from "./PropertyImageGallery";
 import { ShareListingModal } from "./ShareListingModal";
 import { PropertySpecsBento } from "./PropertySpecsBento";
 import { PropertyCommuteExplorer } from "./PropertyCommuteExplorer";
@@ -19,7 +18,6 @@ import { SarahVoiceConciergeCard } from "./SarahVoiceConciergeCard";
 import { PublicListingFooter } from "./PublicListingFooter";
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
 import { BASE_PATH } from "@/lib/base-path";
-import { formatPropertyTypeLabel } from "@/lib/property-types";
 import type { PublicListingClientProps } from "@/lib/public-listing-types";
 
 export function PublicListingClient({
@@ -28,9 +26,7 @@ export function PublicListingClient({
   media,
   shareUrl,
 }: PublicListingClientProps) {
-  const [activeImageIdx, setActiveImageIdx] = useState(0);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
-  const [failedImageUrls, setFailedImageUrls] = useState<Record<string, boolean>>({});
   const { copied, copy: copyShareUrl } = useCopyToClipboard();
 
   const sarahAvatarUrl = `${BASE_PATH}/images/salesagent.webp`;
@@ -50,8 +46,6 @@ export function PublicListingClient({
           property.coverImageUrl ||
             "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80",
         ];
-
-  const currentHeroImage = images[activeImageIdx] || images[0];
 
   const locationSummary = [property.city, property.state].filter(Boolean).join(", ") || property.address || "";
   const whatsAppText = encodeURIComponent(
@@ -128,75 +122,12 @@ export function PublicListingClient({
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
         {/* Photo Gallery & Hero Media Section */}
         <section className="mb-8">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5">
-            {/* Primary Hero Image (8 cols) */}
-            <div className="lg:col-span-8 relative aspect-16/10 rounded-3xl overflow-hidden bg-slate-900 shadow-md border border-slate-200/80">
-              {failedImageUrls[currentHeroImage] ? (
-                <div className="w-full h-full bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col items-center justify-center p-6 text-center select-none">
-                  <div className="w-16 h-16 rounded-3xl bg-white/10 backdrop-blur-md border border-white/15 flex items-center justify-center text-slate-300 mb-3 shadow-inner">
-                    <Camera className="w-8 h-8 text-slate-300" />
-                  </div>
-                  <p className="text-base sm:text-lg font-bold text-white max-w-sm mb-1 line-clamp-1">
-                    {property.title}
-                  </p>
-                  <span className="text-xs text-slate-400 font-medium">Photo Preview Pending</span>
-                </div>
-              ) : (
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <img
-                  src={currentHeroImage}
-                  alt={property.title}
-                  className="w-full h-full object-cover select-none"
-                />
-              )}
-
-              {/* Status & Category Badges */}
-              <div className="absolute top-4 left-4 flex flex-wrap items-center gap-2">
-                <span className="px-3 py-1 rounded-full bg-slate-900/80 backdrop-blur-md border border-white/15 text-white text-xs font-bold uppercase tracking-wider">
-                  {property.listingType === "rent" ? "For Rent" : "For Sale"}
-                </span>
-                <span className="px-3 py-1 rounded-full bg-blue-600/90 backdrop-blur-md text-white text-xs font-bold">
-                  {formatPropertyTypeLabel(property.propertyType)}
-                </span>
-              </div>
-
-              {/* Verified Verification Badge */}
-              <div className="absolute bottom-4 left-4 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/95 backdrop-blur-md text-slate-900 text-xs font-extrabold shadow-lg">
-                <BadgeCheck className="w-4 h-4 text-blue-600" />
-                <span>Verified by Kyron Realty AI</span>
-              </div>
-            </div>
-
-            {/* Thumbnail Grid Strip (4 cols) */}
-            <div className="lg:col-span-4 grid grid-cols-2 gap-3.5">
-              {images.slice(0, 4).map((img, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setActiveImageIdx(idx)}
-                  className={`relative aspect-4/3 rounded-2xl overflow-hidden border-2 transition-all cursor-pointer ${
-                    activeImageIdx === idx
-                      ? "border-blue-600 shadow-md ring-2 ring-blue-500/20"
-                      : "border-slate-200/80 opacity-70 hover:opacity-100"
-                  }`}
-                >
-                  {failedImageUrls[img] ? (
-                    <div className="w-full h-full bg-gradient-to-br from-slate-900 to-slate-800 flex flex-col items-center justify-center text-slate-400 p-2">
-                      <Camera className="w-5 h-5 opacity-60 mb-1" />
-                      <span className="text-[10px] text-slate-500 font-medium">Photo {idx + 1}</span>
-                    </div>
-                  ) : (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img
-                      src={img}
-                      alt=""
-                      onError={() => setFailedImageUrls((prev) => ({ ...prev, [img]: true }))}
-                      className="w-full h-full object-cover"
-                    />
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
+          <PropertyImageGallery
+            images={images}
+            title={property.title}
+            listingType={property.listingType}
+            propertyType={property.propertyType}
+          />
         </section>
 
         {/* 2-Column Main Body Layout */}

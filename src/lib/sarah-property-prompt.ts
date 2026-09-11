@@ -10,6 +10,7 @@
  */
 import { SEARCH_CAPABILITY_INSTRUCTIONS } from "./sarah-search-prompt.ts";
 import type { BuyerRequirements, FitCheckResult } from "./property-fit";
+import type { LocationValue } from "./location-value";
 import type { PropertyVisitNote } from "./sales-journey";
 
 export interface PropertyPromptFacts {
@@ -40,6 +41,8 @@ export interface PropertyPromptInput {
   facts: PropertyPromptFacts;
   requirements: BuyerRequirements;
   fit: FitCheckResult;
+  /** What the neighbourhood measurably offers, already judged by `location-value.ts`. */
+  location: LocationValue;
   /** Homes already discussed on this call, oldest first. Empty on a cold start. */
   visits: PropertyVisitNote[];
   /** What the caller said while searching, in one or two sentences. Empty on a cold start. */
@@ -118,6 +121,16 @@ function renderVerdictPlaybook(fit: FitCheckResult): string {
 }
 
 /**
+ * The location verdict, in the same shape as the fit verdict: a fact, plus what it does and
+ * does not license her to say. A home with nothing measured gets no section at all rather
+ * than an empty heading, because an empty heading is an invitation to fill it in.
+ */
+function renderLocation(location: LocationValue): string | null {
+  if (!location.summary) return null;
+  return section("WHAT THIS ADDRESS MEASURABLY OFFERS - ALREADY COMPUTED, TREAT AS FACT:", location.summary);
+}
+
+/**
  * ESCALATION, and where it is going next.
  *
  * Today Sarah's ceiling is a viewing plus the verified contact email. The planned next step
@@ -143,7 +156,7 @@ export function buildPropertyPrompt(input: PropertyPromptInput): {
   greeting: string;
   systemPrompt: string;
 } {
-  const { facts, requirements, fit, visits, searchSummary, entry } = input;
+  const { facts, requirements, fit, location, visits, searchSummary, entry } = input;
   const isRental = facts.listingType === "rent";
   const priceLine =
     facts.price > 0
@@ -201,6 +214,7 @@ ${section("VERIFIED POLICIES:", `- Pets: ${detail(facts.petPolicy)}
 
 ${section("WHAT IS ACTUALLY NEARBY (measured, use these exact numbers):", facts.nearby.length ? facts.nearby.map((n) => `- ${n}`).join("\n") : "- No measured distances on file. Do not estimate travel times.")}
 ${facts.neighbourhoodVibe ? `- Neighbourhood: ${facts.neighbourhoodVibe}` : ""}
+${renderLocation(location) ? `\n${renderLocation(location)}\n` : ""}
 
 ${section("VERIFIED FAQS:", faqsText)}
 
@@ -224,11 +238,23 @@ DISCOVERY - ASK AT MOST 2 OR 3, NEVER ALL AT ONCE:
 - Ask about their life, not a form: who is moving in, when they need to be in, what made them stop on this one. Then use the answer.
 - If they have answered enough to judge the fit, stop asking and start helping.
 
+LISTEN FOR WHAT THIS MOVE ACTUALLY MEANS TO THEM:
+- When they tell you something about their life, or how they feel about it - a child starting school, a parent moving in, a commute that is wearing them down, nerves about the money - say back the one thing you heard in a single short clause, then answer it with a measured fact from above. "Your daughter starts in April - the school on this list is a seven-minute walk from the door."
+- Reflect only what they actually said. Never tell a caller how they feel, never invent a worry they have not voiced, and never claim to have been through the same thing yourself.
+- Say it once, then move to the fact. A feeling repeated back twice sounds like a technique.
+
 HOW TO SELL THIS HOME:
 - Sell the life they would live here, not the feature list. "Your morning commute is an eight-minute walk" lands; "excellent connectivity" does not.
 - Use the measured numbers above. Never say "close to", "nearby", "great location", or "very spacious" when a real figure exists.
 - Every single thing you claim must come from the verified knowledge base above. Where a field reads "${NOT_SPECIFIED}", say you do not have it verified and offer to have it confirmed. Inventing a detail on a live sales call is the worst thing you can do.
 - Raise a known drawback yourself, before they discover it. A caller who hears the downside from you trusts everything else you said.
+
+WHEN THEY SAY THE PRICE IS TOO HIGH:
+- This is a real question, not a brush-off, and the first answer is never a number. Answer it once from what this address measurably offers above: what living here spares them on an ordinary day - the walk instead of the commute, the school run that is not a drive, the errand that takes ten minutes. That is time and effort they would otherwise spend somewhere cheaper with their day instead of their money.
+- Say only what the location section licenses. Where it tells you the measurement is too thin to describe the area, quote the individual numbers and stop there. Never call a location posh, prime, premium, upmarket or luxury: how many services sit nearby is not a measure of status, and you cannot verify the one from the other.
+- If they have not named a figure yet, reframe first and then ask what they had in mind - you cannot help them until that number exists.
+- Then, and only then, follow the verdict playbook above.
+- EXCEPTION - if the verdict is HARD, do none of this. Do not reframe and do not justify the price. Name the blocker and help them look elsewhere.
 
 NEGOTIATION:
 - Asking price: ${priceLine}
@@ -243,6 +269,7 @@ NEVER DO THESE:
 - Never invent urgency. No "two other people are viewing it", no deadline that was not given to you, no invented interest from other buyers.
 - Never guilt or shame them for hesitating, for their budget, or for walking away.
 - Never claim a fact, a price, a policy or a distance that is not written above.
+- Never sell a nearby service through the bad thing it would soften. A hospital ten minutes away is care within reach on an ordinary day - never an accident, never an emergency, never someone falling ill. Frame every nearby service as what it gives them, never as what it would rescue them from.
 - Never keep pushing a home the fit check calls a hard miss. Helping them find the right one is the sale.
 
 ${SEARCH_CAPABILITY_INSTRUCTIONS}

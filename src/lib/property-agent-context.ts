@@ -8,6 +8,7 @@ import { properties } from "@/db/schema";
 import { and, eq, ne } from "drizzle-orm";
 import { computeFloorPrice } from "./listing-helpers";
 import { checkPropertyFit, type FitCheckResult, type FitProperty } from "./property-fit";
+import { summariseLocationValue, type LocationInput } from "./location-value";
 import { buildPropertyPrompt, type PropertyPromptFacts } from "./sarah-property-prompt";
 import type { SalesJourney } from "./sales-journey";
 
@@ -49,6 +50,29 @@ function buildNearbyLines(kbData: NonNullable<PropertyRow["knowledgeBase"]>["kbD
   }
 
   return lines.slice(0, 8);
+}
+
+/**
+ * The same neighbourhood data `buildNearbyLines` renders, handed to the density check in
+ * structured form. The named lists are only ever the fallback: `summariseLocationValue`
+ * ignores them the moment a single real travel time exists, so a measured home is never
+ * judged against a mix of measured and guessed places.
+ */
+function buildLocationInput(kbData: NonNullable<PropertyRow["knowledgeBase"]>["kbData"]): LocationInput {
+  const metro = kbData?.transit?.nearestMetro;
+  return {
+    measured: (kbData?.nearbyDistances || []).map((place) => ({
+      name: place.name,
+      category: place.category,
+      walkSeconds: place.walkSeconds,
+      driveSeconds: place.driveSeconds,
+    })),
+    named: {
+      transit: metro ? [metro] : [],
+      school: kbData?.neighborhood?.topSchools || [],
+      hospital: kbData?.neighborhood?.topHospitals || [],
+    },
+  };
 }
 
 type PropertyRow = typeof properties.$inferSelect;
@@ -146,6 +170,7 @@ export async function buildPropertyAgentContext(
     facts,
     requirements: journey.requirements,
     fit,
+    location: summariseLocationValue(buildLocationInput(row.knowledgeBase?.kbData)),
     visits: journey.visits.filter((v) => v.slug !== slug),
     searchSummary: journey.searchSummary,
     entry,
