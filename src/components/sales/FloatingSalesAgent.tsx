@@ -3,6 +3,8 @@
 import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
+import gsap from "gsap";
+import { useGSAP } from "@gsap/react";
 import { BASE_PATH } from "@/lib/base-path";
 import { useAgoraVoiceAgent } from "@/hooks/useAgoraVoiceAgent";
 import { GsapSearchHub, type SearchHubProperty } from "./GsapSearchHub";
@@ -78,6 +80,7 @@ export function FloatingSalesAgent() {
 
   // Search Hub states
   const [isSearchHubOpen, setIsSearchHubOpen] = useState(false);
+  const [mobileTab, setMobileTab] = useState<"chat" | "search">("chat");
   const [isSearchingProperties, setIsSearchingProperties] = useState(false);
   const [activeSearchCity, setActiveSearchCity] = useState<string | null>(null);
   const [isPetFriendlyFilter, setIsPetFriendlyFilter] = useState(false);
@@ -151,8 +154,10 @@ export function FloatingSalesAgent() {
     onUIAction: (action) => {
       if (action === "open_search_hub") {
         setIsSearchHubOpen(true);
+        setMobileTab("search");
       } else if (action === "close_search_hub") {
         setIsSearchHubOpen(false);
+        setMobileTab("chat");
       }
     },
   });
@@ -161,6 +166,7 @@ export function FloatingSalesAgent() {
     async (params: PropertySearchParams) => {
       setIsSearchingProperties(true);
       setIsSearchHubOpen(true);
+      setMobileTab("search");
 
       try {
         const speech =
@@ -237,6 +243,53 @@ export function FloatingSalesAgent() {
     }
   }, [transcript, executePropertySearch]);
 
+  const desktopSearchWingRef = useRef<HTMLDivElement>(null);
+
+  const handleCollapseSearch = useCallback(() => {
+    setIsSearchHubOpen(false);
+    setMobileTab("chat");
+  }, [setIsSearchHubOpen, setMobileTab]);
+
+  useGSAP(
+    () => {
+      const el = desktopSearchWingRef.current;
+      if (!el) return;
+
+      if (isSearchHubOpen) {
+        gsap.killTweensOf(el);
+        el.style.display = "flex";
+        gsap.fromTo(
+          el,
+          {
+            width: 0,
+            opacity: 0,
+            x: 24,
+          },
+          {
+            width: 560,
+            opacity: 1,
+            x: 0,
+            duration: 0.45,
+            ease: "power3.out",
+          }
+        );
+      } else {
+        gsap.killTweensOf(el);
+        gsap.to(el, {
+          width: 0,
+          opacity: 0,
+          x: 24,
+          duration: 0.35,
+          ease: "power2.inOut",
+          onComplete: () => {
+            if (el) el.style.display = "none";
+          },
+        });
+      }
+    },
+    { dependencies: [isSearchHubOpen] }
+  );
+
   const isDashboardRoute = pathname.startsWith("/dashboard");
 
   // If user enters dashboard while call was active, tear down call immediately
@@ -299,15 +352,19 @@ export function FloatingSalesAgent() {
       setShowExitConfirm(true);
     } else {
       setIsOpen(false);
+      setIsSearchHubOpen(false);
+      setMobileTab("chat");
     }
-  }, [isCallActive]);
+  }, [isCallActive, setMobileTab, setIsSearchHubOpen]);
 
   // Confirmed disconnect
   const handleConfirmDisconnect = useCallback(async () => {
     setShowExitConfirm(false);
+    setIsSearchHubOpen(false);
+    setMobileTab("chat");
     await endCall();
     setIsOpen(false);
-  }, [endCall]);
+  }, [endCall, setMobileTab, setIsSearchHubOpen]);
 
   // Dashboard navigation confirmation handlers
   const handleConfirmDashboardNav = useCallback(async () => {
@@ -382,127 +439,217 @@ export function FloatingSalesAgent() {
         {/* LIGHT-MODE VOICE POD (Expanded)                                           */}
         {/* ========================================================================= */}
         {isOpen && (
-          <div
-            className={`mb-3 bg-white/95 border border-slate-200/90 rounded-3xl shadow-2xl shadow-slate-900/15 backdrop-blur-xl text-slate-900 overflow-hidden flex flex-col animate-in fade-in slide-in-from-bottom-5 duration-200 transition-all ${
-              isCallActive
-                ? "w-[92vw] sm:w-[380px] max-w-[400px] h-[520px] max-h-[82vh]"
-                : "w-[90vw] sm:w-[340px] max-w-[360px]"
-            }`}
-          >
-            {isCallActive ? (
-              /* ========================================================================= */
-              /* 1. ACTIVE CALL VIEW: Compact Persona Bar + Live Dialogue Stream + Controls */
-              /* ========================================================================= */
-              <>
-                {/* Compact Sticky Header */}
-                <div className="px-4 py-3 border-b border-slate-100 bg-gradient-to-r from-slate-50/90 via-white to-slate-50/90 flex items-center justify-between gap-3 shrink-0 shadow-2xs">
-                  {/* Left: Avatar + Speaking Beacon + Identity */}
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div
-                      className={`relative w-10 h-10 rounded-2xl overflow-hidden p-0.5 shrink-0 transition-all duration-300 ${
-                        isAgentSpeaking
-                          ? "bg-gradient-to-tr from-emerald-500 via-teal-400 to-blue-500 shadow-md shadow-emerald-500/25 ring-2 ring-emerald-400/40"
-                          : "bg-gradient-to-tr from-blue-600 to-indigo-500 shadow-sm"
-                      }`}
-                    >
-                      <div className="w-full h-full rounded-[14px] overflow-hidden bg-slate-100 relative">
-                        <Image
-                          src={avatarUrl}
-                          alt="Sarah AI Sales Advisor"
-                          fill
-                          sizes="40px"
-                          unoptimized={true}
-                          className="object-cover"
+          <div className="mb-3 flex items-end gap-3 max-w-[calc(100vw-24px)] sm:max-w-[calc(100vw-40px)]">
+            {/* 1. LEFT WING (Desktop): Search Hub that fluidly expands to the left */}
+            <div
+              ref={desktopSearchWingRef}
+              className="hidden md:flex h-[560px] sm:h-[620px] overflow-hidden shrink-0"
+              style={{ display: "none", width: 0, opacity: 0 }}
+            >
+              <GsapSearchHub
+                isOpen={isSearchHubOpen}
+                isSearching={isSearchingProperties}
+                activeCity={activeSearchCity}
+                isPetFriendlyFilter={isPetFriendlyFilter}
+                properties={searchResults}
+                availableCities={availableCities}
+                onClose={handleCollapseSearch}
+                onCitySelect={(city) =>
+                  executePropertySearch({ city, petFriendly: isPetFriendlyFilter })
+                }
+                onManualSearch={(query) =>
+                  executePropertySearch({ query, city: activeSearchCity || undefined })
+                }
+              />
+            </div>
+
+            {/* 2. RIGHT WING: Sarah Voice Chat Pod (or Mobile Unified Pod) */}
+            <div
+              className={`bg-white/95 border border-slate-200/90 rounded-3xl shadow-2xl shadow-slate-900/15 backdrop-blur-xl text-slate-900 overflow-hidden flex flex-col animate-in fade-in slide-in-from-bottom-5 duration-200 transition-all ${
+                isCallActive
+                  ? "w-[min(92vw,380px)] h-[min(84vh,620px)] sm:h-[620px]"
+                  : "w-[min(90vw,340px)]"
+              }`}
+            >
+              {isCallActive ? (
+                /* ========================================================================= */
+                /* 1. ACTIVE CALL VIEW: Compact Persona Bar + Live Dialogue Stream + Controls */
+                /* ========================================================================= */
+                <>
+                  {/* Compact Sticky Header */}
+                  <div className="px-4 py-3 border-b border-slate-100 bg-gradient-to-r from-slate-50/90 via-white to-slate-50/90 flex items-center justify-between gap-3 shrink-0 shadow-2xs">
+                    {/* Left: Avatar + Speaking Beacon + Identity */}
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div
+                        className={`relative w-10 h-10 rounded-2xl overflow-hidden p-0.5 shrink-0 transition-all duration-300 ${
+                          isAgentSpeaking
+                            ? "bg-gradient-to-tr from-emerald-500 via-teal-400 to-blue-500 shadow-md shadow-emerald-500/25 ring-2 ring-emerald-400/40"
+                            : "bg-gradient-to-tr from-blue-600 to-indigo-500 shadow-sm"
+                        }`}
+                      >
+                        <div className="w-full h-full rounded-[14px] overflow-hidden bg-slate-100 relative">
+                          <Image
+                            src={avatarUrl}
+                            alt="Sarah AI Sales Advisor"
+                            fill
+                            sizes="40px"
+                            unoptimized={true}
+                            className="object-cover"
+                          />
+                        </div>
+                        <span
+                          className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-white ${
+                            isAgentSpeaking ? "bg-emerald-500 animate-pulse" : "bg-blue-600"
+                          }`}
                         />
                       </div>
-                      <span
-                        className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-white ${
-                          isAgentSpeaking ? "bg-emerald-500 animate-pulse" : "bg-blue-600"
-                        }`}
-                      />
-                    </div>
 
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-extrabold text-slate-900 truncate">
-                          Sarah
-                        </span>
-                        <span className="px-1.5 py-0.2 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-bold">
-                          LIVE
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-extrabold text-slate-900 truncate">
+                            Sarah
+                          </span>
+                          <span className="px-1.5 py-0.2 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-bold">
+                            LIVE
+                          </span>
+                        </div>
+                        <span className="text-[11px] font-semibold text-slate-500 block truncate">
+                          {isAgentSpeaking
+                            ? "Sarah is speaking..."
+                            : callState === "user_speaking"
+                            ? "Listening hands-free..."
+                            : callState === "connecting"
+                            ? "Connecting..."
+                            : isMuted
+                            ? "Microphone muted"
+                            : "Listening • Speak naturally"}
                         </span>
                       </div>
-                      <span className="text-[11px] font-semibold text-slate-500 block truncate">
-                        {isAgentSpeaking
-                          ? "Sarah is speaking..."
-                          : callState === "user_speaking"
-                          ? "Listening hands-free..."
-                          : callState === "connecting"
-                          ? "Connecting..."
-                          : isMuted
-                          ? "Microphone muted"
-                          : "Listening • Speak naturally"}
-                      </span>
+                    </div>
+
+                    {/* Center: Live Soundwave (Visible on sm+ screens) */}
+                    <div className="hidden sm:flex items-center gap-0.5 h-4 px-2 py-1 rounded-lg bg-slate-100/80 shrink-0">
+                      {audioFrequencies.slice(0, 8).map((freq, i) => (
+                        <div
+                          key={i}
+                          className={`w-1 rounded-full transition-all duration-75 ${
+                            isAgentSpeaking
+                              ? "bg-emerald-500"
+                              : callState === "user_speaking"
+                              ? "bg-blue-600"
+                              : "bg-slate-300"
+                          }`}
+                          style={{
+                            height: `${Math.max(
+                              25,
+                              Math.min(
+                                100,
+                                isAgentSpeaking || callState === "user_speaking" ? freq : 25
+                              )
+                            )}%`,
+                          }}
+                        />
+                      ))}
+                    </div>
+
+                    {/* Right: Listings Shortcut Pill + Mute & Close */}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {searchResults.length > 0 && !isSearchHubOpen && (
+                        <button
+                          type="button"
+                          onClick={() => setIsSearchHubOpen(true)}
+                          className="hidden md:flex items-center gap-1 px-2.5 py-1 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200/80 text-[10.5px] font-bold transition-all cursor-pointer shadow-2xs"
+                          title="Re-open property search panel"
+                        >
+                          <span>📍 {searchResults.length}</span>
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={toggleMute}
+                        className={`p-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                          isMuted
+                            ? "bg-amber-500 text-white shadow-sm"
+                            : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                        }`}
+                        title={isMuted ? "Unmute Microphone" : "Mute Microphone"}
+                      >
+                        {isMuted ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleRequestDisconnect}
+                        className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                        aria-label="Close or disconnect voice assistant"
+                        title="Close or disconnect"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
 
-                  {/* Center: Live Soundwave (Visible on sm+ screens) */}
-                  <div className="hidden sm:flex items-center gap-0.5 h-4 px-2 py-1 rounded-lg bg-slate-100/80 shrink-0">
-                    {audioFrequencies.slice(0, 8).map((freq, i) => (
-                      <div
-                        key={i}
-                        className={`w-1 rounded-full transition-all duration-75 ${
-                          isAgentSpeaking
-                            ? "bg-emerald-500"
-                            : callState === "user_speaking"
-                            ? "bg-blue-600"
-                            : "bg-slate-300"
+                  {/* Mobile Segmented Switcher (Visible only on mobile when listings exist or search active) */}
+                  {(searchResults.length > 0 || isSearchHubOpen) && (
+                    <div className="md:hidden px-3 py-1.5 bg-slate-100/90 border-b border-slate-200/60 flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setMobileTab("chat")}
+                        className={`flex-1 py-1 px-2 rounded-lg text-xs font-bold transition-all ${
+                          mobileTab === "chat"
+                            ? "bg-white text-slate-900 shadow-2xs"
+                            : "text-slate-500 hover:text-slate-800"
                         }`}
-                        style={{
-                          height: `${Math.max(
-                            25,
-                            Math.min(
-                              100,
-                              isAgentSpeaking || callState === "user_speaking" ? freq : 25
-                            )
-                          )}%`,
-                        }}
+                      >
+                        💬 Conversation
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMobileTab("search")}
+                        className={`flex-1 py-1 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${
+                          mobileTab === "search"
+                            ? "bg-white text-blue-600 shadow-2xs"
+                            : "text-slate-500 hover:text-slate-800"
+                        }`}
+                      >
+                        <span>🏠 Properties</span>
+                        {searchResults.length > 0 && (
+                          <span className="px-1.5 py-0.2 rounded-full bg-blue-100 text-blue-700 text-[10px] font-extrabold">
+                            {searchResults.length}
+                          </span>
+                        )}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Mobile Search View or Dialogue Stream Body */}
+                  {mobileTab === "search" ? (
+                    <div className="md:hidden flex-1 overflow-hidden flex flex-col">
+                      <GsapSearchHub
+                        isOpen={true}
+                        isSearching={isSearchingProperties}
+                        activeCity={activeSearchCity}
+                        isPetFriendlyFilter={isPetFriendlyFilter}
+                        properties={searchResults}
+                        availableCities={availableCities}
+                        onClose={() => setMobileTab("chat")}
+                        isMobileTab={true}
+                        onCitySelect={(city) =>
+                          executePropertySearch({ city, petFriendly: isPetFriendlyFilter })
+                        }
+                        onManualSearch={(query) =>
+                          executePropertySearch({ query, city: activeSearchCity || undefined })
+                        }
                       />
-                    ))}
-                  </div>
-
-                  {/* Right: Mute & Close */}
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <button
-                      type="button"
-                      onClick={toggleMute}
-                      className={`p-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                        isMuted
-                          ? "bg-amber-500 text-white shadow-sm"
-                          : "bg-slate-100 hover:bg-slate-200 text-slate-700"
-                      }`}
-                      title={isMuted ? "Unmute Microphone" : "Mute Microphone"}
-                    >
-                      {isMuted ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleRequestDisconnect}
-                      className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
-                      aria-label="Close or disconnect voice assistant"
-                      title="Close or disconnect"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Live Dialogue Stream Body */}
-                <SalesDialogueStream
-                  transcript={transcript}
-                  isAgentSpeaking={isAgentSpeaking}
-                  callState={callState}
-                />
+                    </div>
+                  ) : (
+                    <SalesDialogueStream
+                      transcript={transcript}
+                      isAgentSpeaking={isAgentSpeaking}
+                      callState={callState}
+                    />
+                  )}
 
                 {/* Exit Confirmation View (Inline) or Bottom Bar */}
                 {showExitConfirm ? (
@@ -658,6 +805,7 @@ export function FloatingSalesAgent() {
                 </div>
               </>
             )}
+            </div>
           </div>
         )}
 
@@ -726,25 +874,6 @@ export function FloatingSalesAgent() {
           </div>
         </div>
       </aside>
-
-      {/* ========================================================================= */}
-      {/* GSAP MORPHING PROPERTY SEARCH HUB                                        */}
-      {/* ========================================================================= */}
-      <GsapSearchHub
-        isOpen={isSearchHubOpen}
-        isSearching={isSearchingProperties}
-        activeCity={activeSearchCity}
-        isPetFriendlyFilter={isPetFriendlyFilter}
-        properties={searchResults}
-        availableCities={availableCities}
-        onClose={() => setIsSearchHubOpen(false)}
-        onCitySelect={(city) =>
-          executePropertySearch({ city, petFriendly: isPetFriendlyFilter })
-        }
-        onManualSearch={(query) =>
-          executePropertySearch({ query, city: activeSearchCity || undefined })
-        }
-      />
     </>
   );
 }
