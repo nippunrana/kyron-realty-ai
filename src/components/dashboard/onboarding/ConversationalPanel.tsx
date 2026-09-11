@@ -30,6 +30,7 @@ export interface VoiceControlState {
   endCall: () => Promise<void>;
   /** Sends a text/prompt message to Elena Vance over Agora RTM. */
   sendTextMessage: (text: string) => void | Promise<void>;
+  voiceSessionId?: number | null;
 }
 
 interface ConversationalPanelProps {
@@ -49,6 +50,8 @@ interface ConversationalPanelProps {
   ownerEmail?: string;
   /** Why the last call was hung up, when the studio ended it rather than the owner. */
   conductNotice?: string | null;
+  /** Existing draft property ID, if resuming an existing draft. */
+  draftId?: number | null;
 }
 
 export function ConversationalPanel({
@@ -64,6 +67,7 @@ export function ConversationalPanel({
   ownerName,
   ownerEmail,
   conductNotice,
+  draftId,
 }: ConversationalPanelProps) {
   const [autoScroll, setAutoScroll] = useState(true);
   const [isScrolledUp, setIsScrolledUp] = useState(false);
@@ -101,6 +105,7 @@ export function ConversationalPanel({
     audioFrequencies,
     transcript,
     errorMessage,
+    voiceSessionId,
     startCall,
     toggleMute,
     endCall,
@@ -119,8 +124,9 @@ export function ConversationalPanel({
       toggleMute,
       endCall,
       sendTextMessage,
+      voiceSessionId,
     });
-  }, [isCallActive, isMuted, toggleMute, endCall, sendTextMessage, onVoiceStateSync]);
+  }, [isCallActive, isMuted, toggleMute, endCall, sendTextMessage, voiceSessionId, onVoiceStateSync]);
 
   /**
    * Acquire the microphone before `startCall`, not during it. Agora asks for the mic at
@@ -137,7 +143,7 @@ export function ConversationalPanel({
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       stream.getTracks().forEach((track) => track.stop());
       onMicGranted();
-      startCall(undefined, undefined, "owner_onboarding");
+      startCall(undefined, draftId ? Number(draftId) : undefined, "owner_onboarding");
     } catch (err) {
       const name = err instanceof DOMException ? err.name : "";
       setMicError(
@@ -150,7 +156,7 @@ export function ConversationalPanel({
     } finally {
       setIsRequestingMic(false);
     }
-  }, [isRequestingMic, onMicGranted, startCall]);
+  }, [isRequestingMic, onMicGranted, startCall, draftId]);
 
   const isProgrammaticScrollRef = useRef(false);
 

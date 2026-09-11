@@ -136,12 +136,29 @@ export default async function DashboardPage() {
       callerType: sess.callerType,
     });
 
+    const isOwnerOnboarding = sess.callerType === "owner_onboarding";
+    let propertyTitle = prop?.title;
+    let isDraft = false;
+    let isUnsavedIntake = false;
+
+    if (prop) {
+      isDraft = prop.status === "draft";
+    } else {
+      if (isOwnerOnboarding) {
+        propertyTitle = "Unsaved Property Intake";
+        isUnsavedIntake = true;
+      } else {
+        propertyTitle = "Buyer Inquiry Call";
+      }
+    }
+
     return {
       id: sess.id,
       propertyId: sess.propertyId,
-      propertyTitle: prop?.title || (sess.callerType === "owner_onboarding" ? "Property Voice Onboarding" : "Buyer Inquiry Call"),
+      propertyTitle: propertyTitle || (isOwnerOnboarding ? "Property Voice Onboarding" : "Buyer Inquiry Call"),
       propertySlug: prop?.slug || null,
-      isDraft: prop ? prop.status === "draft" : (sess.callerType === "owner_onboarding"),
+      isDraft,
+      isUnsavedIntake,
       callerType: sess.callerType || "buyer_inquiry",
       durationSeconds: durSec,
       durationFormatted,

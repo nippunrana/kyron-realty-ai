@@ -21,6 +21,8 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
   const [audioFrequencies, setAudioFrequencies] = useState<number[]>(new Array(16).fill(10));
   const [transcript, setTranscript] = useState<VoiceMessage[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [voiceSessionId, setVoiceSessionId] = useState<number | null>(null);
+  const voiceSessionIdRef = useRef<number | null>(null);
 
   const clientRef = useRef<any>(null);
   const localAudioTrackRef = useRef<any>(null);
@@ -232,9 +234,11 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
           return;
         }
 
-        const { channelName, token, rtmToken, userUid, agentUid, sessionId } = sessionData;
+        const { channelName, token, rtmToken, userUid, agentUid, sessionId, voiceSessionId: resVoiceSessionId } = sessionData;
         sessionIdRef.current = sessionId;
         channelNameRef.current = channelName;
+        voiceSessionIdRef.current = resVoiceSessionId ?? null;
+        setVoiceSessionId(resVoiceSessionId ?? null);
         agentUidRef.current = Number(agentUid) || 999001;
         userUidRef.current = Number(userUid) || 1001;
         processedTurnIdsRef.current.clear();
@@ -582,6 +586,7 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
     audioFrequencies,
     transcript,
     errorMessage,
+    voiceSessionId,
     startCall,
     toggleMute,
     endCall,

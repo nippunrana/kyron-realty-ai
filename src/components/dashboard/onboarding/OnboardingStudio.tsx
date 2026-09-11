@@ -234,11 +234,15 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
   }, [isTurnSyncing, advanceEntryStage]);
 
   const voiceControlRef = useRef<VoiceControlState | null>(null);
+  const voiceSessionIdsRef = useRef<Set<number>>(new Set());
   const isDeployClosingRef = useRef(false);
   const deployClosingResolveRef = useRef<(() => void) | null>(null);
   const handlePublishRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const handleVoiceStateSync = useCallback((state: VoiceControlState) => {
     voiceControlRef.current = state;
+    if (state.voiceSessionId) {
+      voiceSessionIdsRef.current.add(state.voiceSessionId);
+    }
     setVoiceControl(state);
   }, []);
 
@@ -724,6 +728,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
         body: JSON.stringify({
           property: dataRef.current.property,
           draftId: draftIdRef.current,
+          voiceSessionIds: Array.from(voiceSessionIdsRef.current),
         }),
       });
       const json = await res.json();
@@ -1304,6 +1309,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
           },
           negotiationMatrix: data.negotiationMatrix,
           draftId: draftIdRef.current,
+          voiceSessionIds: Array.from(voiceSessionIdsRef.current),
         }),
       });
 
@@ -1486,6 +1492,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
             isProcessing={isTurnSyncing}
             activePipelineStep={isTurnSyncing ? "Extracting live specifications..." : null}
             pipelineError={pipelineError}
+            draftId={draftId}
           />
         </div>
 

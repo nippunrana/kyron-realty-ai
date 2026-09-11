@@ -27,6 +27,7 @@ export interface UseAgoraVoiceAgentReturn {
   audioFrequencies: number[];
   transcript: VoiceMessage[];
   errorMessage: string | null;
+  voiceSessionId?: number | null;
   startCall: (
     propertySlug?: string,
     propertyId?: number,

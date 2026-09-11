@@ -17,6 +17,7 @@ export interface SessionHistoryItem {
   propertyTitle: string;
   propertySlug?: string | null;
   isDraft: boolean;
+  isUnsavedIntake?: boolean;
   callerType: "owner_onboarding" | "buyer_inquiry" | string;
   durationSeconds: number;
   durationFormatted: string;

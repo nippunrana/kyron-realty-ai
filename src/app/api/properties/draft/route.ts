@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { properties } from "@/db/schema";
+import { properties, voiceSessions } from "@/db/schema";
 import QRCode from "qrcode";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray, isNull } from "drizzle-orm";
 import { buildDefaultTitle, parseAvailableDate, randomSlugSuffix, slugify } from "@/lib/listing-helpers";
 import { BASE_PATH } from "@/lib/base-path";
 
@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     const userId = session.user.id || null;
 
     const body = await req.json();
-    const { property, knowledgeBase, negotiationMatrix, draftId } = body || {};
+    const { property, knowledgeBase, negotiationMatrix, draftId, voiceSessionIds } = body || {};
 
     if (!property) {
       return NextResponse.json({ error: "Property data is required." }, { status: 400 });
@@ -137,6 +137,17 @@ export async function POST(req: NextRequest) {
         .returning({ id: properties.id });
 
       finalDraftId = inserted.id;
+    }
+
+    if (finalDraftId && Array.isArray(voiceSessionIds) && voiceSessionIds.length > 0) {
+      try {
+        await db
+          .update(voiceSessions)
+          .set({ propertyId: finalDraftId })
+          .where(and(inArray(voiceSessions.id, voiceSessionIds), isNull(voiceSessions.propertyId)));
+      } catch (linkErr) {
+        console.warn("[Draft] Failed to link voice sessions:", linkErr);
+      }
     }
 
     const uploadUrl = `${protocol}://${host}${BASE_PATH}/properties/upload/${finalDraftId}?token=${uploadToken}`;

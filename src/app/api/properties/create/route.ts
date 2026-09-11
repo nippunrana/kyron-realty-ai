@@ -4,11 +4,12 @@ import { db } from "@/db";
 import {
   properties,
   propertyMedia,
+  voiceSessions,
   type PropertyKnowledgeBaseData,
   type PropertyNegotiationRules,
 } from "@/db/schema";
 import QRCode from "qrcode";
-import { and, eq } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull } from "drizzle-orm";
 import { buildDefaultTitle, computeFloorPrice, parseAvailableDate, randomSlugSuffix, slugify } from "@/lib/listing-helpers";
 import { BASE_PATH } from "@/lib/base-path";
 
@@ -21,7 +22,7 @@ export async function POST(req: NextRequest) {
     const userId = session.user.id || null;
 
     const body = await req.json();
-    const { property, knowledgeBase, negotiationMatrix, draftId } = body || {};
+    const { property, knowledgeBase, negotiationMatrix, draftId, voiceSessionIds } = body || {};
 
     if (property && !property.title && property.address) {
       property.title = buildDefaultTitle(property.address, property.bedrooms, property.listingType, property.propertyType);
@@ -250,6 +251,35 @@ export async function POST(req: NextRequest) {
       }));
 
       await db.insert(propertyMedia).values(mediaRecords);
+    }
+
+    // 5. Associate Onboarding Voice Sessions to this published property
+    try {
+      if (Array.isArray(voiceSessionIds) && voiceSessionIds.length > 0) {
+        // Direct Handshake: link sessions explicitly supplied by the studio
+        await db
+          .update(voiceSessions)
+          .set({ propertyId: insertedProperty.id })
+          .where(and(inArray(voiceSessions.id, voiceSessionIds), isNull(voiceSessions.propertyId)));
+      }
+
+      // Safety Net: link any unlinked owner onboarding session started by this user in the last 30 minutes
+      if (userId) {
+        const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+        await db
+          .update(voiceSessions)
+          .set({ propertyId: insertedProperty.id })
+          .where(
+            and(
+              eq(voiceSessions.callerIdentifier, userId),
+              eq(voiceSessions.callerType, "owner_onboarding"),
+              isNull(voiceSessions.propertyId),
+              gte(voiceSessions.startedAt, thirtyMinutesAgo)
+            )
+          );
+      }
+    } catch (sessionLinkErr) {
+      console.warn("[Property Create] Failed to link voice sessions:", sessionLinkErr);
     }
 
     return NextResponse.json({

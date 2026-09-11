@@ -15,8 +15,10 @@ import {
   Navigation,
   Bot,
   DollarSign,
+  ExternalLink,
 } from "lucide-react";
 import type { SessionHistoryItem } from "./usage-types";
+import { BASE_PATH } from "@/lib/base-path";
 
 interface SessionHistoryDrawerProps {
   isOpen: boolean;
@@ -266,20 +268,37 @@ export function SessionHistoryDrawer({
                     {/* Col 1: Property / Draft */}
                     <div className="col-span-5 min-w-0 pr-2">
                       <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
-                        <span className="font-semibold text-slate-100 truncate block max-w-full">
-                          {sess.propertyTitle}
-                        </span>
+                        {sess.propertySlug && !sess.isDraft && !sess.isUnsavedIntake ? (
+                          <a
+                            href={`${BASE_PATH}/listings/${sess.propertySlug}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-semibold text-slate-100 hover:text-blue-400 truncate inline-flex items-center gap-1 group/link transition-colors max-w-full"
+                            title={`Open ${sess.propertyTitle} in new tab`}
+                          >
+                            <span className="truncate">{sess.propertyTitle}</span>
+                            <ExternalLink className="w-3 h-3 text-slate-500 group-hover/link:text-blue-400 shrink-0 transition-colors" />
+                          </a>
+                        ) : (
+                          <span className="font-semibold text-slate-100 truncate block max-w-full">
+                            {sess.propertyTitle}
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <span
-                          className={`inline-flex items-center px-1.5 py-0.2 rounded text-[9.5px] font-bold uppercase ${
-                            sess.isDraft
-                              ? "bg-amber-950 text-amber-300 border border-amber-800/40"
-                              : "bg-emerald-950 text-emerald-300 border border-emerald-800/40"
-                          }`}
-                        >
-                          {sess.isDraft ? "Draft" : "Published"}
-                        </span>
+                        {sess.isUnsavedIntake ? (
+                          <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9.5px] font-bold uppercase bg-slate-900 text-slate-400 border border-slate-700/60">
+                            Unsaved Intake
+                          </span>
+                        ) : sess.isDraft ? (
+                          <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9.5px] font-bold uppercase bg-amber-950 text-amber-300 border border-amber-800/40">
+                            Draft
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9.5px] font-bold uppercase bg-emerald-950 text-emerald-300 border border-emerald-800/40">
+                            Published
+                          </span>
+                        )}
                         {sess.mapsUsageSummary && (
                           <span className="inline-flex items-center gap-1 text-[10px] text-amber-300/80 bg-slate-900 px-1.5 py-0.2 rounded border border-slate-800">
                             <MapPin className="w-2.5 h-2.5 text-amber-400" />

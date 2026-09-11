@@ -30,6 +30,7 @@ export interface StartAgentSessionParams {
 export interface AgoraAgentSessionResult {
   success: boolean;
   sessionId: string;
+  voiceSessionId?: number | null;
   channelName: string;
   agentUid: number;
   userUid: number;
@@ -454,6 +455,7 @@ ${contactEmail ? `5. If asked for direct owner or leasing office contact, provid
   return {
     success: true,
     sessionId: remoteAgentId,
+    voiceSessionId: voiceSessionRowId,
     channelName,
     agentUid,
     userUid,
