@@ -45,10 +45,12 @@ export interface AgoraAgentSessionResult {
 }
 
 /**
- * Authorization header for the Agora Conversational AI REST API: Basic customer
- * credentials when present, otherwise the raw API key. Empty string when unset.
+ * Authorization header for the Agora Conversational AI REST API:
+ * - Basic customer credentials or API key when explicitly configured.
+ * - Otherwise, dynamically generates Token Auth (`agora token=<AccessToken2>`)
+ *   using AGORA_APP_ID and AGORA_APP_CERTIFICATE.
  */
-function buildAgoraCloudAuthHeader(): string {
+export function buildAgoraCloudAuthHeader(channelName?: string, agentUid: number | string = 999001): string {
   const customerId = process.env.AGORA_CUSTOMER_ID?.trim();
   const customerSecret = process.env.AGORA_CUSTOMER_SECRET?.trim();
   if (customerId && customerSecret) {
@@ -56,9 +58,17 @@ function buildAgoraCloudAuthHeader(): string {
   }
 
   const apiKey = (process.env.AGORA_CONVERSATIONAL_AI_API_KEY || process.env.AGORA_API_KEY || "").trim();
-  if (!apiKey || apiKey === "your_agora_conversational_ai_api_key_here") return "";
-  if (apiKey.startsWith("Basic ") || apiKey.startsWith("Bearer ")) return apiKey;
-  return apiKey.includes(":") ? `Basic ${Buffer.from(apiKey).toString("base64")}` : `Basic ${apiKey}`;
+  if (apiKey && apiKey !== "your_agora_conversational_ai_api_key_here") {
+    if (apiKey.startsWith("Basic ") || apiKey.startsWith("Bearer ")) return apiKey;
+    return apiKey.includes(":") ? `Basic ${Buffer.from(apiKey).toString("base64")}` : `Basic ${apiKey}`;
+  }
+
+  try {
+    const { token } = generateAgoraAgentCombinedToken(channelName || "", Number(agentUid) || 999001);
+    return `agora token=${token}`;
+  } catch {
+    return "";
+  }
 }
 
 /**
@@ -106,7 +116,7 @@ export async function updateAgoraAgentPrompt(
   if (!row) return false;
 
   const appId = getAgoraAppId();
-  const authHeader = buildAgoraCloudAuthHeader();
+  const authHeader = buildAgoraCloudAuthHeader(channelName);
   if (!appId || !authHeader) {
     throw new Error("Missing Agora Cloud credentials; cannot update the running agent.");
   }
@@ -281,10 +291,10 @@ ${contactEmail ? `5. If asked for direct owner or leasing office contact, provid
   }
 
   // 4. Call Agora Conversational AI Cloud Gateway REST API (v2)
-  const authHeader = buildAgoraCloudAuthHeader();
+  const authHeader = buildAgoraCloudAuthHeader(channelName, agentUid);
   if (!authHeader) {
     throw new Error(
-      "Missing Agora Cloud credentials in .env. Please configure AGORA_CUSTOMER_ID & AGORA_CUSTOMER_SECRET (or AGORA_CONVERSATIONAL_AI_API_KEY)."
+      "Missing Agora credentials in .env. Please configure AGORA_APP_ID and AGORA_APP_CERTIFICATE (or AGORA_CUSTOMER_ID & AGORA_CUSTOMER_SECRET)."
     );
   }
 
@@ -549,7 +559,7 @@ export async function stopAgoraAgentSession(sessionId: string, channelName: stri
   if (!row) return null;
 
   const appId = getAgoraAppId();
-  const authHeader = buildAgoraCloudAuthHeader();
+  const authHeader = buildAgoraCloudAuthHeader(channelName);
 
   if (appId && authHeader) {
     try {
@@ -575,7 +585,7 @@ export async function stopAgoraAgentSession(sessionId: string, channelName: stri
   // Query Agora Cloud Gateway for ground-truth duration
   if (appId && authHeader && sessionId) {
     try {
-      const agentDetails = await fetchAgoraAgentDetails(sessionId);
+      const agentDetails = await fetchAgoraAgentDetails(sessionId, channelName);
       if (agentDetails?.durationSeconds && agentDetails.durationSeconds > 0) {
         durationSeconds = agentDetails.durationSeconds;
         if (agentDetails.stop_ts) {

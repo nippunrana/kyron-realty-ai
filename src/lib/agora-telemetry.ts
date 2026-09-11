@@ -1,7 +1,7 @@
 import { db } from "@/db";
 import { voiceSessions } from "@/db/schema";
 import { and, eq, isNotNull, isNull, or } from "drizzle-orm";
-import { getAgoraAppId } from "@/lib/agora-token";
+import { getAgoraAppId, generateAgoraAgentCombinedToken } from "@/lib/agora-token";
 
 export interface AgoraAgentDetails {
   agent_id: string;
@@ -14,9 +14,11 @@ export interface AgoraAgentDetails {
 
 /**
  * Authorization header for the Agora Conversational AI REST API:
- * Basic customer credentials when present, otherwise the conversational AI API key.
+ * - Basic customer credentials or API key when explicitly configured.
+ * - Otherwise, dynamically generates Token Auth (`agora token=<AccessToken2>`)
+ *   using AGORA_APP_ID and AGORA_APP_CERTIFICATE.
  */
-export function buildAgoraCloudAuthHeader(): string {
+export function buildAgoraCloudAuthHeader(channelName?: string, agentUid: number | string = 999001): string {
   const customerId = process.env.AGORA_CUSTOMER_ID?.trim();
   const customerSecret = process.env.AGORA_CUSTOMER_SECRET?.trim();
   if (customerId && customerSecret) {
@@ -24,17 +26,39 @@ export function buildAgoraCloudAuthHeader(): string {
   }
 
   const apiKey = (process.env.AGORA_CONVERSATIONAL_AI_API_KEY || process.env.AGORA_API_KEY || "").trim();
-  if (!apiKey || apiKey === "your_agora_conversational_ai_api_key_here") return "";
-  if (apiKey.startsWith("Basic ") || apiKey.startsWith("Bearer ")) return apiKey;
-  return apiKey.includes(":") ? `Basic ${Buffer.from(apiKey).toString("base64")}` : `Basic ${apiKey}`;
+  if (apiKey && apiKey !== "your_agora_conversational_ai_api_key_here") {
+    if (apiKey.startsWith("Basic ") || apiKey.startsWith("Bearer ")) return apiKey;
+    return apiKey.includes(":") ? `Basic ${Buffer.from(apiKey).toString("base64")}` : `Basic ${apiKey}`;
+  }
+
+  try {
+    const { token } = generateAgoraAgentCombinedToken(channelName || "", Number(agentUid) || 999001);
+    return `agora token=${token}`;
+  } catch {
+    return "";
+  }
 }
 
 /**
  * Queries Agora's Cloud Gateway for exact start_ts and stop_ts of a given Conversational AI agent instance.
  */
-export async function fetchAgoraAgentDetails(agentId: string): Promise<AgoraAgentDetails | null> {
+export async function fetchAgoraAgentDetails(agentId: string, channelName?: string): Promise<AgoraAgentDetails | null> {
   const appId = getAgoraAppId();
-  const authHeader = buildAgoraCloudAuthHeader();
+  let resolvedChannel = channelName;
+  if (!resolvedChannel) {
+    try {
+      const [row] = await db
+        .select({ channelName: voiceSessions.channelName })
+        .from(voiceSessions)
+        .where(eq(voiceSessions.agoraSessionId, agentId))
+        .limit(1);
+      resolvedChannel = row?.channelName;
+    } catch {
+      // Non-fatal query fallback
+    }
+  }
+
+  const authHeader = buildAgoraCloudAuthHeader(resolvedChannel);
 
   if (!appId || !authHeader || !agentId) {
     return null;
@@ -80,8 +104,8 @@ export async function fetchAgoraAgentDetails(agentId: string): Promise<AgoraAgen
 /**
  * Synchronizes an individual database voice session with Agora's ground-truth duration.
  */
-export async function syncSessionFromAgora(sessionId: number, agoraSessionId: string): Promise<number> {
-  const details = await fetchAgoraAgentDetails(agoraSessionId);
+export async function syncSessionFromAgora(sessionId: number, agoraSessionId: string, channelName?: string): Promise<number> {
+  const details = await fetchAgoraAgentDetails(agoraSessionId, channelName);
   if (!details || details.durationSeconds === undefined || details.durationSeconds <= 0) {
     return 0;
   }
@@ -116,6 +140,7 @@ export async function backfillUnsyncedSessions(): Promise<number> {
       .select({
         id: voiceSessions.id,
         agoraSessionId: voiceSessions.agoraSessionId,
+        channelName: voiceSessions.channelName,
       })
       .from(voiceSessions)
       .where(
@@ -135,7 +160,7 @@ export async function backfillUnsyncedSessions(): Promise<number> {
     let updatedCount = 0;
     for (const session of targetSessions) {
       if (!session.agoraSessionId) continue;
-      const duration = await syncSessionFromAgora(session.id, session.agoraSessionId);
+      const duration = await syncSessionFromAgora(session.id, session.agoraSessionId, session.channelName || undefined);
       if (duration > 0) {
         updatedCount++;
       }
