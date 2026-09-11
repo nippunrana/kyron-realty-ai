@@ -6,7 +6,12 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { buildOwnerOnboardingPrompt } from "../lib/elena-prompt.ts";
-import { detectAssistantModalIntent, detectUserModalIntent, stripUITags } from "./voice-intents.ts";
+import {
+  detectAssistantModalIntent,
+  detectAssistantSearchIntent,
+  detectUserModalIntent,
+  stripUITags,
+} from "./voice-intents.ts";
 
 const { systemPrompt: promptSource } = buildOwnerOnboardingPrompt({
   ownerName: "Richa Luthra",
@@ -172,5 +177,61 @@ describe("owner commands", () => {
 
   test("plain approval closes", () => {
     assert.equal(detectUserModalIntent("looks good, let's move on"), "close_review_modal");
+  });
+});
+
+describe("detectAssistantSearchIntent", () => {
+  test("detects search parameters from silent [SEARCH:...] tag", () => {
+    const res = detectAssistantSearchIntent("Let me check that for you! [SEARCH:city=Faridabad,pets=true,bedrooms=3]");
+    assert.deepEqual(res, {
+      city: "Faridabad",
+      pets: true,
+      bedrooms: 3,
+    });
+  });
+
+  test("detects search parameters from spoken confirmation fallback", () => {
+    const res = detectAssistantSearchIntent(
+      "Let me check our available flats in Faridabad within that budget for you right now."
+    );
+    assert.deepEqual(res, {
+      city: "Faridabad",
+      query: "flat",
+    });
+  });
+
+  test("detects pet-friendly search from spoken sentence", () => {
+    const res = detectAssistantSearchIntent(
+      "Let me check our pet-friendly properties in Faridabad for you right now."
+    );
+    assert.deepEqual(res, {
+      city: "Faridabad",
+      pets: true,
+    });
+  });
+
+  test("detects multi-word city from spoken confirmation", () => {
+    const res = detectAssistantSearchIntent(
+      "Let me check available flats in New Delhi for you right now."
+    );
+    assert.deepEqual(res, {
+      city: "New Delhi",
+      query: "flat",
+    });
+  });
+
+  test("returns null for non-search sentences", () => {
+    assert.equal(
+      detectAssistantSearchIntent(
+        "Hi, I can hear you loud and clear! How can I help you find a new home today?"
+      ),
+      null
+    );
+    assert.equal(
+      detectAssistantSearchIntent(
+        "I would love to help you find a flat! Which city are you looking in?"
+      ),
+      null
+    );
   });
 });

@@ -7,7 +7,7 @@ import { BASE_PATH } from "@/lib/base-path";
 import { useAgoraVoiceAgent } from "@/hooks/useAgoraVoiceAgent";
 import { GsapSearchHub, type SearchHubProperty } from "./GsapSearchHub";
 import { SalesDialogueStream } from "./SalesDialogueStream";
-import { parseSearchTag } from "@/hooks/voice-intents";
+import { detectAssistantSearchIntent } from "@/hooks/voice-intents";
 import {
   Mic,
   MicOff,
@@ -99,20 +99,52 @@ export function FloatingSalesAgent() {
     endCall,
     sendTextMessage,
   } = useAgoraVoiceAgent({
+    onSearchRequest: (params) => {
+      const searchKey = `search_${params.city?.toLowerCase()}`;
+      if (processedSearchTurnsRef.current.has(searchKey)) return;
+      processedSearchTurnsRef.current.add(searchKey);
+      executePropertySearch({
+        city: params.city,
+        petFriendly: params.pets,
+        bedrooms: params.bedrooms,
+        query: params.query,
+      });
+    },
     onAgentTurnComplete: (currentTranscript) => {
+      // 1. Assistant Turn: Check for search intent in recent messages
       const recent = currentTranscript.slice(-3);
       for (const msg of recent) {
-        if (!msg.text || processedSearchTurnsRef.current.has(msg.id)) continue;
-        const tag = parseSearchTag(msg.text);
+        if (!msg.text) continue;
+        const tag = detectAssistantSearchIntent(msg.text);
         if (tag && tag.city) {
-          processedSearchTurnsRef.current.add(msg.id);
-          triggerSearchRef.current?.({
-            city: tag.city,
-            petFriendly: tag.pets,
-            bedrooms: tag.bedrooms,
-            query: tag.query,
-          });
-          break;
+          const searchKey = `search_${tag.city.toLowerCase()}`;
+          if (!processedSearchTurnsRef.current.has(searchKey)) {
+            processedSearchTurnsRef.current.add(searchKey);
+            triggerSearchRef.current?.({
+              city: tag.city,
+              petFriendly: tag.pets,
+              bedrooms: tag.bedrooms,
+              query: tag.query,
+            });
+            break;
+          }
+        }
+      }
+
+      // 2. User Turn Fast-Path: If user provides city, trigger search in parallel while Sarah speaks
+      const lastMsg = currentTranscript[currentTranscript.length - 1];
+      if (lastMsg && lastMsg.role === "user" && lastMsg.text) {
+        const cityMatch = lastMsg.text.match(/\b(faridabad|delhi|gurugram|gurgaon|noida|bangalore|bengaluru|mumbai|pune|hyderabad|chennai|kolkata)\b/i);
+        if (cityMatch) {
+          const city = cityMatch[1].charAt(0).toUpperCase() + cityMatch[1].slice(1).toLowerCase();
+          const searchKey = `search_${city.toLowerCase()}`;
+          if (!processedSearchTurnsRef.current.has(searchKey)) {
+            processedSearchTurnsRef.current.add(searchKey);
+            triggerSearchRef.current?.({
+              city,
+              userSpeech: lastMsg.text,
+            });
+          }
         }
       }
     },
@@ -182,15 +214,17 @@ export function FloatingSalesAgent() {
     triggerSearchRef.current = executePropertySearch;
   });
 
-  // Real-time transcript listener for rapid tag extraction while Sarah is speaking
+  // Real-time transcript listener for rapid tag / spoken confirmation extraction while Sarah is speaking
   useEffect(() => {
     if (!transcript || transcript.length === 0) return;
     const latest = transcript[transcript.length - 1];
-    if (!latest || !latest.text || processedSearchTurnsRef.current.has(latest.id)) return;
+    if (!latest || !latest.text) return;
 
-    const tag = parseSearchTag(latest.text);
+    const tag = detectAssistantSearchIntent(latest.text);
     if (tag && tag.city) {
-      processedSearchTurnsRef.current.add(latest.id);
+      const searchKey = `search_${tag.city.toLowerCase()}`;
+      if (processedSearchTurnsRef.current.has(searchKey)) return;
+      processedSearchTurnsRef.current.add(searchKey);
       const searchParams: PropertySearchParams = {
         city: tag.city,
         petFriendly: tag.pets,

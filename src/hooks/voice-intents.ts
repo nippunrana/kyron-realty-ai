@@ -1,4 +1,4 @@
-import type { UIAction } from "./voice-agent-types";
+import type { UIAction, ParsedSearchTag } from "./voice-agent-types";
 
 /**
  * Silent screen-control tags. Elena ends the sentence that announces a card with one of
@@ -31,12 +31,7 @@ export interface AssistantIntent {
   source: AssistantIntentSource;
 }
 
-export interface ParsedSearchTag {
-  city?: string;
-  pets?: boolean;
-  bedrooms?: number;
-  query?: string;
-}
+export type { ParsedSearchTag };
 
 const SEARCH_TAG = /\[\s*SEARCH\s*:\s*([^\]]+)\]/i;
 
@@ -54,10 +49,49 @@ export function parseSearchTag(text: string): ParsedSearchTag | null {
     const keyLower = k.toLowerCase();
     if (keyLower === "city") result.city = v;
     else if (keyLower === "pets" || keyLower === "pet") result.pets = v.toLowerCase() === "true" || v.toLowerCase() === "yes";
-    else if (keyLower === "beds" || keyLower === "bedrooms") result.bedrooms = parseInt(v, 10) || undefined;
+    else if (keyLower === "beds" || keyLower === "bedrooms") {
+      const b = parseInt(v, 10);
+      if (!isNaN(b)) result.bedrooms = b;
+    }
     else if (keyLower === "query") result.query = v;
   }
   return result;
+}
+
+const ASSISTANT_SEARCH_SPOKEN =
+  /(?:let me check|let me search|checking|searching|looking for|looking up|pulling up|finding|find you)\b[\s\S]{1,80}?\b(?:in|around|near)\s+(?:the\s+)?([a-zA-Z\s]+?)(?:\s+(?:within|for|with|under|budget|right now|immediately)|[.,!?;]|$)/i;
+
+/**
+ * Detects assistant search intent either from silent [SEARCH:city=...] tags (primary)
+ * or spoken natural language confirmation (fallback).
+ */
+export function detectAssistantSearchIntent(text: string): ParsedSearchTag | null {
+  const tagged = parseSearchTag(text);
+  if (tagged && tagged.city) return tagged;
+
+  const match = text.match(ASSISTANT_SEARCH_SPOKEN);
+  if (match) {
+    const rawCity = match[1]?.trim();
+    if (rawCity && rawCity.length > 2) {
+      const city = rawCity
+        .split(/\s+/)
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+        .join(" ");
+      const lower = text.toLowerCase();
+      const pets = /\b(pet|pets|dog|dogs|cat|cats|pet-friendly)\b/i.test(lower);
+      const bedMatch = lower.match(/(\d+)\s*(bhk|bed|bedroom)/i);
+      const bedrooms = bedMatch ? parseInt(bedMatch[1], 10) : undefined;
+      const isFlat = /\b(flat|flats|apartment|apartments)\b/i.test(lower);
+
+      const result: ParsedSearchTag = { city };
+      if (pets) result.pets = true;
+      if (bedrooms) result.bedrooms = bedrooms;
+      if (isFlat) result.query = "flat";
+      return result;
+    }
+  }
+
+  return null;
 }
 
 /** Removes screen-control and search tags so they never reach the owner's transcript or extractors. */

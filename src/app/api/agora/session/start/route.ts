@@ -35,6 +35,10 @@ export async function POST(req: NextRequest) {
         ? `sales-sarah-${Date.now().toString(36)}`
         : `listing-${propertySlug || "call"}-${Date.now().toString(36)}`;
 
+    // Generate unique UIDs per session so Agora RTM never collides on a hardcoded UID (prevents "Kicked off by remote session")
+    const userUid = Math.floor(100000 + Math.random() * 800000);
+    const agentUid = Math.floor(900000 + Math.random() * 99999);
+
     const sessionResult = await startAgoraAgentSession({
       channelName: resolvedChannelName,
       propertySlug,
@@ -43,6 +47,8 @@ export async function POST(req: NextRequest) {
       ownerName,
       ownerEmail,
       userId,
+      userUid,
+      agentUid,
     });
 
     return NextResponse.json(sessionResult);

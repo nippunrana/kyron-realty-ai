@@ -9,10 +9,11 @@ import type {
   UseAgoraVoiceAgentOptions,
   UseAgoraVoiceAgentReturn,
   VoiceMessage,
+  ParsedSearchTag,
 } from "./voice-agent-types";
 import { formatTimestamp, isUserTranscriptionItem, mapTranscriptionsToMessages } from "./voice-transcript";
 import { startFrequencyVisualizer } from "./audio-visualizer";
-import { detectAssistantModalIntent, detectUserModalIntent } from "./voice-intents";
+import { detectAssistantModalIntent, detectAssistantSearchIntent, detectUserModalIntent } from "./voice-intents";
 
 export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgoraVoiceAgentReturn {
   const [callState, setCallState] = useState<CallState>("idle");
@@ -37,12 +38,14 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
   const onCallEndRef = useRef<((transcript: VoiceMessage[]) => void) | undefined>(options?.onCallEnd);
   const onAgentTurnCompleteRef = useRef<((transcript: VoiceMessage[]) => void) | undefined>(options?.onAgentTurnComplete);
   const onUIActionRef = useRef<((action: UIAction) => void) | undefined>(options?.onUIAction);
+  const onSearchRequestRef = useRef<((params: ParsedSearchTag) => void) | undefined>(options?.onSearchRequest);
   const onLogEventRef = useRef<((category: "AGORA" | "INTENT", title: string, details?: any) => void) | undefined>(options?.onLogEvent);
   // Keep the latest callbacks reachable from long-lived SDK listeners without re-subscribing
   useEffect(() => {
     onCallEndRef.current = options?.onCallEnd;
     onAgentTurnCompleteRef.current = options?.onAgentTurnComplete;
     onUIActionRef.current = options?.onUIAction;
+    onSearchRequestRef.current = options?.onSearchRequest;
     onLogEventRef.current = options?.onLogEvent;
   });
   const transcriptRef = useRef<VoiceMessage[]>([]);
@@ -140,9 +143,18 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
     }
   }, []);
 
-  // Cleanup on unmount
+  // Cleanup on unmount & window unload
   useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (callActiveRef.current) {
+        rtmClientRef.current?.logout().catch(() => {});
+        localAudioTrackRef.current?.stop();
+        localAudioTrackRef.current?.close();
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
     return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
       teardownResources();
     };
   }, [teardownResources]);
@@ -271,6 +283,16 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
         const rtmClient = new AgoraRTM.RTM(appId, stringUserUid);
         rtmClientRef.current = rtmClient;
 
+        rtmClient.addEventListener("linkState", (event: any) => {
+          if (event.currentState === "FAILED" || event.currentState === "DISCONNECTED") {
+            if (event.reasonCode === "SAME_UID_LOGIN") {
+              console.warn("[Agora RTM] Disconnected: another session connected with the same UID.");
+              setErrorMessage("Voice session disconnected: another session connected.");
+              teardownResources();
+            }
+          }
+        });
+
         await rtmClient.login({ token: rtmToken });
 
         // Step 3: Initialize Agora RTC client and AgoraVoiceAI Toolkit
@@ -373,6 +395,26 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
                   onUIActionRef.current?.(intent.action);
                 }
               }
+
+              // Assistant search action: silent [SEARCH:...] tag or spoken natural language fallback
+              const searchIntent = detectAssistantSearchIntent(spokenText);
+              if (searchIntent && searchIntent.city) {
+                const turnId = item.turn_id !== undefined ? String(item.turn_id) : spokenText.slice(0, 40).toLowerCase();
+                const searchKey = `assistant_search_${turnId}_${searchIntent.city.toLowerCase()}`;
+                if (!processedAssistantTurnIntentsRef.current.has(searchKey)) {
+                  processedAssistantTurnIntentsRef.current.add(searchKey);
+                  onLogEventRef.current?.("INTENT", `Detected Search Intent in city: ${searchIntent.city}`, { text: spokenText, searchIntent });
+                  onSearchRequestRef.current?.(searchIntent);
+                }
+              }
+
+              // Notify turn listeners when assistant turn finishes
+              const isFinished = item.final === true || item.metadata?.final === true;
+              if (isFinished) {
+                setTimeout(() => {
+                  onAgentTurnCompleteRef.current?.(transcriptRef.current);
+                }, 50);
+              }
             }
           }
         });
@@ -392,6 +434,7 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
           if (isListening) {
             setIsAgentSpeaking(false);
             setCallState("connected");
+            onAgentTurnCompleteRef.current?.(transcriptRef.current);
           }
         });
 

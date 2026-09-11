@@ -56,9 +56,17 @@ export type UIAction =
   /** Elena initiating property publish and agent deployment. */
   | "trigger_deploy";
 
+export interface ParsedSearchTag {
+  city?: string;
+  pets?: boolean;
+  bedrooms?: number;
+  query?: string;
+}
+
 export interface UseAgoraVoiceAgentOptions {
   onCallEnd?: (transcript: VoiceMessage[]) => void;
   onAgentTurnComplete?: (transcript: VoiceMessage[]) => void;
   onUIAction?: (action: UIAction) => void;
+  onSearchRequest?: (params: ParsedSearchTag) => void;
   onLogEvent?: (category: "AGORA" | "INTENT", title: string, details?: any) => void;
 }
