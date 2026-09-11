@@ -9,6 +9,8 @@ import { BASE_PATH } from "@/lib/base-path";
 
 import QRCode from "qrcode";
 
+export const dynamic = "force-dynamic";
+
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
@@ -73,14 +75,21 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
       }
     }
 
-    return NextResponse.json({
-      success: true,
-      images,
-      coverImageUrl: property.coverImageUrl,
-      title: property.title,
-      address: property.address,
-      qrCodeSvg,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        images,
+        coverImageUrl: property.coverImageUrl,
+        title: property.title,
+        address: property.address,
+        qrCodeSvg,
+      },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+        },
+      }
+    );
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to fetch images.";
     console.error("Failed to fetch draft images:", error);

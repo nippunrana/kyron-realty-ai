@@ -797,6 +797,21 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
     setShowFinalModal(true);
   }, []);
 
+  const handleImagesUpdated = useCallback((newImages: string[]) => {
+    setData((prev) => {
+      const updated = {
+        ...prev,
+        property: {
+          ...prev.property,
+          images: newImages,
+          coverImageUrl: prev.property.coverImageUrl || newImages[0] || "",
+        },
+      };
+      dataRef.current = updated;
+      return updated;
+    });
+  }, []);
+
   const handleUIAction = useCallback(
     (action: UIAction) => {
       addTelemetryLog("INTENT", `UI Action received: ${action}`, {
@@ -1580,16 +1595,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
         qrCodeSvg={qrCodeSvg}
         propertyTitle={data.property.title || data.property.address}
         existingImages={data.property.images || []}
-        onImagesUpdated={(newImages) => {
-          setData((prev) => ({
-            ...prev,
-            property: {
-              ...prev.property,
-              images: newImages,
-              coverImageUrl: prev.property.coverImageUrl || newImages[0] || "",
-            },
-          }));
-        }}
+        onImagesUpdated={handleImagesUpdated}
         onProceedToFinalReview={handleProceedToFinalReview}
         isCallActive={voiceControl?.isCallActive ?? false}
         isMuted={voiceControl?.isMuted ?? false}

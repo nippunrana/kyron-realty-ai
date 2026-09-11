@@ -67,10 +67,15 @@ export function ImageUploadModal({
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const existingImagesRef = useRef(existingImages);
+  const onImagesUpdatedRef = useRef(onImagesUpdated);
 
   useEffect(() => {
     existingImagesRef.current = existingImages;
   }, [existingImages]);
+
+  useEffect(() => {
+    onImagesUpdatedRef.current = onImagesUpdated;
+  }, [onImagesUpdated]);
 
   // Real-time Polling: Check for incoming mobile uploads every 2.5 seconds while modal is open
   useEffect(() => {
@@ -78,13 +83,14 @@ export function ImageUploadModal({
 
     let isSubscribed = true;
 
-    const pollDraftImages = async () => {
-      // Pause polling if document is hidden to save resources
-      if (typeof document !== "undefined" && document.hidden) return;
+    const pollDraftImages = async (force = false) => {
+      // Pause background polling if document is hidden to save resources (unless forced by tab focus or initial open)
+      if (!force && typeof document !== "undefined" && document.hidden) return;
 
       try {
         const res = await fetch(
-          `${BASE_PATH}/api/properties/draft/${draftId}/images?token=${encodeURIComponent(uploadToken)}`
+          `${BASE_PATH}/api/properties/draft/${draftId}/images?token=${encodeURIComponent(uploadToken)}&_t=${Date.now()}`,
+          { cache: "no-store" }
         );
         if (!res.ok) return;
         const json = await res.json();
@@ -99,7 +105,7 @@ export function ImageUploadModal({
               setRecentSyncCount(remoteImages.length - currentCount);
               setTimeout(() => setRecentSyncCount(0), 4500);
             }
-            onImagesUpdated(remoteImages);
+            onImagesUpdatedRef.current(remoteImages);
           }
         }
       } catch {
@@ -107,12 +113,37 @@ export function ImageUploadModal({
       }
     };
 
-    const intervalId = setInterval(pollDraftImages, 2500);
+    // 1. Initial immediate poll on modal open
+    pollDraftImages(true);
+
+    // 2. Refocus poll: Sync immediately when user switches back to desktop browser tab from phone
+    const handleVisibilityOrFocus = () => {
+      if (typeof document !== "undefined" && !document.hidden) {
+        pollDraftImages(true);
+      }
+    };
+
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", handleVisibilityOrFocus);
+    }
+    if (typeof window !== "undefined") {
+      window.addEventListener("focus", handleVisibilityOrFocus);
+    }
+
+    // 3. Regular heartbeat short-polling every 2.5 seconds
+    const intervalId = setInterval(() => pollDraftImages(false), 2500);
+
     return () => {
       isSubscribed = false;
       clearInterval(intervalId);
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
+      }
+      if (typeof window !== "undefined") {
+        window.removeEventListener("focus", handleVisibilityOrFocus);
+      }
     };
-  }, [isOpen, draftId, uploadToken, onImagesUpdated]);
+  }, [isOpen, draftId, uploadToken]);
 
   if (!isOpen) return null;
 
