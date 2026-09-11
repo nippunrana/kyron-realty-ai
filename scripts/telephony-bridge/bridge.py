@@ -25,6 +25,7 @@ from agora.rtc.agora_service import (
 from agora.rtc.agora_base import (
     RtcConnectionPublishConfig,
     ClientRoleType,
+    AudioFramePosition,
 )
 from agora.rtc.audio_frame_observer import (
     IAudioFrameObserver,
@@ -103,6 +104,14 @@ class ChannelAudioObserver(IAudioFrameObserver):
         self.loop = loop
         self.playback_count = 0
         self.before_mixing_count = 0
+        self._pre_mix_buffers = {}
+
+    def on_get_audio_frame_position(self, agora_local_user):
+        """Specifies that we observe both mixed channel playback and per-user decoded frames."""
+        return (
+            AudioFramePosition.AUDIO_FRAME_POSITION_PLAYBACK.value
+            | AudioFramePosition.AUDIO_FRAME_POSITION_BEFORE_MIXING.value
+        )
 
     def on_playback_audio_frame(self, agora_local_user, channel_id, frame: AudioFrame):
         try:
@@ -162,9 +171,17 @@ class ChannelAudioObserver(IAudioFrameObserver):
             if frame.samples_per_sec != 8000:
                 raw_pcm, _ = audioop.ratecv(raw_pcm, 2, 1, frame.samples_per_sec, 8000, None)
 
-            ulaw_chunk = audioop.lin2ulaw(raw_pcm, 2)
-            if not self.queue.full():
-                self.loop.call_soon_threadsafe(self.queue.put_nowait, ulaw_chunk)
+            # Accumulate 10ms chunks (160 bytes) into 20ms chunks (320 bytes) for Twilio
+            buf = self._pre_mix_buffers.get(uid, bytearray())
+            buf += raw_pcm
+            if len(buf) >= 320:
+                pcm_chunk = bytes(buf[:320])
+                self._pre_mix_buffers[uid] = buf[320:]
+                ulaw_chunk = audioop.lin2ulaw(pcm_chunk, 2)
+                if not self.queue.full():
+                    self.loop.call_soon_threadsafe(self.queue.put_nowait, ulaw_chunk)
+            else:
+                self._pre_mix_buffers[uid] = buf
         except Exception as e:
             logger.warning(f"Error in on_playback_audio_frame_before_mixing: {e}")
         return 1
@@ -212,8 +229,8 @@ class ChannelLocalUserObserver(IRTCLocalUserObserver):
     def on_user_audio_track_subscribed(self, agora_local_user, user_id, agora_remote_audio_track):
         logger.info(f"[Agora LocalUser] Subscribed to remote user audio track: user_id={user_id}")
 
-    def on_first_remote_audio_frame(self, agora_local_user, user_id):
-        logger.info(f"[Agora LocalUser] First remote audio frame received from user_id={user_id}")
+    def on_first_remote_audio_frame(self, agora_local_user, user_id, elapsed):
+        logger.info(f"[Agora LocalUser] First remote audio frame received from user_id={user_id}, elapsed={elapsed}ms")
 
 
 async def twilio_audio_sender(websocket, stream_sid: str, queue: asyncio.Queue, stop_event: asyncio.Event):
@@ -309,22 +326,23 @@ async def handle_twilio_stream(websocket):
                 )
                 rtc_conn = agora_service.create_rtc_connection(conn_config, pub_config)
 
-                # 2. Register Connection, LocalUser, and Audio Observers
+                # 2. Register Connection and LocalUser Observers
                 conn_observer = ChannelConnectionObserver(rtc_conn)
                 rtc_conn.register_observer(conn_observer)
 
                 local_user_observer = ChannelLocalUserObserver()
                 rtc_conn.local_user._register_local_user_observer(local_user_observer)
 
+                # 3. Configure audio frame playback format & subscribe to channel audio BEFORE registering frame observer
+                rtc_conn.local_user.set_playback_audio_frame_before_mixing_parameters(1, 8000)
+                rtc_conn.local_user.set_playback_audio_frame_parameters(1, 8000, 0, 160)
+                rtc_conn.local_user.subscribe_all_audio()
+
+                # 4. Register Audio Frame Observer (listens to both playback and pre-mix positions)
                 audio_observer = ChannelAudioObserver(audio_queue, loop)
                 rtc_conn.register_audio_frame_observer(audio_observer, 0, None)
 
-                # 3. Configure audio frame playback format & subscribe to channel audio
-                rtc_conn.local_user.set_playback_audio_frame_parameters(1, 8000, 0, 160)
-                rtc_conn.local_user.set_playback_audio_frame_before_mixing_parameters(1, 8000)
-                rtc_conn.local_user.subscribe_all_audio()
-
-                # 4. Connect to channel as UID 888 and publish audio track
+                # 5. Connect to channel as UID 888 and publish audio track
                 ret = rtc_conn.connect(token, channel_name, str(MANAGER_RTC_UID))
                 pub_ret = rtc_conn.publish_audio()
                 logger.info(
@@ -332,12 +350,12 @@ async def handle_twilio_stream(websocket):
                     f"(connect_ret={ret}, pub_ret={pub_ret})"
                 )
 
-                # 5. Start background sender task to stream Agora audio back to Twilio
+                # 6. Start background sender task to stream Agora audio back to Twilio
                 sender_task = asyncio.create_task(
                     twilio_audio_sender(websocket, stream_sid, audio_queue, stop_event)
                 )
 
-                # 6. Notify Next.js server so Sarah announces manager arrival & enters Observer Mode
+                # 7. Notify Next.js server so Sarah announces manager arrival & enters Observer Mode
                 notify_nextjs_event("connected", channel_name, property_id, stream_sid or "", call_sid or "")
 
             elif event == "media":
