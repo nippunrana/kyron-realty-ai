@@ -7,7 +7,7 @@ import type { UIAction, ParsedSearchTag } from "./voice-agent-types";
  * signal - the spoken-language patterns below are the fallback for a turn without one.
  */
 const UI_TAG = /\[\s*UI\s*:\s*([A-Z_]+)\s*\]/gi;
-const CONTROL_TAG = /\[\s*(UI|SEARCH|SEARCH_RESULT|OPEN_PROPERTY)\s*:[^\]]+\]/gi;
+const CONTROL_TAG = /\[\s*(UI|SEARCH|SEARCH_RESULT|OPEN_PROPERTY|PROPERTY_OPENED)\s*:[^\]]+\]/gi;
 
 const TAG_ACTIONS: Record<string, UIAction> = {
   OPEN_CORE: "open_core_modal",
@@ -141,7 +141,7 @@ export function detectAssistantSearchIntent(text: string): ParsedSearchTag | nul
 
 /** Removes screen-control and search tags so they never reach the owner's transcript or extractors. */
 export function stripUITags(text: string): string {
-  if (!/\[\s*(UI|SEARCH|SEARCH_RESULT|OPEN_PROPERTY)\s*:/i.test(text)) return text;
+  if (!/\[\s*(UI|SEARCH|SEARCH_RESULT|OPEN_PROPERTY|PROPERTY_OPENED)\s*:/i.test(text)) return text;
   return text
     .replace(CONTROL_TAG, "")
     .replace(/\s+([.,!?;:])/g, "$1")

@@ -12,7 +12,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "lint:unused": "knip",
-    "test:intents": "node --test src/hooks/voice-intents.test.ts",
+    "test:intents": "node --test src/hooks/voice-intents.test.ts src/lib/property-fit.test.ts src/lib/sarah-property-prompt.test.ts",
     "eval:prompt": "node scripts/eval-elena-prompt.ts"
   },
   "dependencies": {

@@ -8,6 +8,7 @@ import { useGSAP } from "@gsap/react";
 import { BASE_PATH } from "@/lib/base-path";
 import { useAgoraVoiceAgent } from "@/hooks/useAgoraVoiceAgent";
 import { GsapSearchHub, type SearchHubProperty } from "./GsapSearchHub";
+import { emptyJourney, type SalesJourney } from "@/lib/sales-journey";
 import { SalesDialogueStream } from "./SalesDialogueStream";
 import {
   Mic,
@@ -49,6 +50,12 @@ function getPageContext(pathname: string): PageContextInfo {
     return { pageTitle: "Legal Policies" };
   }
   return { pageTitle: "Home Showcase" };
+}
+
+/** The listing slug the caller is standing on, or null anywhere else in the app. */
+function getListingSlug(pathname: string): string | null {
+  if (!pathname.startsWith("/listings/")) return null;
+  return pathname.replace(/^\/listings\//, "").split("/")[0] || null;
 }
 
 interface PropertySearchParams {
@@ -145,6 +152,13 @@ export function FloatingSalesAgent() {
     searchResultsRef.current = searchResults;
   }, [searchResults]);
   const [availableCities, setAvailableCities] = useState<string[]>([]);
+
+  // The call's running memory. Held in a ref rather than state because nothing on screen
+  // renders from it - it exists to travel back to the server on the next handover.
+  const journeyRef = useRef<SalesJourney>(emptyJourney());
+  const summarizedUpToRef = useRef(0);
+  const currentListingSlugRef = useRef<string | null>(null);
+  const retargetInFlightRef = useRef(false);
   const processedSearchTurnsRef = useRef<Set<string>>(new Set());
   const triggerSearchRef = useRef<((params: PropertySearchParams) => Promise<void>) | null>(null);
 
@@ -160,6 +174,7 @@ export function FloatingSalesAgent() {
     toggleMute,
     endCall,
     sendTextMessage,
+    retargetAgent,
   } = useAgoraVoiceAgent({
     onSearchRequest: (params) => {
       const criteriaSig = `${params.city || ""}_${params.pets}_${params.bedrooms}_${params.listingType || ""}_${params.reset || ""}`;
@@ -199,9 +214,11 @@ export function FloatingSalesAgent() {
       // Sarah's own [SEARCH:] tag is handled once by onSearchRequest, which fires from the
       // same transcript stream a turn earlier. Re-scanning it here only duplicated the search.
 
-      // User Turn Fast-Path: If user provides city or refinement speech, trigger search in parallel
+      // User Turn Fast-Path: If user provides city or refinement speech, trigger search in parallel.
+      // Silent on a listing page: "does it have three bedrooms?" is a question about the home
+      // on screen, and answering it with a search would drop the hub's overlay over that home.
       const lastMsg = currentTranscript[currentTranscript.length - 1];
-      if (lastMsg && lastMsg.role === "user" && lastMsg.text) {
+      if (!getListingSlug(pathname) && lastMsg && lastMsg.role === "user" && lastMsg.text) {
         const cityMatch = lastMsg.text.match(/\b(faridabad|delhi|gurugram|gurgaon|noida|bangalore|bengaluru|mumbai|pune|hyderabad|chennai|kolkata)\b/i);
         const isRefinementIntent = /\b(pet|pets|bhk|bedroom|rent|sale|clear filter|reset filter)\b/i.test(lastMsg.text);
         // "Open the 4 BHK one" reads as a refinement to the patterns above, and re-running the
@@ -370,6 +387,64 @@ export function FloatingSalesAgent() {
     triggerSearchRef.current = executePropertySearch;
   });
 
+  const listingSlug = getListingSlug(pathname);
+
+  /**
+   * Hands Sarah over to whichever property the caller is looking at, and records what they
+   * said about the one they just left. Fires on every change of listing - including leaving
+   * for the search console, where there is no prompt to install but the notes still matter.
+   */
+  useEffect(() => {
+    if (!isCallActive) return;
+    const previousSlug = currentListingSlugRef.current;
+    if (previousSlug === listingSlug || retargetInFlightRef.current) return;
+
+    retargetInFlightRef.current = true;
+    const turnsAtRequest = transcriptRef.current.length;
+
+    (async () => {
+      try {
+        const result = await retargetAgent({
+          slug: listingSlug,
+          previousSlug,
+          journey: journeyRef.current,
+          fromTurnIndex: summarizedUpToRef.current,
+        });
+        if (!result) return;
+
+        journeyRef.current = result.journey;
+        summarizedUpToRef.current = turnsAtRequest;
+        currentListingSlugRef.current = listingSlug;
+
+        if (result.retargeted && result.title) {
+          // A hard verdict is the one case where she is about to search for a better home,
+          // and that search re-opens the hub - collapsing it here only makes it flicker.
+          if (result.verdict !== "hard") {
+            setIsSearchHubOpen(false);
+            setMobileTab("chat");
+          }
+          // The prompt swap is silent, so this cue is what makes Sarah open her new mode.
+          // It must land after the swap, and with APPEND so it never cuts her off.
+          sendTextMessage(
+            `[PROPERTY_OPENED:title=${sanitizeCueText(result.title)},mode=handover,verdict=${result.verdict || "unknown"}]`,
+            { priority: "append" }
+          );
+        }
+      } finally {
+        retargetInFlightRef.current = false;
+      }
+    })();
+  }, [listingSlug, isCallActive, retargetAgent, sendTextMessage]);
+
+  // A call always begins with an empty memory; the previous caller's is never inherited.
+  useEffect(() => {
+    if (!isCallActive) {
+      journeyRef.current = emptyJourney();
+      summarizedUpToRef.current = 0;
+      currentListingSlugRef.current = null;
+    }
+  }, [isCallActive]);
+
   const desktopSearchWingRef = useRef<HTMLDivElement>(null);
 
   const handleCollapseSearch = useCallback(() => {
@@ -470,8 +545,12 @@ export function FloatingSalesAgent() {
     }
 
     setIsRequestingMic(false);
-    await startCall(undefined, undefined, "sales_agent");
-  }, [startCall]);
+    // Starting the call on a listing page opens Sarah directly in that home's prompt, so the
+    // handover effect below sees no change of listing and stays quiet.
+    const slug = getListingSlug(pathname);
+    currentListingSlugRef.current = slug;
+    await startCall(slug || undefined, undefined, "sales_agent");
+  }, [startCall, pathname]);
 
   // Request close or disconnect with confirmation check
   const handleRequestDisconnect = useCallback(() => {

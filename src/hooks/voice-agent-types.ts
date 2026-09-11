@@ -1,4 +1,26 @@
 /** Public types of the Agora voice-agent hook. */
+import type { SalesJourney } from "@/lib/sales-journey";
+
+/** Outcome of handing the running agent a property's knowledge base. */
+export interface RetargetResult {
+  success: boolean;
+  /** False when the caller returned to the search console: notes were kept, no prompt swap. */
+  retargeted: boolean;
+  title?: string;
+  verdict?: string;
+  journey: SalesJourney;
+  error?: string;
+}
+
+export interface RetargetInput {
+  /** The listing to hand over to, or null when leaving a listing for the search console. */
+  slug: string | null;
+  /** The listing the caller was on during these turns, so it can gain a visit note. */
+  previousSlug: string | null;
+  journey: SalesJourney;
+  /** Index into the transcript at which the un-summarised turns begin. */
+  fromTurnIndex: number;
+}
 
 export type CallState =
   | "idle"
@@ -44,6 +66,11 @@ export interface UseAgoraVoiceAgentReturn {
     text: string,
     options?: { priority?: "interrupted" | "append" }
   ) => void;
+  /**
+   * Hands the live agent one property's knowledge base, and folds the newest turns into the
+   * call's running memory. Resolves null when no call is active.
+   */
+  retargetAgent: (input: RetargetInput) => Promise<RetargetResult | null>;
 }
 
 export type UIAction =

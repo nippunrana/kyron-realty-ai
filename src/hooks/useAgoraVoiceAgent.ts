@@ -5,6 +5,8 @@ import { BASE_PATH } from "@/lib/base-path";
 import type {
   CallerType,
   CallState,
+  RetargetInput,
+  RetargetResult,
   UIAction,
   UseAgoraVoiceAgentOptions,
   UseAgoraVoiceAgentReturn,
@@ -659,6 +661,60 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
     }
   }, []);
 
+  /**
+   * Hands the running agent a property's knowledge base. The journey update and the prompt
+   * swap travel in one request so they cannot land out of order: a single navigation fires
+   * both, and the notes for the home being left must be folded in before the prompt for the
+   * home being opened is built from them.
+   */
+  const retargetAgent = useCallback(async (input: RetargetInput): Promise<RetargetResult | null> => {
+    const sessionId = sessionIdRef.current;
+    const channelName = channelNameRef.current;
+    if (!sessionId || !channelName || !callActiveRef.current) return null;
+
+    const turns = transcriptRef.current.slice(Math.max(0, input.fromTurnIndex)).map((m) => ({
+      role: m.role,
+      text: m.text,
+    }));
+
+    try {
+      const res = await fetch(`${BASE_PATH}/api/agora/session/retarget`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId,
+          channelName,
+          slug: input.slug,
+          previousSlug: input.previousSlug,
+          journey: input.journey,
+          turns,
+        }),
+      });
+      const data = await res.json();
+
+      if (!data.success) {
+        // Fail loud: a silently unswapped prompt leaves Sarah discussing the wrong home.
+        setErrorMessage(
+          `Could not hand the call over to this property: ${data.error || "the voice gateway rejected the update"}`
+        );
+        onLogEventRef.current?.("AGORA", "Agent retarget failed", data);
+        return { success: false, retargeted: false, journey: input.journey, error: data.error };
+      }
+
+      onLogEventRef.current?.(
+        "AGORA",
+        data.retargeted ? `Agent retargeted to ${data.title}` : "Journey memory updated",
+        { verdict: data.verdict }
+      );
+      return data as RetargetResult;
+    } catch (err: any) {
+      setErrorMessage(
+        `Could not hand the call over to this property: ${err?.message || "network failure"}`
+      );
+      return { success: false, retargeted: false, journey: input.journey, error: String(err?.message || err) };
+    }
+  }, []);
+
   return {
     callState,
     isCallActive:
@@ -676,5 +732,6 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
     toggleMute,
     endCall,
     sendTextMessage,
+    retargetAgent,
   };
 }
