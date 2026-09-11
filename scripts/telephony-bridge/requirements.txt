@@ -1,0 +1,4 @@
+agora_python_server_sdk>=2.4.9
+websockets>=13.0
+audioop-lts>=0.2.0
+requests>=2.31.0

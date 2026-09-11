@@ -40,3 +40,7 @@ coverage/
 .agents/
 
 public/uploads/
+
+# Agora runtime cache
+agora*.dat
+agora_cache.db

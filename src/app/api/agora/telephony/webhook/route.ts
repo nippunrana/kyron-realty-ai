@@ -66,7 +66,11 @@ async function handleWebhook(req: NextRequest) {
         // query param fallback
       }
 
-      const { twiml, bridged } = await handleWhisperInput(digits, channelName, propertyId);
+      const proto = req.headers.get("x-forwarded-proto") || "https";
+      const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || "egnitech.com";
+      const hostUrl = process.env.TWILIO_WEBHOOK_BASE_URL || process.env.NEXTAUTH_URL || `${proto}://${host}`;
+
+      const { twiml, bridged } = await handleWhisperInput(digits, channelName, propertyId, hostUrl);
 
       // If bridged, transition Sarah's prompt to Passive Observer Mode
       if (bridged && channelName) {

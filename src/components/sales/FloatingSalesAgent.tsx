@@ -402,6 +402,30 @@ export function FloatingSalesAgent() {
     sendTextMessageRef.current = sendTextMessage;
   }, [sendTextMessage]);
 
+  // Manage verbal transitions when Property Manager bridges in or out of the Agora channel
+  const prevManagerConnectedRef = useRef(false);
+  useEffect(() => {
+    if (!isCallActive) {
+      prevManagerConnectedRef.current = false;
+      return;
+    }
+
+    if (isManagerConnected && !prevManagerConnectedRef.current) {
+      prevManagerConnectedRef.current = true;
+      sendTextMessageRef.current("The property manager has joined the call. I'm here if you need me!", {
+        priority: "append",
+      });
+    } else if (!isManagerConnected && prevManagerConnectedRef.current) {
+      prevManagerConnectedRef.current = false;
+      sendTextMessageRef.current(
+        "Hope that was helpful! Would you like to schedule an in-person viewing or explore other listings?",
+        {
+          priority: "append",
+        }
+      );
+    }
+  }, [isManagerConnected, isCallActive]);
+
   const executePropertySearch = useCallback(
     async (params: PropertySearchParams) => {
       // No city means no search, and no search means the hub stays shut.

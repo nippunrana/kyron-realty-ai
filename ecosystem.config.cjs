@@ -25,6 +25,20 @@ module.exports = {
       restart_delay: 3000,
       watch: false,
     },
+    {
+      name: "kyron-telephony-bridge",
+      script: "scripts/telephony-bridge/bridge.py",
+      interpreter: "python3",
+      instances: 1,
+      exec_mode: "fork",
+      env: {
+        BRIDGE_PORT: "3005",
+        ...process.env,
+      },
+      max_memory_restart: "500M",
+      restart_delay: 3000,
+      watch: false,
+    },
   ],
 };
 

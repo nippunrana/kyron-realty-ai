@@ -7,7 +7,7 @@ import type { UIAction, ParsedSearchTag, ParsedBookTourTag, ParsedCallManagerTag
  * signal - the spoken-language patterns below are the fallback for a turn without one.
  */
 const UI_TAG = /\[\s*UI\s*:\s*([A-Z_]+)\s*\]/gi;
-const CONTROL_TAG = /\[\s*(UI|SEARCH|SEARCH_RESULT|OPEN_PROPERTY|PROPERTY_OPENED|CALENDAR_SELECT_DATE|BOOK_TOUR|TOUR_BOOKED|CALL_MANAGER|MANAGER_CONNECTED|MANAGER_UNAVAILABLE)\s*:[^\]]+\]/gi;
+const CONTROL_TAG = /\[\s*(UI|SEARCH|SEARCH_RESULT|OPEN_PROPERTY|PROPERTY_OPENED|CALENDAR_SELECT_DATE|BOOK_TOUR|TOUR_BOOKED|CALL_MANAGER|MANAGER_CONNECTED|MANAGER_DISCONNECTED|MANAGER_UNAVAILABLE)\s*:[^\]]+\]/gi;
 
 const TAG_ACTIONS: Record<string, UIAction> = {
   OPEN_CORE: "open_core_modal",

@@ -7,7 +7,7 @@ import { db } from "@/db";
 import { properties, inquiriesAndLeads, users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { BASE_PATH } from "@/lib/base-path";
-import { generateAgoraRtcToken, getAgoraAppId } from "@/lib/agora-token";
+import { generateAgoraRtcToken } from "@/lib/agora-token";
 
 export const MANAGER_RTC_UID = 888; // Reserved RTC UID for the dialed property manager
 
@@ -18,7 +18,7 @@ export interface ManagerCallSession {
   prospectName?: string;
   managerPhone: string;
   propertyTitle: string;
-  status: "dialing" | "whispering" | "connected" | "declined" | "no_answer" | "failed";
+  status: "dialing" | "whispering" | "connected" | "declined" | "no_answer" | "failed" | "completed";
   createdAt: number;
 }
 
@@ -280,10 +280,10 @@ export function generateWhisperTwiML(
 export async function handleWhisperInput(
   digits: string,
   channelName: string,
-  propertyId: number
+  propertyId: number,
+  hostUrl?: string
 ): Promise<{ twiml: string; bridged: boolean }> {
   const session = activeCalls.get(channelName);
-  const appId = getAgoraAppId() || "";
 
   if (digits === "1") {
     // Manager agreed to join!
@@ -307,16 +307,31 @@ export async function handleWhisperInput(
       console.warn("[Agora Telephony] DB lead logging warning:", dbErr);
     }
 
-    // Connect via Agora SIP Gateway or Twilio SIP
-    // In Agora Telephony, SIP URI format: sip:888@channelName.appId.agora.io
-    const sipUri = `sip:${MANAGER_RTC_UID}@${channelName}.${appId}.agora.io?rtc_token=${encodeURIComponent(tokenResult.token)}`;
+    // Clean host URL for WebSocket connection
+    let cleanHost = (
+      hostUrl ||
+      process.env.TWILIO_WEBHOOK_BASE_URL ||
+      process.env.NEXTAUTH_URL ||
+      "https://egnitech.com"
+    ).replace(/\/+$/, "");
+    cleanHost = cleanHost.replace(/^https?:\/\//, "");
+    if (BASE_PATH && cleanHost.endsWith(BASE_PATH)) {
+      cleanHost = cleanHost.slice(0, -BASE_PATH.length);
+    }
+
+    const wsUrl = `wss://${cleanHost}${BASE_PATH}/telephony-bridge/stream`;
 
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="Polly.Aditi">Connecting you to the live call now. Please go ahead.</Say>
-  <Dial>
-    <Sip>${escapeXml(sipUri)}</Sip>
-  </Dial>
+  <Connect>
+    <Stream url="${escapeXml(wsUrl)}">
+      <Parameter name="channelName" value="${escapeXml(channelName)}" />
+      <Parameter name="propertyId" value="${propertyId}" />
+      <Parameter name="prospectName" value="${escapeXml(session?.prospectName || "a prospect")}" />
+      <Parameter name="token" value="${escapeXml(tokenResult.token)}" />
+    </Stream>
+  </Connect>
 </Response>`;
 
     return { twiml, bridged: true };
