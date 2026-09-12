@@ -75,7 +75,7 @@ async function runTestCall() {
     process.exit(1);
   }
 
-  const callData = (await response.json()) as any;
+  const callData = (await response.json()) as { sid: string; status: string; direction: string; to: string };
   console.log(`\n Call successfully queued!`);
   console.log(`Call SID:       ${callData.sid}`);
   console.log(`Initial Status: ${callData.status}`);
@@ -94,7 +94,7 @@ async function runTestCall() {
         }
       );
       if (statusRes.ok) {
-        const statusData = (await statusRes.json()) as any;
+        const statusData = (await statusRes.json()) as { status: string; duration?: string };
         console.log(`[Twilio Call Status]: ${statusData.status} (Duration: ${statusData.duration || 0}s)`);
         if (["completed", "busy", "no-answer", "canceled", "failed"].includes(statusData.status)) {
           console.log(`\nCall finished with status: ${statusData.status}`);

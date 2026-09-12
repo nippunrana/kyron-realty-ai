@@ -167,10 +167,10 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ ok: true });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("[Telephony Bridge Event API] Error:", err);
     return NextResponse.json(
-      { error: err.message || "Failed to process bridge event." },
+      { error: err instanceof Error ? err.message : "Failed to process bridge event." },
       { status: 500 }
     );
   }

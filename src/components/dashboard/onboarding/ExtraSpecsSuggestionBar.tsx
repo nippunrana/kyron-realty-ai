@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import type { ComponentType } from "react";
 import { Car, PawPrint, Zap, Calendar, Building2, Sparkles, Check, Home, Wrench } from "lucide-react";
 import type { PillLabels } from "@/lib/turn-extractor";
 
@@ -14,7 +15,7 @@ interface ChipItem {
 interface SuggestionGroup {
   id: string;
   label: string;
-  icon: any;
+  icon: ComponentType<{ className?: string }>;
   field: "parkingDetail" | "petPolicyDetail" | "utilitiesDetail" | "hoaFeeMonthly" | "availableDate" | "feature";
   chips: ChipItem[];
 }
@@ -32,7 +33,7 @@ interface ExtraSpecsSuggestionBarProps {
     features?: string[];
   };
   pillLabels?: PillLabels;
-  onApplyChip: (field: string, value: any) => void;
+  onApplyChip: (field: string, value: string) => void;
 }
 
 /** Helper to extract a clean fallback pill title from a freeform text value */
@@ -332,7 +333,7 @@ export function ExtraSpecsSuggestionBar({
   };
 
   /** Determine if a category has a custom user value that warrants a dynamic selected pill */
-  const getDynamicPillInfo = (group: SuggestionGroup): { label: string; value: any } | null => {
+  const getDynamicPillInfo = (group: SuggestionGroup): { label: string; value: string } | null => {
     let cur = "";
     let pillText: string | undefined;
 

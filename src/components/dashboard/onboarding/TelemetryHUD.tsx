@@ -34,7 +34,7 @@ export interface TelemetryLogEvent {
     | "AI-ENRICH"
     | "ERROR";
   title: string;
-  details?: any;
+  details?: Record<string, unknown> | null;
   latencyMs?: number;
   level?: "info" | "warn" | "error" | "success";
 }
@@ -459,9 +459,9 @@ export function TelemetryHUD({
                   </div>
 
                   <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                    {log.details?.usage?.costFormatted && (
+                    {(log.details?.usage as { costFormatted?: string } | undefined)?.costFormatted && (
                       <span className="text-[10px] text-emerald-400 font-bold bg-emerald-950/60 border border-emerald-800/50 px-1.5 py-0.2 rounded">
-                        {log.details.usage.costFormatted}
+                        {(log.details?.usage as { costFormatted?: string } | undefined)?.costFormatted}
                       </span>
                     )}
                     {typeof log.latencyMs === "number" && (

@@ -59,7 +59,7 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
   const onCalendarSelectDateRef = useRef<((date: string) => void) | undefined>(options?.onCalendarSelectDate);
   const onBookTourRequestRef = useRef<((booking: ParsedBookTourTag) => void) | undefined>(options?.onBookTourRequest);
   const onCallManagerRequestRef = useRef<((data: ParsedCallManagerTag) => void) | undefined>(options?.onCallManagerRequest);
-  const onLogEventRef = useRef<((category: "AGORA" | "INTENT", title: string, details?: Record<string, unknown>) => void) | undefined>(options?.onLogEvent);
+  const onLogEventRef = useRef<((category: "AGORA" | "INTENT", title: string, details?: Record<string, unknown> | null) => void) | undefined>(options?.onLogEvent);
   // Keep the latest callbacks reachable from long-lived SDK listeners without re-subscribing
   useEffect(() => {
     onCallEndRef.current = options?.onCallEnd;

@@ -168,7 +168,7 @@ export function LivePropertyInspector({
     onboardingStage === "final_review" ||
     additionalSpecs.length > 0;
 
-  const handleApplyChip = (field: string, value: any) => {
+  const handleApplyChip = (field: string, value: string) => {
     if (field === "washroomDetail") {
       onUpdateKnowledgeBase({ washroomDetail: value });
       if (property.washrooms === null || property.washrooms === undefined) {

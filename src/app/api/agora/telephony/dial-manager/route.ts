@@ -36,10 +36,10 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json(result);
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("[API Telephony Dial Manager] Error:", err);
     return NextResponse.json(
-      { success: false, error: err.message || "Failed to dial property manager." },
+      { success: false, error: err instanceof Error ? err.message : "Failed to dial property manager." },
       { status: 500 }
     );
   }

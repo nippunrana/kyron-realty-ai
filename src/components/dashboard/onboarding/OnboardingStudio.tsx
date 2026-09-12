@@ -280,7 +280,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
     (
       category: TelemetryLogEvent["category"],
       title: string,
-      details?: any,
+      details?: Record<string, unknown> | null,
       latencyMs?: number,
       level: TelemetryLogEvent["level"] = "info"
     ) => {
@@ -443,7 +443,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
         addTelemetryLog(
           "STATE-UPDATE",
           `Failed to load draft listing #${initialDraftId}`,
-          err,
+          err instanceof Error ? { message: err.message } : null,
           undefined,
           "error"
         );
@@ -496,7 +496,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
 
   // Success Modal State
   const [publishedResult, setPublishedResult] = useState<{
-    property: any;
+    property: { id: number; title: string; slug: string; price: string | number; listingType: string; city: string };
     qrCodeSvg: string;
     shareUrl: string;
   } | null>(null);
@@ -631,17 +631,17 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
             usable ? "success" : "warn"
           );
         } else {
-          addTelemetryLog("AI-ENRICH", `Hyper-local enrichment attempt ${attempt} returned no data`, json, undefined, "warn");
+          addTelemetryLog("AI-ENRICH", `Hyper-local enrichment attempt ${attempt} returned no data`, json as Record<string, unknown>, undefined, "warn");
           if (shouldRetry && !isFinalAttempt) return true;
           setEnrichmentError(json.error || "Location research returned no result.");
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.warn("[Location Enrichment Error]:", err);
-        addTelemetryLog("AI-ENRICH", `Hyper-local enrichment attempt ${attempt} encountered an issue`, err, undefined, "warn");
+        addTelemetryLog("AI-ENRICH", `Hyper-local enrichment attempt ${attempt} encountered an issue`, err instanceof Error ? { message: err.message } : null, undefined, "warn");
         // A stale error must never outlive a retry that then succeeds, so it is written
         // only once no further attempt is coming.
         if (shouldRetry && !isFinalAttempt) return true;
-        setEnrichmentError(err?.message || "Location research could not complete.");
+        setEnrichmentError(err instanceof Error ? err.message : "Location research could not complete.");
       }
 
       return shouldRetry && !isFinalAttempt;
@@ -752,7 +752,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
       }
     } catch (err) {
       console.error("Draft creation error:", err);
-      addTelemetryLog("STATE-UPDATE", "Failed to create draft property", err, undefined, "error");
+      addTelemetryLog("STATE-UPDATE", "Failed to create draft property", err instanceof Error ? { message: err.message } : null, undefined, "error");
     }
     return null;
   }, [addTelemetryLog]);
@@ -1237,10 +1237,11 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
           }
         }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       clearTimeout(timeoutId);
       const elapsedMs = Date.now() - startTime;
-      const isAborted = err.name === "AbortError";
+      const isAborted = err instanceof Error && err.name === "AbortError";
+      const errorMessage = err instanceof Error ? err.message : String(err);
 
       // Coalesce failed window into retry buffer so no turns or facts are missed
       failedTurnBufferRef.current = mergeTurnWindows(failedTurnBufferRef.current, slidingWindow);
@@ -1248,7 +1249,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
       addTelemetryLog(
         isAborted ? "SYNC-GATE" : "ERROR",
         `Turn extraction #${sequenceId} ${isAborted ? "timed out (15s limit) - buffered for retry" : "failed - buffered for retry"} (${elapsedMs}ms)`,
-        err.message || String(err),
+        { message: errorMessage },
         elapsedMs,
         isAborted ? "warn" : "error"
       );
@@ -1256,7 +1257,7 @@ export function OnboardingStudio({ user, initialDraftId }: OnboardingStudioProps
       // Never invoke console.error on AbortError to prevent Next.js Turbopack dev error overlay
       if (!isAborted) {
         console.error("[Turn Extraction Client Error]:", err);
-        setPipelineError(err.message || "Turn extraction encountered an issue.");
+        setPipelineError(errorMessage || "Turn extraction encountered an issue.");
       }
     } finally {
       // If new turns arrived while this extraction was in flight, execute the latest coalesced snapshot
