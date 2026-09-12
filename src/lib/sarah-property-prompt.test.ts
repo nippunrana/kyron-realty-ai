@@ -350,7 +350,7 @@ describe("three-way manager call & observer mode", () => {
 
     assert.match(systemPrompt, /PASSIVE OBSERVER MODE/);
     assert.match(systemPrompt, /KEEP YOUR MOUTH SHUT/);
-    assert.match(systemPrompt, /SPEAK ONLY WHEN DIRECTLY ADDRESSED BY NAME/);
+    assert.match(systemPrompt, /SPEAK WHEN DIRECTLY ADDRESSED/);
     assert.match(systemPrompt, /ZERO NUMBER DISCLOSURE/);
   });
 });

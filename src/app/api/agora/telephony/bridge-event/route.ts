@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
         .replace(/\b(?:sara|saari|sera|zara)\b/gi, "Sarah");
 
       const isAddressingSarah = /\b(?:sarah|sara|assistant)\b/i.test(normalizedText);
-      const priority: "INTERRUPT" | "APPEND" = isAddressingSarah ? "INTERRUPT" : "APPEND";
+      const mode: "respond" | "context" = isAddressingSarah ? "respond" : "context";
 
       // Relay to running Agora Conversational AI Agent via /think REST API
       try {
@@ -49,13 +49,15 @@ export async function POST(req: NextRequest) {
           .limit(1);
 
         if (voiceSession?.agoraSessionId) {
-          const instructionText = `Property Manager: ${normalizedText}`;
-          console.log(`[Bridge Event] Relaying to agent (${priority}): "${instructionText}"`);
+          const instructionText = isAddressingSarah
+            ? `[DIRECT QUESTION TO SARAH from Property Manager]: "${normalizedText}". Please answer their question directly and concisely now.`
+            : `Property Manager: ${normalizedText}`;
+          console.log(`[Bridge Event] Relaying to agent (mode=${mode}): "${instructionText}"`);
           await sendAgoraAgentInstruction(
             voiceSession.agoraSessionId,
             channelName,
             instructionText,
-            priority
+            mode
           );
         }
       } catch (thinkErr) {

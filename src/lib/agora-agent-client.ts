@@ -127,13 +127,17 @@ export async function updateAgoraAgentPrompt(
 
 /**
  * Sends a custom text instruction to the running Agora Conversational AI Agent via its /think REST API.
- * The instruction is processed as user input with APPEND priority, allowing the agent to react to external speakers.
+ * Per Agora REST API spec (https://docs.agora.io/en/api-reference/api-ref/conversational-ai/think):
+ * - text (string, required): custom instruction text injected as user input
+ * - on_listening_action: 'interrupt' | 'inject' | 'append' | 'ignore'
+ * - on_thinking_action: 'interrupt' | 'append' | 'ignore'
+ * - on_speaking_action: 'interrupt' | 'append' | 'ignore'
  */
 export async function sendAgoraAgentInstruction(
   sessionId: string,
   channelName: string,
-  instruction: string,
-  priority: "INTERRUPT" | "APPEND" = "APPEND"
+  text: string,
+  mode: "respond" | "context" = "context"
 ): Promise<boolean> {
   const appId = getAgoraAppId();
   const authHeader = buildAgoraCloudAuthHeader(channelName);
@@ -142,18 +146,25 @@ export async function sendAgoraAgentInstruction(
     return false;
   }
 
+  const isRespond = mode === "respond";
+
   try {
     const thinkUrl = `https://api.agora.io/api/conversational-ai-agent/v2/projects/${appId}/agents/${sessionId}/think`;
+    const payload = {
+      text,
+      on_listening_action: isRespond ? "interrupt" : "append",
+      on_thinking_action: isRespond ? "interrupt" : "ignore",
+      on_speaking_action: isRespond ? "interrupt" : "ignore",
+      interruptable: true,
+    };
+
     const response = await fetch(thinkUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: authHeader,
       },
-      body: JSON.stringify({
-        instruction,
-        priority,
-      }),
+      body: JSON.stringify(payload),
     });
 
     if (!response.ok) {
@@ -162,6 +173,7 @@ export async function sendAgoraAgentInstruction(
       return false;
     }
 
+    console.log(`[Agora Gateway] Think accepted (mode=${mode}): "${text.slice(0, 60)}"`);
     return true;
   } catch (err) {
     console.warn("[Agora Gateway] Think request exception:", err);
