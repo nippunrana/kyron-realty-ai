@@ -18,5 +18,6 @@ export async function GET(req: NextRequest) {
     callSid: session.callSid,
     propertyTitle: session.propertyTitle,
     createdAt: session.createdAt,
+    transcripts: session.transcripts || [],
   });
 }

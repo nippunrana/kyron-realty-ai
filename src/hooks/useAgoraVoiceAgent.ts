@@ -81,6 +81,8 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
   const processedAssistantTurnIntentsRef = useRef<Set<string>>(new Set());
   const localMessagesRef = useRef<VoiceMessage[]>([]);
   const mappedRemoteRef = useRef<VoiceMessage[]>([]);
+  const managerMessagesRef = useRef<VoiceMessage[]>([]);
+  const seenManagerMsgIdsRef = useRef<Set<string>>(new Set());
   const lastExtractedAssistantTextRef = useRef<string>("");
 
   // Centralized Resource Teardown
@@ -117,6 +119,8 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
 
     localMessagesRef.current = [];
     mappedRemoteRef.current = [];
+    managerMessagesRef.current = [];
+    seenManagerMsgIdsRef.current.clear();
     processedTurnIdsRef.current.clear();
     processedAssistantTurnIntentsRef.current.clear();
 
@@ -358,7 +362,7 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
             (local) => !mapped.some((remote) => remote.role === "user" && remote.text.toLowerCase() === local.text.toLowerCase())
           );
 
-          const fullList = [...mapped, ...localMessagesRef.current];
+          const fullList = [...mapped, ...localMessagesRef.current, ...managerMessagesRef.current];
 
           transcriptRef.current = fullList;
           setTranscript(fullList);
@@ -667,7 +671,7 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
 
   // End Call
   const endCall = useCallback(async () => {
-    const finalTranscript = [...mappedRemoteRef.current, ...localMessagesRef.current];
+    const finalTranscript = [...mappedRemoteRef.current, ...localMessagesRef.current, ...managerMessagesRef.current];
     await teardownResources();
     setCallState("idle");
     setIsAgentSpeaking(false);
@@ -705,7 +709,7 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
         timestamp: formatTimestamp(),
       };
       localMessagesRef.current = [...localMessagesRef.current, localMsg];
-      setTranscript([...mappedRemoteRef.current, ...localMessagesRef.current]);
+      setTranscript([...mappedRemoteRef.current, ...localMessagesRef.current, ...managerMessagesRef.current]);
     }
 
     try {
@@ -792,6 +796,55 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
       return { success: false, retargeted: false, journey: input.journey, error: String(err?.message || err) };
     }
   }, []);
+
+  // Poll for Property Manager speech turns while manager is connected
+  useEffect(() => {
+    if (!isManagerConnected || !channelNameRef.current) {
+      return;
+    }
+
+    const channel = channelNameRef.current;
+    let isCancelled = false;
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const res = await fetch(
+          `${BASE_PATH}/api/agora/telephony/status?channelName=${encodeURIComponent(channel)}`
+        );
+        if (!res.ok || isCancelled) return;
+        const data = await res.json();
+        const incoming: Array<{ id: string; text: string; timestamp: string }> = data?.transcripts || [];
+
+        let added = false;
+        for (const item of incoming) {
+          if (!seenManagerMsgIdsRef.current.has(item.id)) {
+            seenManagerMsgIdsRef.current.add(item.id);
+            const msg: VoiceMessage = {
+              id: item.id,
+              role: "manager",
+              text: item.text,
+              timestamp: item.timestamp,
+            };
+            managerMessagesRef.current = [...managerMessagesRef.current, msg];
+            added = true;
+          }
+        }
+
+        if (added) {
+          const fullList = [...mappedRemoteRef.current, ...localMessagesRef.current, ...managerMessagesRef.current];
+          transcriptRef.current = fullList;
+          setTranscript(fullList);
+        }
+      } catch {
+        // Non-fatal polling error
+      }
+    }, 800);
+
+    return () => {
+      isCancelled = true;
+      clearInterval(pollInterval);
+    };
+  }, [isManagerConnected]);
 
   return {
     callState,

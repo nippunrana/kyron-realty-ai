@@ -125,6 +125,49 @@ export async function updateAgoraAgentPrompt(
   return true;
 }
 
+/**
+ * Sends a custom text instruction to the running Agora Conversational AI Agent via its /think REST API.
+ * The instruction is processed as user input with APPEND priority, allowing the agent to react to external speakers.
+ */
+export async function sendAgoraAgentInstruction(
+  sessionId: string,
+  channelName: string,
+  instruction: string
+): Promise<boolean> {
+  const appId = getAgoraAppId();
+  const authHeader = buildAgoraCloudAuthHeader(channelName);
+  if (!appId || !authHeader || !sessionId) {
+    console.warn("[Agora Gateway] Missing credentials or sessionId to send instruction");
+    return false;
+  }
+
+  try {
+    const thinkUrl = `https://api.agora.io/api/conversational-ai-agent/v2/projects/${appId}/agents/${sessionId}/think`;
+    const response = await fetch(thinkUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: authHeader,
+      },
+      body: JSON.stringify({
+        instruction,
+        priority: "APPEND",
+      }),
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      console.warn(`[Agora Gateway] Think error (${response.status}): ${errorBody}`);
+      return false;
+    }
+
+    return true;
+  } catch (err) {
+    console.warn("[Agora Gateway] Think request exception:", err);
+    return false;
+  }
+}
+
 export async function startAgoraAgentSession(
   params: StartAgentSessionParams
 ): Promise<AgoraAgentSessionResult> {

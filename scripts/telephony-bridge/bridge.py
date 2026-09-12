@@ -13,6 +13,9 @@ import asyncio
 import logging
 import requests
 import audioop
+import io
+import wave
+import urllib.request
 
 from agora.rtc.agora_service import (
     AgoraService,
@@ -58,6 +61,8 @@ APP_ID = env_vars.get("AGORA_APP_ID") or os.environ.get("AGORA_APP_ID", "")
 BASE_PATH = env_vars.get("BASE_PATH", "/projects/kyron-realty-ai")
 NEXT_INTERNAL_PORT = env_vars.get("PORT", "3000")
 WS_PORT = int(os.environ.get("BRIDGE_PORT", "3005"))
+GEMINI_API_KEY = env_vars.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY", "")
+GEMINI_MODEL = env_vars.get("GEMINI_MODEL") or os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite")
 MANAGER_RTC_UID = 888
 
 if not APP_ID:
@@ -93,6 +98,121 @@ def notify_nextjs_event(event_type: str, channel_name: str, property_id: int, st
         logger.info(f"Notified Next.js ({event_type}) for channel={channel_name}: status={resp.status_code}")
     except Exception as e:
         logger.warning(f"Failed to notify Next.js ({event_type}): {e}")
+
+
+def notify_manager_speech(channel_name: str, property_id: int, text: str):
+    """Sends transcribed manager speech to Next.js API for /think relay to Sarah and UI dialogue stream."""
+    url = f"http://127.0.0.1:{NEXT_INTERNAL_PORT}{BASE_PATH}/api/agora/telephony/bridge-event"
+    payload = {
+        "event": "manager_speech",
+        "channelName": channel_name,
+        "propertyId": property_id,
+        "text": text,
+    }
+    try:
+        resp = requests.post(url, json=payload, timeout=5)
+        logger.info(f"Notified Next.js (manager_speech) for channel={channel_name}: status={resp.status_code}")
+    except Exception as e:
+        logger.warning(f"Failed to notify Next.js (manager_speech): {e}")
+
+
+class ManagerVADTranscriber:
+    """
+    Monitors incoming 8kHz linear PCM phone audio from the property manager.
+    Detects speech activity (RMS energy > threshold), buffers frames, and
+    upon detecting conversational pause (~660ms of silence, 33 chunks),
+    asynchronously transcribes the utterance using the configured GEMINI_MODEL API
+    and posts the transcript to Next.js /api/agora/telephony/bridge-event.
+    """
+
+    def __init__(self, channel_name: str, property_id: int, loop: asyncio.AbstractEventLoop):
+        self.channel_name = channel_name
+        self.property_id = property_id
+        self.loop = loop
+        self.speech_buffer = bytearray()
+        self.is_speaking = False
+        self.silence_count = 0
+        # 33 chunks of 20ms = ~660ms of silence
+        self.silence_threshold_chunks = 33
+        self.energy_threshold = 450
+        self.min_speech_bytes = 8000 * 2 * 0.5  # at least 500ms of audio (8000 bytes)
+        self.max_buffer_bytes = 8000 * 2 * 15   # max 15 seconds
+
+    def process_pcm_frame(self, pcm_bytes: bytes):
+        try:
+            rms = audioop.rms(pcm_bytes, 2)
+        except Exception:
+            rms = 0
+
+        if rms >= self.energy_threshold:
+            self.speech_buffer += pcm_bytes
+            self.is_speaking = True
+            self.silence_count = 0
+            if len(self.speech_buffer) >= self.max_buffer_bytes:
+                utterance_pcm = bytes(self.speech_buffer)
+                self.speech_buffer = bytearray()
+                self.is_speaking = False
+                self.silence_count = 0
+                asyncio.create_task(self._transcribe_and_dispatch(utterance_pcm))
+        elif self.is_speaking:
+            self.speech_buffer += pcm_bytes
+            self.silence_count += 1
+            if self.silence_count >= self.silence_threshold_chunks:
+                if len(self.speech_buffer) >= self.min_speech_bytes:
+                    utterance_pcm = bytes(self.speech_buffer)
+                    asyncio.create_task(self._transcribe_and_dispatch(utterance_pcm))
+                self.speech_buffer = bytearray()
+                self.is_speaking = False
+                self.silence_count = 0
+
+    async def _transcribe_and_dispatch(self, pcm_data: bytes):
+        try:
+            if not GEMINI_API_KEY:
+                logger.warning("[Telephony Bridge] GEMINI_API_KEY not configured; skipping transcription.")
+                return
+
+            # Pack 8kHz mono 16-bit linear PCM into in-memory WAV
+            wav_io = io.BytesIO()
+            with wave.open(wav_io, "wb") as wf:
+                wf.setnchannels(1)
+                wf.setsampwidth(2)
+                wf.setframerate(8000)
+                wf.writeframes(pcm_data)
+            wav_bytes = wav_io.getvalue()
+            b64_audio = base64.b64encode(wav_bytes).decode("ascii")
+
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
+            payload = {
+                "contents": [{
+                    "parts": [
+                        {"inlineData": {"mimeType": "audio/wav", "data": b64_audio}},
+                        {"text": "Transcribe this phone speech accurately. Output ONLY the transcription text, nothing else. If silence, background noise, or inaudible, output empty."}
+                    ]
+                }]
+            }
+
+            def _sync_post():
+                req = urllib.request.Request(
+                    url,
+                    data=json.dumps(payload).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                )
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    return json.loads(resp.read().decode("utf-8"))
+
+            res = await self.loop.run_in_executor(None, _sync_post)
+            parts = res.get("candidates", [{}])[0].get("content", {}).get("parts", [])
+            text = ""
+            for p in parts:
+                if "text" in p:
+                    text += p["text"]
+            text = text.strip()
+
+            if text and len(text) > 1 and not text.lower().startswith("[silence") and not text.lower().startswith("(silence"):
+                logger.info(f"[Telephony Bridge] Transcribed manager speech for {self.channel_name}: \"{text}\"")
+                notify_manager_speech(self.channel_name, self.property_id, text)
+        except Exception as e:
+            logger.warning(f"[Telephony Bridge] Manager transcription error: {e}")
 
 
 class ChannelAudioObserver(IAudioFrameObserver):
@@ -276,6 +396,7 @@ async def handle_twilio_stream(websocket):
     rtc_conn = None
     sender_task = None
     media_in_count = 0
+    transcriber = None
 
     try:
         async for raw_message in websocket:
@@ -355,7 +476,10 @@ async def handle_twilio_stream(websocket):
                     twilio_audio_sender(websocket, stream_sid, audio_queue, stop_event)
                 )
 
-                # 7. Notify Next.js server so Sarah announces manager arrival & enters Observer Mode
+                # 7. Initialize manager speech transcriber
+                transcriber = ManagerVADTranscriber(channel_name, property_id, loop)
+
+                # 8. Notify Next.js server so Sarah announces manager arrival & enters Observer Mode
                 notify_nextjs_event("connected", channel_name, property_id, stream_sid or "", call_sid or "")
 
             elif event == "media":
@@ -371,6 +495,10 @@ async def handle_twilio_stream(websocket):
                             # a mutable buffer (bytearray), otherwise it raises TypeError: buffer is not writable
                             pcm_buffer = bytearray(pcm_bytes)
                             ret_push = rtc_conn.push_audio_pcm_data(pcm_buffer, 8000, 1)
+
+                            # Process frame for manager VAD and Gemini speech transcription
+                            if transcriber:
+                                transcriber.process_pcm_frame(pcm_bytes)
 
                             media_in_count += 1
                             if media_in_count <= 5 or media_in_count % 250 == 0:

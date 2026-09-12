@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import type { VoiceMessage, CallState } from "@/hooks/voice-agent-types";
-import { Mic, User } from "lucide-react";
+import { Mic, User, PhoneCall } from "lucide-react";
 
 export interface SalesDialogueStreamProps {
   transcript: VoiceMessage[];
@@ -119,10 +119,10 @@ export function SalesDialogueStream({
             <div
               key={msg.id}
               className={`flex gap-2 animate-in fade-in duration-150 ${
-                msg.role === "user" ? "justify-end" : "justify-start"
+                msg.role === "user" || msg.role === "manager" ? "justify-end" : "justify-start"
               }`}
             >
-              {msg.role !== "user" && (
+              {msg.role === "assistant" && (
                 <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-[9px] font-bold shrink-0 mt-1 shadow-2xs">
                   SA
                 </div>
@@ -130,16 +130,29 @@ export function SalesDialogueStream({
 
               <div
                 className={`px-3.5 py-2 rounded-2xl max-w-[82%] text-xs leading-relaxed shadow-2xs ${
-                  msg.role === "user"
+                  msg.role === "manager"
+                    ? "bg-blue-600 text-white rounded-tr-xs border border-blue-500 shadow-blue-500/10"
+                    : msg.role === "user"
                     ? "bg-slate-900 text-white rounded-tr-xs"
                     : "bg-white border border-slate-200 text-slate-800 rounded-tl-xs"
                 }`}
               >
+                {msg.role === "manager" && (
+                  <div className="text-[10px] font-semibold text-blue-200 uppercase tracking-wider mb-0.5 flex items-center gap-1">
+                    <span>Property Manager</span>
+                  </div>
+                )}
                 <p>{msg.text}</p>
               </div>
 
+              {msg.role === "manager" && (
+                <div className="w-5 h-5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[9px] font-bold shrink-0 mt-1 shadow-2xs" title="Property Manager">
+                  <PhoneCall className="w-3 h-3" />
+                </div>
+              )}
+
               {msg.role === "user" && (
-                <div className="w-5 h-5 rounded-full bg-slate-300 text-slate-700 flex items-center justify-center text-[9px] font-bold shrink-0 mt-1 shadow-2xs">
+                <div className="w-5 h-5 rounded-full bg-slate-300 text-slate-700 flex items-center justify-center text-[9px] font-bold shrink-0 mt-1 shadow-2xs" title="You">
                   <User className="w-3 h-3" />
                 </div>
               )}

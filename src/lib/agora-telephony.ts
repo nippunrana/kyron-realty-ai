@@ -11,6 +11,12 @@ import { generateAgoraRtcToken } from "@/lib/agora-token";
 
 export const MANAGER_RTC_UID = 888; // Reserved RTC UID for the dialed property manager
 
+export interface ManagerTranscriptItem {
+  id: string;
+  text: string;
+  timestamp: string;
+}
+
 export interface ManagerCallSession {
   callSid: string;
   propertyId: number;
@@ -20,6 +26,7 @@ export interface ManagerCallSession {
   propertyTitle: string;
   status: "dialing" | "whispering" | "connected" | "declined" | "no_answer" | "failed" | "completed";
   createdAt: number;
+  transcripts?: ManagerTranscriptItem[];
 }
 
 // In-memory registry for active outbound screening calls (TTL 30 mins)
@@ -226,6 +233,32 @@ export function updateManagerCallSession(
     session.status = status;
     activeCalls.set(channelName, session);
   }
+}
+
+export function addManagerTranscript(channelName: string, text: string): ManagerTranscriptItem | null {
+  const session = activeCalls.get(channelName);
+  if (!session) return null;
+
+  if (!session.transcripts) {
+    session.transcripts = [];
+  }
+
+  const item: ManagerTranscriptItem = {
+    id: `mgr-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    text: text.trim(),
+    timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+  };
+
+  session.transcripts.push(item);
+  if (session.transcripts.length > 50) {
+    session.transcripts.shift();
+  }
+  return item;
+}
+
+export function getManagerTranscripts(channelName: string): ManagerTranscriptItem[] {
+  const session = activeCalls.get(channelName);
+  return session?.transcripts || [];
 }
 
 /** Escapes special characters for safe XML/TwiML attribute and text inclusion */

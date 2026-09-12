@@ -35,7 +35,7 @@ export type CallerType = "buyer_inquiry" | "owner_onboarding" | "sales_agent";
 
 export interface VoiceMessage {
   id: string;
-  role: "user" | "assistant" | "system";
+  role: "user" | "assistant" | "system" | "manager";
   text: string;
   timestamp: string;
 }
