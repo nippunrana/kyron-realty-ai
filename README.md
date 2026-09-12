@@ -127,10 +127,13 @@ Sarah is mounted at the root application layout (`src/components/sales/FloatingS
 - **Dual-Thread Journey Memory (`src/lib/sales-journey.ts`)**: Preserves exact, uncompressed caller requirements while maintaining per-home visit notes.
 
 #### Mode C: Three-Way Property Manager Telephony Call
-- **Server-Side PSTN Dialing**: Initiates an outbound phone call to the property manager via Twilio using the silent `[CALL_MANAGER]` tag. Manager phone numbers are strictly protected server-side and never exposed to the client or LLM.
+- **Server-Side PSTN Dialing**: Initiates an outbound phone call to the property manager via Twilio using the silent `[CALL_MANAGER]` tag. Manager phone numbers are strictly protected server-side and never exposed to the client or LLM prompt facts.
 - **Private IVR Whisper Screening**: The manager hears: *"Press 1 to connect, 2 if busy"*, ensuring customer calls are never exposed to voicemails or unprepared pickups.
-- **Twilio Media Stream WebSocket Relay (`scripts/telephony-bridge/bridge.py`)**: Bridges 8kHz G.711 mu-law PSTN audio into the live Agora WebRTC channel (`UID 888`) via linear PCM resampling.
-- **Silent Observer Mode (`[SILENT]`)**: Sarah introduces the manager, then transitions to Observer Mode. Between human dialogue, Sarah outputs `[SILENT]`, which is filtered from audio and transcripts. If either participant addresses her by name (*"Sarah, ..."*), she provides a concise 1–2 sentence answer before resuming silence.
+- **Twilio Media Stream WebSocket Relay (`scripts/telephony-bridge/bridge.py`)**: Bridges 8kHz G.711 mu-law PSTN audio into the live Agora WebRTC channel (`UID 888`) via linear PCM resampling, enabling sub-second multi-party voice communication.
+- **Server-Side Gemini STT & Agora `/think` Injection**: Because Agora Conversational AI cloud agents subscribe to a single remote WebRTC user (`userUid`), manager phone speech is transcribed in real time via acoustic VAD and Gemini STT in the bridge, then relayed to Sarah via the Agora `/think` REST API (`mode="context"` for silent listening or `mode="respond"` when addressed).
+- **Silent Observer Mode (`[SILENT]`)**: Sarah introduces the manager, then transitions to Observer Mode. Between human dialogue, Sarah outputs `[SILENT]`, which Agora TTS and transcripts filter out. If either participant addresses her by name (*"Sarah, ..."*), checks her presence (*"Sarah, are you there?"*), or asks caller role questions, she answers immediately in 1–2 factual sentences before returning to silence.
+- **PostgreSQL Session & Transcript Persistence**: Telephony status, Twilio Call SID, and manager transcripts are persisted to `voice_sessions` in PostgreSQL, enabling cluster-wide state synchronization across PM2 worker instances.
+- **Unified Multi-Party Dialogue**: The web client (`useAgoraVoiceAgent`) renders chronologically sorted messages across buyer, Sarah, and property manager while stripping synthetic tags and ghost echo bubbles.
 
 #### Mode D: Voice-Driven Google Calendar Tour Scheduling
 - **Live `freeBusy` Availability**: Queries the host's Google Calendar API (`calendar.app.created` scope) and local bookings database to identify genuine 1-hour tour openings.
@@ -155,7 +158,7 @@ flowchart TB
     subgraph AgoraNetwork [Agora SD-RTN Global Real-Time Network]
         RTCChannel[Agora RTC Audio Channel]
         RTMStream[Agora RTM Signaling & Transcripts]
-        ConvoGateway[Agora Conversational AI Cloud Gateway v2<br/>Dynamic AccessToken2 Authorization]
+        ConvoGateway[Agora Conversational AI Cloud Gateway v2<br/>Dynamic AccessToken2 Authorization & /think REST API]
     end
 
     subgraph IntelligenceLayer [Speech & Intelligence Engine]
@@ -173,7 +176,7 @@ flowchart TB
 
     subgraph BackendServices [Next.js 16 App Router Backend]
         API_Agora[/api/agora/session/start, stop, retarget]
-        API_Telephony[/api/agora/telephony/call, webhook, bridge]
+        API_Telephony[/api/agora/telephony/call, webhook, bridge-event]
         API_Calendar[/api/properties/id/calendar/]
         TokenGen[Agora Dual RTC + RTM Token Generator]
         FitEngine[Property Fit & Location Value Engines]
@@ -205,12 +208,15 @@ flowchart TB
     TwilioVoice <-->|WebSocket Media Stream| PyBridge
     PyBridge <-->|Raw PCM Audio Frames| AgoraPySDK
     AgoraPySDK <-->|Agora WebRTC Stream UID 888| RTCChannel
+    PyBridge -->|VAD + Gemini STT Transcriptions| API_Telephony
 
     %% Backend Control Flows
     UI -->|Start/Retarget Call| API_Agora
     FloatAgent -->|Call Manager Tag| API_Telephony
     FloatAgent -->|Book Tour Tag| API_Calendar
     API_Telephony --> TwilioVoice
+    API_Telephony -->|REST /think Context & Respond| ConvoGateway
+    API_Telephony -->|Persist Sessions & Transcripts| DB
     API_Calendar --> GCal
     API_Agora --> TokenGen
     API_Agora --> FitEngine
@@ -228,6 +234,7 @@ Kyron Realty AI relies strictly on an **Agora-Only Conversational AI Architectur
 | Agora Product / Feature | Implementation Details |
 | :--- | :--- |
 | **Conversational AI Cloud Gateway v2** | Full lifecycle orchestration via Agora REST APIs (`/v2/projects/{appId}/join`, `/leave`, and `/update`). Enables mid-call prompt swapping and retargeting without dropping active WebRTC connections. |
+| **Conversational AI `/think` REST API** | Enables dynamic injection of external speaker text and instructions into the running agent without interrupting active audio. Features dual action modes (`mode="respond"` with `on_listening_action: "interrupt"` for instant answers when addressed, and `mode="context"` with `on_listening_action: "append"` for silent contextual awareness). |
 | **Dynamic Token Authentication (`AccessToken2`)** | Cloud Gateway REST requests are signed dynamically using `agora-token` AccessToken2 authorization (`buildAgoraCloudAuthHeader`), requiring only `AGORA_APP_ID` and `AGORA_APP_CERTIFICATE`. |
 | **Voice / WebRTC (`agora-rtc-sdk-ng`)** | Ultra-low latency bi-directional audio capture, live frequency visualizers, dual-participant audio rendering, and sub-second agent speech playback. |
 | **Real-Time Messaging (`agora-rtm`)** | Full signaling and transcript streaming via dual-token authentication. Powers live captions, turn detection, silent tag dispatching (`[SEARCH]`, `[CALL_MANAGER]`, `[TOUR_BOOKED]`), and append-priority cues. |
@@ -247,7 +254,7 @@ sequenceDiagram
     autonumber
     actor Buyer as Buyer (Browser WebRTC)
     participant Sarah as Sarah (Agora ConvoAI)
-    participant Server as Next.js API
+    participant Server as Next.js API & PostgreSQL
     participant Bridge as Python Bridge (UID 888)
     participant Twilio as Twilio PSTN Gateway
     actor Manager as Property Manager (+91 Phone)
@@ -266,22 +273,56 @@ sequenceDiagram
     Bridge->>Sarah: Joins Agora RTC Channel as UID 888
     Sarah->>Buyer: "The property manager has joined the call. I'm here if you need me!"
     Server->>Sarah: Swaps Prompt to Observer Mode via Agora REST /update
+    Server->>Server: Persists active session state to voice_sessions table
     
     rect rgb(240, 248, 255)
         Note over Buyer,Manager: Three-Way Audio Call Active
-        Buyer<->Manager: Spoken Dialogue
+        Buyer<->Bridge: Bidirectional Spoken Audio via Agora RTC (UID 888)
+        Bridge<->Twilio: Bidirectional Audio Stream (8kHz mu-law)
+        Twilio<->Manager: PSTN Audio (Buyer and Manager speak directly)
+        
+        Note over Bridge,Sarah: Real-Time Cognition & Observer Mode
+        Manager->>Twilio: Manager speaks to Buyer
+        Twilio->>Bridge: Phone Audio Frames
+        Bridge->>Bridge: Acoustic VAD + Gemini Real Estate STT
+        Bridge->>Server: Transcribed Utterance via /bridge-event
+        Server->>Server: Appends to PostgreSQL voice_sessions.manager_transcripts
+        Server->>Sarah: Injects Context via Agora REST /think (mode="context")
         Sarah-->>Sarah: Emits [SILENT] (filtered from audio & transcripts)
-        Buyer->>Sarah: "Sarah, what was the parking fee again?"
-        Sarah->>Buyer: "Covered parking is 2,000 rupees monthly."
+        
+        Note over Buyer,Sarah: Direct Human Query to Agent
+        Buyer->>Sarah: "Sarah, are you there?"
+        Sarah->>Buyer: "Yes, I'm here! How can I help you both?"
+        Sarah->>Bridge: Audio on RTC Channel (Manager hears Sarah)
+        
+        Note over Manager,Sarah: Phone Manager Query to Agent
+        Manager->>Twilio: "Sarah, what was the security deposit again?"
+        Twilio->>Bridge: Audio Stream
+        Bridge->>Bridge: VAD + Gemini STT ("Sarah, what was the security deposit again?")
+        Bridge->>Server: Dispatches /bridge-event
+        Server->>Sarah: Dispatches /think (mode="respond", on_listening_action="interrupt")
+        Sarah->>Buyer: "The security deposit is two months rent."
+        Sarah->>Bridge: Broadcasts on RTC Channel (Manager hears answer)
         Sarah-->>Sarah: Returns immediately to [SILENT] Observer Mode
     end
 
     Manager->>Twilio: Hangs up call
     Twilio->>Bridge: Closes WebSocket
     Bridge->>Sarah: Releases UID 888 from Agora RTC Channel
-    Server->>Sarah: Reverts Prompt to Sales Agent Mode
+    Server->>Sarah: Reverts Prompt to Sales Agent Mode via /update
+    Server->>Server: Updates voice_sessions telephony_status to 'completed'
     Sarah->>Buyer: "Hope that was helpful! Would you like to schedule a viewing or explore other listings?"
 ```
+
+### Key Architectural Pillars:
+- **Zero Client Phone Disclosure**: The manager's phone number is retrieved and dialed strictly server-side (`src/lib/agora-telephony.ts`). It is never passed to the client browser or serialized in listing discovery JSON, and Sarah's prompt facts carry only `hasManagerPhone: boolean` so the LLM physically cannot leak or hallucinate the number.
+- **Private Whisper Screening Before Bridge**: The manager is dialed on PSTN (+91 Indian E.164 numbers) via Twilio and screened with a private IVR whisper (*"Press 1 to connect, 2 if busy"*). The manager is only bridged into the Agora WebRTC channel (`UID 888`) after pressing 1, preventing ringing, voicemails, or unprepared pickups on the live customer call.
+- **Twilio Media Stream WebSocket Relay (`scripts/telephony-bridge/bridge.py`)**: Bridges bidirectional audio between 8kHz G.711 mu-law and 16kHz linear PCM into Agora RTC channel `UID 888` on the server, avoiding SIP DNS lookup failures and providing clean audio mixing.
+- **Acoustic VAD & Gemini Real-Estate STT**: The Python bridge employs adaptive voice activity detection (280 energy threshold, 960ms silence window, hangover buffer) and Gemini STT primed with real-estate terminology (deposit, rent, carpet area, lease) and phonetic name normalization for "Sarah", relaying transcribed speech to `/api/agora/telephony/bridge-event`.
+- **Agora Conversational AI `/think` Dynamic Relay**: Because Agora's cloud agent runtime subscribes to a single remote WebRTC participant (`userUid`), manager phone speech is transcribed and relayed to Sarah via Agora's official `/think` REST API. Contextual dialogue is injected with `mode="context"` (`on_listening_action: "append"`), while direct queries use `mode="respond"` (`on_listening_action: "interrupt"`) to yield instantaneous verbal answers.
+- **Silent Observer Mode (`[SILENT]`)**: Once bridged, Sarah introduces the manager before transitioning to Observer Mode (`buildObserverPrompt`). Between human turns, Sarah emits `[SILENT]`, which Agora TTS skips via `skip_patterns: [4]` and the dialogue stream drops via bracket filtering. When either person addresses her by name (*"Sarah, ..."*), checks her presence (*"Sarah, are you there?"*), or asks caller identity questions (*"Do you know who I am?"*), she answers in 1–2 factual sentences before returning immediately to silent observation.
+- **PostgreSQL Session & Transcript Persistence**: Telephony status, Twilio Call SID, and manager transcripts are persisted directly to PostgreSQL `voice_sessions`, ensuring cluster-wide resilience across PM2 worker processes and unified multi-party transcripts.
+- **Unified Multi-Party Dialogue & Ghost Bubble Elimination**: The web client (`useAgoraVoiceAgent`) renders chronologically sorted messages across buyer, Sarah, and manager while filtering out synthetic tags and ghost echo bubbles (`Property Manager:` prefixes).
 
 ---
 
@@ -319,7 +360,7 @@ kyron-realty-ai/
 │   │   ├── (auth)/login/             # NextAuth authentication pages
 │   │   ├── api/
 │   │   │   ├── agora/                # Agora session lifecycle (start, stop, retarget)
-│   │   │   │   └── telephony/        # Twilio outbound calls, TwiML webhooks, bridge status
+│   │   │   │   └── telephony/        # Twilio outbound calls, TwiML webhooks, bridge events & status
 │   │   │   ├── auth/                 # NextAuth route handlers & Google token persist
 │   │   │   ├── properties/           # Property queries, search, and calendar slots
 │   │   │   └── leads/                # Lead & booking capture endpoints
@@ -338,11 +379,13 @@ kyron-realty-ai/
 │   │   ├── index.ts                  # PostgreSQL connection pool with Drizzle ORM
 │   │   └── schema.ts                 # Single source of truth for all database tables
 │   ├── hooks/
-│   │   ├── use-agora-conversational-agent.ts  # Agora WebRTC & RTM agent client hook
-│   │   └── use-voice-intents.ts      # Voice intent tag parsing ([SEARCH], [CALL_MANAGER], etc.)
+│   │   ├── useAgoraVoiceAgent.ts     # Agora WebRTC, RTM & multi-party transcript hook
+│   │   ├── voice-intents.ts          # Voice intent tag parsing ([SEARCH], [CALL_MANAGER], etc.)
+│   │   ├── voice-transcript.ts       # Multi-role transcript formatting & ghost bubble filtering
+│   │   └── audio-visualizer.ts       # Web Audio API frequency visualizer
 │   └── lib/
-│       ├── agora-agent-client.ts     # Agora ConvoAI Cloud Gateway REST API client
-│       ├── agora-telephony.ts        # Twilio telephony dialer & whisper TwiML generation
+│       ├── agora-agent-client.ts     # Agora ConvoAI Cloud Gateway REST API client (/join, /update, /think)
+│       ├── agora-telephony.ts        # Twilio telephony dialer, whisper TwiML & DB session persistence
 │       ├── agora-token.ts            # Dynamic AccessToken2 generator for RTC, RTM & Cloud REST
 │       ├── calendar-service.ts       # Google Calendar freeBusy & booking engine
 │       ├── google-calendar.ts        # Google OAuth credential refresh & calendar link
@@ -350,8 +393,7 @@ kyron-realty-ai/
 │       ├── location-value.ts         # Code-computed travel time & service density engine
 │       ├── sales-journey.ts          # Dual-thread caller journey memory manager
 │       ├── sarah-search-prompt.ts    # Sarah Global Voice Search mode prompt
-│       ├── sarah-property-prompt.ts  # Sarah Listing Retargeting mode prompt
-│       └── sarah-observer-prompt.ts  # Sarah Three-Way Telephony Observer mode prompt
+│       └── sarah-property-prompt.ts  # Sarah Listing Retargeting & Observer mode prompts
 ├── scripts/
 │   ├── telephony-bridge/             # Python Twilio-to-Agora audio bridge service
 │   │   ├── bridge.py                 # WebSocket Media Stream relay + Agora Python RTC UID 888
