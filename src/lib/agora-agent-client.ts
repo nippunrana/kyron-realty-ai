@@ -133,7 +133,7 @@ export async function sendAgoraAgentInstruction(
   sessionId: string,
   channelName: string,
   instruction: string,
-  priority: "INTERRUPTED" | "APPEND" = "APPEND"
+  priority: "INTERRUPT" | "APPEND" = "APPEND"
 ): Promise<boolean> {
   const appId = getAgoraAppId();
   const authHeader = buildAgoraCloudAuthHeader(channelName);

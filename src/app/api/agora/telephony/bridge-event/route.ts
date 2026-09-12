@@ -31,8 +31,8 @@ export async function POST(req: NextRequest) {
         .replace(/^(?:sara|saari|sera|zara)\b/gi, "Sarah")
         .replace(/\b(?:sara|saari|sera|zara)\b/gi, "Sarah");
 
-      const isAddressingSarah = /\bsarah\b/i.test(normalizedText);
-      const priority = isAddressingSarah ? "INTERRUPTED" : "APPEND";
+      const isAddressingSarah = /\b(?:sarah|sara|assistant)\b/i.test(normalizedText);
+      const priority: "INTERRUPT" | "APPEND" = isAddressingSarah ? "INTERRUPT" : "APPEND";
 
       // Relay to running Agora Conversational AI Agent via /think REST API
       try {
