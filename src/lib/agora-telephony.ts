@@ -256,10 +256,6 @@ export function addManagerTranscript(channelName: string, text: string): Manager
   return item;
 }
 
-export function getManagerTranscripts(channelName: string): ManagerTranscriptItem[] {
-  const session = activeCalls.get(channelName);
-  return session?.transcripts || [];
-}
 
 /** Escapes special characters for safe XML/TwiML attribute and text inclusion */
 export function escapeXml(unsafe: string): string {
