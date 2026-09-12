@@ -56,7 +56,7 @@ export default async function DashboardPage() {
 
   // Own listings only. Rows with a null owner_id predate authentication and stay
   // visible to every user until they are assigned (see docs/built-systems/database.md).
-  let userProperties: (ListingCardItem & { knowledgeBase?: any })[] = [];
+  let userProperties: (ListingCardItem & { knowledgeBase?: { kbData?: Record<string, unknown> } })[] = [];
   try {
     userProperties = await db
       .select(listingCardColumns)
@@ -75,7 +75,7 @@ export default async function DashboardPage() {
   }
 
   // Fetch Voice Sessions associated with the user or their properties
-  let userSessions: any[] = [];
+  let userSessions: (typeof voiceSessions.$inferSelect)[] = [];
   try {
     const userPropertyIds = userProperties.map((p) => p.id).filter(Boolean);
     const sessionConditions = [

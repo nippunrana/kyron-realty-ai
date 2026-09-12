@@ -43,7 +43,7 @@ export interface VoiceControlState {
 interface ConversationalPanelProps {
   onTurnExtraction?: (slidingWindow: TurnMessage[]) => void;
   onUIAction?: (action: UIAction) => void;
-  onLogEvent?: (category: "AGORA" | "INTENT", title: string, details?: any) => void;
+  onLogEvent?: (category: "AGORA" | "INTENT", title: string, details?: Record<string, unknown>) => void;
   isProcessing: boolean;
   activePipelineStep: string | null;
   /** Failure from the synthesis pipeline, shown beside the transcript; never a silent no-op. */

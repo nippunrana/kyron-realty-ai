@@ -193,7 +193,7 @@ export function SessionHistoryDrawer({
               <button
                 key={tab.key}
                 type="button"
-                onClick={() => setActiveFilter(tab.key as any)}
+                onClick={() => setActiveFilter(tab.key as "ALL" | "ONBOARDING" | "BUYER" | "DRAFTS")}
                 className={`px-2.5 py-1 rounded-lg font-medium transition-colors whitespace-nowrap cursor-pointer ${
                   activeFilter === tab.key
                     ? "bg-purple-600 text-white shadow-sm"

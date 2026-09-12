@@ -136,5 +136,5 @@ export interface UseAgoraVoiceAgentOptions {
   onBookTourRequest?: (booking: ParsedBookTourTag) => void;
   /** Sarah asking to call the property manager for a 3-way conversation. */
   onCallManagerRequest?: (data: ParsedCallManagerTag) => void;
-  onLogEvent?: (category: "AGORA" | "INTENT", title: string, details?: any) => void;
+  onLogEvent?: (category: "AGORA" | "INTENT", title: string, details?: Record<string, unknown>) => void;
 }

@@ -29,10 +29,10 @@ export async function POST(req: NextRequest) {
       success: true,
       data: result,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[Hyper-Local Enrichment Route Error]:", error);
     return NextResponse.json(
-      { success: false, error: error.message || "Hyper-local enrichment failed." },
+      { success: false, error: error instanceof Error ? error.message : "Hyper-local enrichment failed." },
       { status: 500 }
     );
   }

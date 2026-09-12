@@ -157,7 +157,7 @@ async function handleWebhook(req: NextRequest) {
     }
 
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("[Agora Telephony Webhook] Error:", err);
     return new NextResponse(
       `<?xml version="1.0" encoding="UTF-8"?><Response><Say>An error occurred.</Say><Hangup/></Response>`,
