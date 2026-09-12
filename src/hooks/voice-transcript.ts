@@ -26,7 +26,17 @@ export function mapTranscriptionsToMessages(
 ): VoiceMessage[] {
   return transcriptions
     .map((item: any) => ({ item, text: stripUITags((item.text || "").trim()) }))
-    .filter(({ item, text }) => text.length > 0 && !text.startsWith("[") && !(item.text || "").trim().startsWith("["))
+    .filter(({ item, text }) => {
+      const rawText = (item.text || "").trim();
+      return (
+        text.length > 0 &&
+        !text.startsWith("[") &&
+        !rawText.startsWith("[") &&
+        !text.startsWith("Property Manager:") &&
+        !rawText.startsWith("Property Manager:") &&
+        !rawText.includes("PROPERTY_MANAGER")
+      );
+    })
     .map(({ item, text }, idx: number) => {
       const fromUser = isUser(item);
       return {

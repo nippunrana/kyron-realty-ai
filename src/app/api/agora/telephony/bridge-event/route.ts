@@ -31,7 +31,10 @@ export async function POST(req: NextRequest) {
         .replace(/^(?:sara|saari|sera|zara)\b/gi, "Sarah")
         .replace(/\b(?:sara|saari|sera|zara)\b/gi, "Sarah");
 
-      const isAddressingSarah = /\b(?:sarah|sara|assistant)\b/i.test(normalizedText);
+      // Check if manager is directly addressing Sarah or asking a direct/meta question
+      const hasSarahName = /\b(?:sarah|sara|assistant)\b/i.test(normalizedText);
+      const isDirectQuestionToAi = /\b(?:who am i|who are you|do you know who|am i the|can you hear|what did you|are you listening|can you tell|do you know me)\b/i.test(normalizedText);
+      const isAddressingSarah = hasSarahName || isDirectQuestionToAi;
       const mode: "respond" | "context" = isAddressingSarah ? "respond" : "context";
 
       // Relay to running Agora Conversational AI Agent via /think REST API
@@ -49,9 +52,11 @@ export async function POST(req: NextRequest) {
           .limit(1);
 
         if (voiceSession?.agoraSessionId) {
+          // ALWAYS format with square brackets so Agora's RTM transcript echo is filtered
+          // and never misrendered in the web client as a user/tenant turn.
           const instructionText = isAddressingSarah
-            ? `[DIRECT QUESTION TO SARAH from Property Manager]: "${normalizedText}". Please answer their question directly and concisely now.`
-            : `Property Manager: ${normalizedText}`;
+            ? `[DIRECT QUESTION TO SARAH from Property Manager on Phone]: "${normalizedText}". Please answer directly and concisely.`
+            : `[PROPERTY_MANAGER_PHONE]: "${normalizedText}"`;
           console.log(`[Bridge Event] Relaying to agent (mode=${mode}): "${instructionText}"`);
           await sendAgoraAgentInstruction(
             voiceSession.agoraSessionId,
