@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Metadata } from "next";
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { properties, voiceSessions } from "@/db/schema";
+import { properties, voiceSessions, type PropertyKnowledgeBaseData } from "@/db/schema";
 import { desc, eq, inArray, isNull, or } from "drizzle-orm";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { PropertyListingsSection, type ListingCardItem } from "@/components/dashboard/PropertyListingsSection";
@@ -56,7 +56,7 @@ export default async function DashboardPage() {
 
   // Own listings only. Rows with a null owner_id predate authentication and stay
   // visible to every user until they are assigned (see docs/built-systems/database.md).
-  let userProperties: (ListingCardItem & { knowledgeBase?: { kbData?: Record<string, unknown> } })[] = [];
+  let userProperties: (ListingCardItem & { knowledgeBase?: PropertyKnowledgeBaseData | null })[] = [];
   try {
     userProperties = await db
       .select(listingCardColumns)
