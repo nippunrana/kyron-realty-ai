@@ -8,11 +8,30 @@ import {
   Volume2,
   UserCheck,
 } from "lucide-react";
+import { BASE_PATH } from "@/lib/base-path";
 
 /**
  * The trust centrepiece: an AI that knows when to stop being the answer.
  * Dark surface on a light page — this is the one moment the page raises its voice.
  */
+
+const SPEAKER_AVATARS: Record<string, { src: string; alt: string; tagColor: string }> = {
+  Buyer: {
+    src: `${BASE_PATH}/images/caller-buyer.jpg`,
+    alt: "Prospective Buyer",
+    tagColor: "text-blue-400",
+  },
+  Sarah: {
+    src: `${BASE_PATH}/images/sarah-sales-agent.jpg`,
+    alt: "Sarah (AI Associate)",
+    tagColor: "text-emerald-400",
+  },
+  "Your manager": {
+    src: `${BASE_PATH}/images/manager-ravi.jpg`,
+    alt: "Manager Ravi Sharma",
+    tagColor: "text-indigo-400",
+  },
+};
 
 const HANDOFF_BEATS = [
   {
@@ -107,27 +126,71 @@ export function LiveHumanHandoff() {
             </div>
 
             <ol className="mt-5 space-y-5">
-              {HANDOFF_BEATS.map((beat) => (
-                <li key={beat.time} className="flex items-start gap-4">
-                  <span className="w-10 shrink-0 text-[11px] font-bold text-white/35 tabular-nums pt-0.5">
-                    {beat.time}
-                  </span>
-                  <div className="min-w-0">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-blue-400">
-                      {beat.speaker}
+              {HANDOFF_BEATS.map((beat) => {
+                const avatar = SPEAKER_AVATARS[beat.speaker];
+                return (
+                  <li key={beat.time} className="flex items-start gap-3 sm:gap-4">
+                    <span className="w-10 shrink-0 text-[11px] font-bold text-white/35 tabular-nums pt-1">
+                      {beat.time}
                     </span>
-                    <p className="mt-1 text-sm text-white/90 leading-relaxed">{beat.line}</p>
-                    {beat.note && (
-                      <p className="mt-1.5 text-xs text-white/45 leading-relaxed">{beat.note}</p>
+                    {avatar && (
+                      <div className="w-7 h-7 rounded-full overflow-hidden ring-1 ring-white/20 shrink-0 shadow-xs mt-0.5">
+                        <img
+                          src={avatar.src}
+                          alt={avatar.alt}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
                     )}
-                  </div>
-                </li>
-              ))}
+                    <div className="min-w-0 flex-1">
+                      <span className={`text-[11px] font-bold uppercase tracking-wider ${avatar?.tagColor || "text-blue-400"}`}>
+                        {beat.speaker}
+                      </span>
+                      <p className="mt-1 text-sm text-white/90 leading-relaxed">{beat.line}</p>
+                      {beat.note && (
+                        <p className="mt-1.5 text-xs text-white/45 leading-relaxed">{beat.note}</p>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
             </ol>
           </div>
 
-          {/* Side: booking + guarantees */}
+          {/* Side: manager card + booking + guarantees */}
           <div className="lg:col-span-5 flex flex-col gap-4">
+            {/* Manager Live Profile Card */}
+            <div className="luxury-dark-card rounded-2xl p-5 sm:p-6 border border-emerald-500/30 bg-gradient-to-br from-emerald-950/25 via-slate-900/90 to-slate-950 shadow-xl shadow-black/40">
+              <div className="flex items-center gap-3.5">
+                <div className="relative shrink-0">
+                  <div className="w-13 h-13 rounded-2xl overflow-hidden ring-2 ring-emerald-500/50 shadow-md">
+                    <img
+                      src={`${BASE_PATH}/images/manager-ravi.jpg`}
+                      alt="Ravi Sharma - Senior Property Manager"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <span className="absolute -bottom-1 -right-1 flex h-4 w-4">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-500 ring-2 ring-slate-950" />
+                  </span>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-sm font-bold text-white truncate">Ravi Sharma</h3>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide bg-emerald-500/20 text-emerald-300 border border-emerald-500/35 whitespace-nowrap">
+                      On-Call Manager
+                    </span>
+                  </div>
+                  <p className="text-xs text-white/65 mt-0.5 truncate">Senior Property Manager • DLF CyberCity</p>
+                  <p className="text-[11px] text-emerald-400 font-semibold mt-1 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                    <span>Rings &amp; joins within 10s via private RTC bridge</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+
             {/* Calendar */}
             <div className="luxury-dark-card luxury-dark-card-hover rounded-2xl p-5 sm:p-6">
               <div className="flex items-center gap-2.5">

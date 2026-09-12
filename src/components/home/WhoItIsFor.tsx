@@ -8,6 +8,7 @@ import {
   ArrowRight,
   Sparkles,
 } from "lucide-react";
+import { BASE_PATH } from "@/lib/base-path";
 
 /**
  * Persona split. Each card names the pain in the reader's own words first,
@@ -17,6 +18,9 @@ import {
 interface Persona {
   id: string;
   icon: typeof Home;
+  imageSrc: string;
+  imageAlt: string;
+  imageCaption: string;
   audience: string;
   headline: string;
   pain: string;
@@ -30,6 +34,9 @@ const PERSONAS: Persona[] = [
   {
     id: "owners",
     icon: Home,
+    imageSrc: `${BASE_PATH}/images/persona-owner.jpg`,
+    imageAlt: "Landlord managing luxury property portfolio comfortably",
+    imageCaption: "Spoken onboarding",
     audience: "Owners & landlords",
     headline: "You own the flat. You never signed up to be its marketing department.",
     pain: "Listing it means a long form, photos trapped on your phone, and an hour of looking up what is nearby and how far it really is.",
@@ -46,6 +53,9 @@ const PERSONAS: Persona[] = [
   {
     id: "teams",
     icon: Building,
+    imageSrc: `${BASE_PATH}/images/persona-broker.jpg`,
+    imageAlt: "Real estate broker and property manager in agency office",
+    imageCaption: "Zero missed calls",
     audience: "Brokerages & property managers",
     headline: "Your team cannot answer every call. It should not have to.",
     pain: "Coordinators burn their day repeating the same five answers, and the calls that arrive after 7pm simply never get answered at all.",
@@ -62,6 +72,9 @@ const PERSONAS: Persona[] = [
   {
     id: "buyers",
     icon: Search,
+    imageSrc: `${BASE_PATH}/images/persona-buyer.jpg`,
+    imageAlt: "Homebuyers checking live property details outside residence",
+    imageCaption: "Instant answers",
     audience: "Buyers & renters",
     headline: "You just want a straight answer before you drive across town.",
     pain: "Listings say \"prime location\" and nobody picks up to tell you what that means, whether pets are allowed, or when you could see it.",
@@ -98,18 +111,32 @@ export function WhoItIsFor() {
           return (
             <article
               key={persona.id}
-              className={`luxury-card luxury-card-hover rounded-2xl p-6 sm:p-7 flex flex-col border ${persona.accent}`}
+              className={`luxury-card luxury-card-hover rounded-2xl p-5 sm:p-6 flex flex-col border ${persona.accent} overflow-hidden`}
             >
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-xs ${persona.iconClass}`}>
-                  <Icon className="w-5 h-5" />
+              {/* 16:9 Cinematic Photo Banner */}
+              <div className="relative -mx-5 -mt-5 sm:-mx-6 sm:-mt-6 mb-5 aspect-16/9 overflow-hidden rounded-t-2xl border-b border-slate-100 group">
+                <img
+                  src={persona.imageSrc}
+                  alt={persona.imageAlt}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/75 via-slate-950/20 to-transparent" />
+                <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center shadow-xs ${persona.iconClass}`}>
+                      <Icon className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="text-xs font-bold uppercase tracking-wider text-white drop-shadow-xs">
+                      {persona.audience}
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-bold text-white/90 bg-slate-900/70 backdrop-blur-md px-2 py-0.5 rounded-full border border-white/15">
+                    {persona.imageCaption}
+                  </span>
                 </div>
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  {persona.audience}
-                </span>
               </div>
 
-              <h3 className="mt-5 text-lg font-bold text-slate-900 leading-snug">
+              <h3 className="text-lg font-bold text-slate-900 leading-snug">
                 {persona.headline}
               </h3>
 

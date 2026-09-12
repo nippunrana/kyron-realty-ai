@@ -7,14 +7,13 @@ import {
   PhoneCall,
   ShieldCheck,
   Mic,
-  Bot,
-  User,
   Clock,
   CalendarCheck,
   MapPin,
   Users,
   Lock,
 } from "lucide-react";
+import { BASE_PATH } from "@/lib/base-path";
 
 /**
  * Hero: one promise, one primary CTA, one visual anchor (a replayed call).
@@ -177,6 +176,36 @@ export function HeroVoiceSimulator({ onTalkToSarah, onOpenCallModal }: HeroVoice
             <span className="text-slate-400">Listing a property needs a free account.</span>
           </p>
 
+          {/* Social proof avatar stack */}
+          <div className="mt-7 pt-5 border-t border-slate-200/80 flex items-center gap-3.5">
+            <div className="flex -space-x-2.5 overflow-hidden p-0.5">
+              <img
+                src={`${BASE_PATH}/images/persona-owner.jpg`}
+                alt="Property owner"
+                className="inline-block h-8 w-8 rounded-full ring-2 ring-white object-cover shadow-xs"
+              />
+              <img
+                src={`${BASE_PATH}/images/avatar-investor.jpg`}
+                alt="Real estate investor"
+                className="inline-block h-8 w-8 rounded-full ring-2 ring-white object-cover shadow-xs"
+              />
+              <img
+                src={`${BASE_PATH}/images/persona-broker.jpg`}
+                alt="Estate manager"
+                className="inline-block h-8 w-8 rounded-full ring-2 ring-white object-cover shadow-xs"
+              />
+              <img
+                src={`${BASE_PATH}/images/manager-ravi.jpg`}
+                alt="Property manager"
+                className="inline-block h-8 w-8 rounded-full ring-2 ring-white object-cover shadow-xs"
+              />
+            </div>
+            <div className="text-xs text-slate-600 leading-tight">
+              <span className="font-bold text-slate-900">240+ landlords &amp; brokerages</span>
+              <span className="block text-slate-500 text-[11px] mt-0.5">active across Gurugram, Delhi &amp; Mumbai</span>
+            </div>
+          </div>
+
           {/* Trust strip — each chip answers an objection raised later on the page */}
           <ul className="mt-9 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5 text-xs text-slate-600">
             {TRUST_CHIPS.map((chip) => {
@@ -199,9 +228,13 @@ export function HeroVoiceSimulator({ onTalkToSarah, onOpenCallModal }: HeroVoice
             {/* Caller HUD */}
             <div className="flex items-center justify-between gap-4 pb-4 border-b border-slate-100">
               <div className="flex items-center gap-3">
-                <div className="relative">
-                  <div className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center shadow-md">
-                    <Bot className="w-5 h-5" />
+                <div className="relative shrink-0">
+                  <div className="w-11 h-11 rounded-full overflow-hidden ring-2 ring-blue-600/20 shadow-md">
+                    <img
+                      src={`${BASE_PATH}/images/sarah-sales-agent.jpg`}
+                      alt="Sarah — AI Leasing Associate"
+                      className="w-full h-full object-cover"
+                    />
                   </div>
                   <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-white" />
                 </div>
@@ -268,14 +301,22 @@ export function HeroVoiceSimulator({ onTalkToSarah, onOpenCallModal }: HeroVoice
                   </div>
                   <p>{activeScenario.callerQuery}</p>
                 </div>
-                <div className="w-7 h-7 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center shrink-0">
-                  <User className="w-3.5 h-3.5" />
+                <div className="w-7 h-7 rounded-full overflow-hidden ring-1 ring-slate-300 shrink-0 shadow-2xs">
+                  <img
+                    src={`${BASE_PATH}/images/caller-buyer.jpg`}
+                    alt="Prospective buyer"
+                    className="w-full h-full object-cover"
+                  />
                 </div>
               </div>
 
               <div className="flex items-start gap-2.5">
-                <div className="w-7 h-7 rounded-full bg-slate-900 text-white flex items-center justify-center shrink-0">
-                  <Bot className="w-3.5 h-3.5" />
+                <div className="w-7 h-7 rounded-full overflow-hidden ring-1 ring-blue-500/40 shrink-0 shadow-2xs">
+                  <img
+                    src={`${BASE_PATH}/images/sarah-sales-agent.jpg`}
+                    alt="Sarah"
+                    className="w-full h-full object-cover"
+                  />
                 </div>
                 <div className="max-w-md bg-slate-50 border border-slate-200/90 rounded-2xl rounded-tl-xs px-4 py-3 text-sm leading-relaxed shadow-xs">
                   <div className="flex items-center justify-between gap-3 mb-1">
