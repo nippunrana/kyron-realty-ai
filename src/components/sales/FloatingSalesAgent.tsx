@@ -168,7 +168,7 @@ export function FloatingSalesAgent() {
   const [bookedTour, setBookedTour] = useState<BookedTourSummary | null>(null);
   const [calendarPropertyTitle, setCalendarPropertyTitle] = useState<string>("Viewing Schedule");
   const lastCalendarCueRef = useRef<string | null>(null);
-  const sendTextMessageRef = useRef<((text: string, options?: { priority?: "interrupt" | "append" }) => boolean) | null>(null);
+  const sendTextMessageRef = useRef<((text: string, options?: { priority?: "interrupted" | "append" }) => void) | null>(null);
 
   const fetchCalendarAvailability = useCallback(async (slug: string) => {
     setIsLoadingCalendar(true);
@@ -197,7 +197,7 @@ export function FloatingSalesAgent() {
               const scheduleCue = `[CALENDAR_SCHEDULE:today=${days[0].date},title=${data.propertyTitle || "Home"},days=${daySummaries.join("|")}]`;
               if (lastCalendarCueRef.current !== scheduleCue) {
                 lastCalendarCueRef.current = scheduleCue;
-                sendTextMessageRef.current(scheduleCue, { priority: "append" });
+                sendTextMessageRef.current?.(scheduleCue, { priority: "append" });
               }
             }
           }
@@ -451,12 +451,12 @@ export function FloatingSalesAgent() {
 
     if (isManagerConnected && !prevManagerConnectedRef.current) {
       prevManagerConnectedRef.current = true;
-      sendTextMessageRef.current("The property manager has joined the call. I'm here if you need me!", {
+      sendTextMessageRef.current?.("The property manager has joined the call. I'm here if you need me!", {
         priority: "append",
       });
     } else if (!isManagerConnected && prevManagerConnectedRef.current) {
       prevManagerConnectedRef.current = false;
-      sendTextMessageRef.current(
+      sendTextMessageRef.current?.(
         "Hope that was helpful! Would you like to schedule an in-person viewing or explore other listings?",
         {
           priority: "append",
@@ -600,7 +600,7 @@ export function FloatingSalesAgent() {
               // APPEND hands the queueing to the Agora gateway, which knows when her
               // interaction actually ends; the client's own speaking flag does not, because
               // it flips false during the gateway's "thinking" phase.
-              sendTextMessageRef.current(cue, { priority: "append" });
+              sendTextMessageRef.current?.(cue, { priority: "append" });
             }
           }
         }
