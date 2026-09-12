@@ -362,7 +362,9 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
             (local) => !mapped.some((remote) => remote.role === "user" && remote.text.toLowerCase() === local.text.toLowerCase())
           );
 
-          const fullList = [...mapped, ...localMessagesRef.current, ...managerMessagesRef.current];
+          const fullList = [...mapped, ...localMessagesRef.current, ...managerMessagesRef.current].sort(
+            (a, b) => (a.createdAt || 0) - (b.createdAt || 0)
+          );
 
           transcriptRef.current = fullList;
           setTranscript(fullList);
@@ -700,16 +702,22 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
 
     // Render the pending local message until remote transcript confirms it (skip synthetic system control cues like [DEPLOY_CONFIRMED])
     const isSystemCue = trimmed.startsWith("[");
-    const localMsgId = `local-text-${Date.now()}`;
+    const now = Date.now();
+    const localMsgId = `local-text-${now}`;
     if (!isSystemCue) {
       const localMsg: VoiceMessage = {
         id: localMsgId,
         role: "user",
         text: trimmed,
         timestamp: formatTimestamp(),
+        createdAt: now,
       };
       localMessagesRef.current = [...localMessagesRef.current, localMsg];
-      setTranscript([...mappedRemoteRef.current, ...localMessagesRef.current, ...managerMessagesRef.current]);
+      const fullList = [...mappedRemoteRef.current, ...localMessagesRef.current, ...managerMessagesRef.current].sort(
+        (a, b) => (a.createdAt || 0) - (b.createdAt || 0)
+      );
+      transcriptRef.current = fullList;
+      setTranscript(fullList);
     }
 
     try {
@@ -735,7 +743,9 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
       console.error("[Agora Voice Agent] Could not send text message over RTM:", sendErr);
       if (!isSystemCue) {
         localMessagesRef.current = localMessagesRef.current.filter((msg) => msg.id !== localMsgId);
-        setTranscript([...mappedRemoteRef.current, ...localMessagesRef.current]);
+        setTranscript([...mappedRemoteRef.current, ...localMessagesRef.current, ...managerMessagesRef.current].sort(
+          (a, b) => (a.createdAt || 0) - (b.createdAt || 0)
+        ));
       }
       setErrorMessage(
         `Failed to deliver message to voice agent: ${sendErr?.message || "RTM communication failure"}`
@@ -819,11 +829,14 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
         for (const item of incoming) {
           if (!seenManagerMsgIdsRef.current.has(item.id)) {
             seenManagerMsgIdsRef.current.add(item.id);
+            const rawTs = item.id.startsWith("mgr-") ? Number(item.id.split("-")[1]) : NaN;
+            const createdAt = !isNaN(rawTs) && rawTs > 0 ? rawTs : Date.now();
             const msg: VoiceMessage = {
               id: item.id,
               role: "manager",
               text: item.text,
               timestamp: item.timestamp,
+              createdAt,
             };
             managerMessagesRef.current = [...managerMessagesRef.current, msg];
             added = true;
@@ -831,7 +844,9 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
         }
 
         if (added) {
-          const fullList = [...mappedRemoteRef.current, ...localMessagesRef.current, ...managerMessagesRef.current];
+          const fullList = [...mappedRemoteRef.current, ...localMessagesRef.current, ...managerMessagesRef.current].sort(
+            (a, b) => (a.createdAt || 0) - (b.createdAt || 0)
+          );
           transcriptRef.current = fullList;
           setTranscript(fullList);
         }

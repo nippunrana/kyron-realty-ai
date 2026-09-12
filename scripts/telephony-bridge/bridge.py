@@ -132,11 +132,14 @@ class ManagerVADTranscriber:
         self.speech_buffer = bytearray()
         self.is_speaking = False
         self.silence_count = 0
-        # 33 chunks of 20ms = ~660ms of silence
-        self.silence_threshold_chunks = 33
-        self.energy_threshold = 450
-        self.min_speech_bytes = 8000 * 2 * 0.5  # at least 500ms of audio (8000 bytes)
-        self.max_buffer_bytes = 8000 * 2 * 15   # max 15 seconds
+        # 48 chunks of 20ms = ~960ms of silence pause before dispatch
+        self.silence_threshold_chunks = 48
+        # Lowered threshold to avoid prematurely cutting off unvoiced consonants and soft speech
+        self.energy_threshold = 280
+        self.hangover_chunks = 3
+        self.hangover_count = 0
+        self.min_speech_bytes = 8000 * 2 * 0.4  # at least 400ms of audio (6400 bytes)
+        self.max_buffer_bytes = 8000 * 2 * 20   # max 20 seconds for long sentences
 
     def process_pcm_frame(self, pcm_bytes: bytes):
         try:
@@ -148,15 +151,21 @@ class ManagerVADTranscriber:
             self.speech_buffer += pcm_bytes
             self.is_speaking = True
             self.silence_count = 0
+            self.hangover_count = self.hangover_chunks
             if len(self.speech_buffer) >= self.max_buffer_bytes:
                 utterance_pcm = bytes(self.speech_buffer)
                 self.speech_buffer = bytearray()
                 self.is_speaking = False
                 self.silence_count = 0
+                self.hangover_count = 0
                 asyncio.create_task(self._transcribe_and_dispatch(utterance_pcm))
         elif self.is_speaking:
             self.speech_buffer += pcm_bytes
-            self.silence_count += 1
+            if self.hangover_count > 0:
+                self.hangover_count -= 1
+            else:
+                self.silence_count += 1
+
             if self.silence_count >= self.silence_threshold_chunks:
                 if len(self.speech_buffer) >= self.min_speech_bytes:
                     utterance_pcm = bytes(self.speech_buffer)
@@ -164,6 +173,7 @@ class ManagerVADTranscriber:
                 self.speech_buffer = bytearray()
                 self.is_speaking = False
                 self.silence_count = 0
+                self.hangover_count = 0
 
     async def _transcribe_and_dispatch(self, pcm_data: bytes):
         try:
@@ -186,7 +196,13 @@ class ManagerVADTranscriber:
                 "contents": [{
                     "parts": [
                         {"inlineData": {"mimeType": "audio/wav", "data": b64_audio}},
-                        {"text": "Transcribe this phone speech accurately. Output ONLY the transcription text, nothing else. If silence, background noise, or inaudible, output empty."}
+                        {
+                            "text": (
+                                "Transcribe this phone speech accurately. The AI assistant on the call is named Sarah. "
+                                "Capture real estate terms accurately (tenant, rent, deposit, lease, amenities, maintenance, sqft). "
+                                "Output ONLY the transcription text, nothing else. If silence, background noise, or inaudible, output empty."
+                            )
+                        }
                     ]
                 }]
             }
@@ -197,7 +213,7 @@ class ManagerVADTranscriber:
                     data=json.dumps(payload).encode("utf-8"),
                     headers={"Content-Type": "application/json"},
                 )
-                with urllib.request.urlopen(req, timeout=5) as resp:
+                with urllib.request.urlopen(req, timeout=20) as resp:
                     return json.loads(resp.read().decode("utf-8"))
 
             res = await self.loop.run_in_executor(None, _sync_post)
@@ -209,6 +225,11 @@ class ManagerVADTranscriber:
             text = text.strip()
 
             if text and len(text) > 1 and not text.lower().startswith("[silence") and not text.lower().startswith("(silence"):
+                import re
+                # Normalize common phonetic mistranscriptions of Sarah
+                text = re.sub(r"^(?:sara|saari|sera|zara)\b", "Sarah", text, flags=re.IGNORECASE)
+                text = re.sub(r"\b(?:sara|saari|sera|zara)\b", "Sarah", text, flags=re.IGNORECASE)
+
                 logger.info(f"[Telephony Bridge] Transcribed manager speech for {self.channel_name}: \"{text}\"")
                 notify_manager_speech(self.channel_name, self.property_id, text)
         except Exception as e:

@@ -38,6 +38,7 @@ export interface VoiceMessage {
   role: "user" | "assistant" | "system" | "manager";
   text: string;
   timestamp: string;
+  createdAt?: number;
 }
 
 export interface UseAgoraVoiceAgentReturn {

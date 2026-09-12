@@ -64,6 +64,13 @@
       "when": 1789148696635,
       "tag": "0008_tearful_captain_marvel",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1789178686422,
+      "tag": "0009_fearless_salo",
+      "breakpoints": true
     }
   ]
 }

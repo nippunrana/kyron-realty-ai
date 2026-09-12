@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Missing channelName parameter." }, { status: 400 });
   }
 
-  const session = getManagerCallSession(channelName);
+  const session = await getManagerCallSession(channelName);
   if (!session) {
     return NextResponse.json({ active: false, status: "idle" });
   }

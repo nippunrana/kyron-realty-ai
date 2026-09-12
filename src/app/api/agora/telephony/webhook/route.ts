@@ -150,7 +150,7 @@ async function handleWebhook(req: NextRequest) {
       }
 
       if (callStatus === "no-answer" || callStatus === "busy" || callStatus === "failed") {
-        updateManagerCallSession(channelName, "no_answer");
+        await updateManagerCallSession(channelName, "no_answer");
       }
 
       return NextResponse.json({ ok: true });

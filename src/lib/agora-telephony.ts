@@ -4,7 +4,7 @@
  * Facilitates 3-way conference bridging between prospect and property manager.
  */
 import { db } from "@/db";
-import { properties, inquiriesAndLeads, users } from "@/db/schema";
+import { properties, inquiriesAndLeads, users, voiceSessions } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { BASE_PATH } from "@/lib/base-path";
 import { generateAgoraRtcToken } from "@/lib/agora-token";
@@ -202,6 +202,19 @@ export async function dialPropertyManager(
       createdAt: Date.now(),
     });
 
+    try {
+      await db
+        .update(voiceSessions)
+        .set({
+          telephonyStatus: "dialing",
+          telephonyCallSid: callSid,
+          managerTranscripts: [],
+        })
+        .where(eq(voiceSessions.channelName, channelName));
+    } catch (dbErr) {
+      console.warn("[Agora Telephony] DB session dial status update warning:", dbErr);
+    }
+
     return {
       success: true,
       status: "dialing",
@@ -218,13 +231,45 @@ export async function dialPropertyManager(
   }
 }
 
-/** Returns the active session associated with an Agora channel */
-export function getManagerCallSession(channelName: string): ManagerCallSession | null {
-  return activeCalls.get(channelName) || null;
+/** Returns the active session associated with an Agora channel (backed by DB for cluster sync) */
+export async function getManagerCallSession(channelName: string): Promise<ManagerCallSession | null> {
+  const memSession = activeCalls.get(channelName);
+  try {
+    const [row] = await db
+      .select({
+        telephonyStatus: voiceSessions.telephonyStatus,
+        telephonyCallSid: voiceSessions.telephonyCallSid,
+        managerTranscripts: voiceSessions.managerTranscripts,
+        propertyId: voiceSessions.propertyId,
+        startedAt: voiceSessions.startedAt,
+      })
+      .from(voiceSessions)
+      .where(eq(voiceSessions.channelName, channelName))
+      .limit(1);
+
+    if (row && row.telephonyStatus && row.telephonyStatus !== "idle") {
+      const dbTranscripts = Array.isArray(row.managerTranscripts) ? row.managerTranscripts : [];
+      return {
+        callSid: row.telephonyCallSid || memSession?.callSid || "",
+        propertyId: row.propertyId || memSession?.propertyId || 0,
+        channelName,
+        prospectName: memSession?.prospectName,
+        managerPhone: memSession?.managerPhone || "",
+        propertyTitle: memSession?.propertyTitle || "",
+        status: (row.telephonyStatus as ManagerCallSession["status"]) || memSession?.status || "connected",
+        createdAt: row.startedAt ? row.startedAt.getTime() : memSession?.createdAt || Date.now(),
+        transcripts: dbTranscripts.length > 0 ? dbTranscripts : (memSession?.transcripts || []),
+      };
+    }
+  } catch (dbErr) {
+    console.warn("[Agora Telephony] DB get session warning:", dbErr);
+  }
+
+  return memSession || null;
 }
 
-/** Updates the status of an ongoing call session */
-export function updateManagerCallSession(
+/** Updates the status of an ongoing call session across memory and DB */
+export async function updateManagerCallSession(
   channelName: string,
   status: ManagerCallSession["status"]
 ) {
@@ -233,26 +278,59 @@ export function updateManagerCallSession(
     session.status = status;
     activeCalls.set(channelName, session);
   }
+  try {
+    await db
+      .update(voiceSessions)
+      .set({ telephonyStatus: status })
+      .where(eq(voiceSessions.channelName, channelName));
+  } catch (dbErr) {
+    console.warn("[Agora Telephony] DB session status update warning:", dbErr);
+  }
 }
 
-export function addManagerTranscript(channelName: string, text: string): ManagerTranscriptItem | null {
-  const session = activeCalls.get(channelName);
-  if (!session) return null;
-
-  if (!session.transcripts) {
-    session.transcripts = [];
-  }
+export async function addManagerTranscript(channelName: string, text: string): Promise<ManagerTranscriptItem | null> {
+  const cleanText = text.trim();
+  if (!cleanText) return null;
 
   const item: ManagerTranscriptItem = {
     id: `mgr-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    text: text.trim(),
+    text: cleanText,
     timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
   };
 
-  session.transcripts.push(item);
-  if (session.transcripts.length > 50) {
-    session.transcripts.shift();
+  const session = activeCalls.get(channelName);
+  if (session) {
+    if (!session.transcripts) {
+      session.transcripts = [];
+    }
+    session.transcripts.push(item);
+    if (session.transcripts.length > 50) {
+      session.transcripts.shift();
+    }
   }
+
+  // Persist to PostgreSQL database so all cluster workers have immediate visibility
+  try {
+    const [row] = await db
+      .select({ transcripts: voiceSessions.managerTranscripts })
+      .from(voiceSessions)
+      .where(eq(voiceSessions.channelName, channelName))
+      .limit(1);
+
+    const existing: ManagerTranscriptItem[] = Array.isArray(row?.transcripts) ? row.transcripts : [];
+    const updated = [...existing, item];
+    if (updated.length > 50) {
+      updated.shift();
+    }
+
+    await db
+      .update(voiceSessions)
+      .set({ managerTranscripts: updated })
+      .where(eq(voiceSessions.channelName, channelName));
+  } catch (dbErr) {
+    console.warn("[Agora Telephony] DB transcript append warning:", dbErr);
+  }
+
   return item;
 }
 

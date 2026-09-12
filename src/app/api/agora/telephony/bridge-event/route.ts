@@ -23,8 +23,16 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true, skipped: "empty" });
       }
 
-      // Record transcript item for frontend retrieval
-      const item = addManagerTranscript(channelName, text);
+      // Record transcript item for frontend retrieval (persisted to DB for PM2 cluster sync)
+      const item = await addManagerTranscript(channelName, text);
+
+      // Normalize phonetic mistranscriptions of Sarah (e.g. Sara, Saari)
+      const normalizedText = text
+        .replace(/^(?:sara|saari|sera|zara)\b/gi, "Sarah")
+        .replace(/\b(?:sara|saari|sera|zara)\b/gi, "Sarah");
+
+      const isAddressingSarah = /\bsarah\b/i.test(normalizedText);
+      const priority = isAddressingSarah ? "INTERRUPTED" : "APPEND";
 
       // Relay to running Agora Conversational AI Agent via /think REST API
       try {
@@ -41,10 +49,13 @@ export async function POST(req: NextRequest) {
           .limit(1);
 
         if (voiceSession?.agoraSessionId) {
+          const instructionText = `Property Manager: ${normalizedText}`;
+          console.log(`[Bridge Event] Relaying to agent (${priority}): "${instructionText}"`);
           await sendAgoraAgentInstruction(
             voiceSession.agoraSessionId,
             channelName,
-            `Property Manager: ${text}`
+            instructionText,
+            priority
           );
         }
       } catch (thinkErr) {
@@ -55,7 +66,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (event === "connected") {
-      updateManagerCallSession(channelName, "connected");
+      await updateManagerCallSession(channelName, "connected");
 
       // Transition Sarah's prompt to Passive Observer Mode
       if (propertyId) {
@@ -123,7 +134,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (event === "disconnected") {
-      updateManagerCallSession(channelName, "completed");
+      await updateManagerCallSession(channelName, "completed");
 
       // Revert Sarah's prompt back to active Property Sales Mode
       if (propertyId) {

@@ -34,6 +34,7 @@ export function mapTranscriptionsToMessages(
         role: fromUser ? "user" : "assistant",
         text,
         timestamp: formatTimestamp(item._time || undefined),
+        createdAt: typeof item._time === "number" ? item._time : Date.now(),
       };
     });
 }

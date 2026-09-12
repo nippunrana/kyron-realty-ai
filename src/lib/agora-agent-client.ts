@@ -132,7 +132,8 @@ export async function updateAgoraAgentPrompt(
 export async function sendAgoraAgentInstruction(
   sessionId: string,
   channelName: string,
-  instruction: string
+  instruction: string,
+  priority: "INTERRUPTED" | "APPEND" = "APPEND"
 ): Promise<boolean> {
   const appId = getAgoraAppId();
   const authHeader = buildAgoraCloudAuthHeader(channelName);
@@ -151,7 +152,7 @@ export async function sendAgoraAgentInstruction(
       },
       body: JSON.stringify({
         instruction,
-        priority: "APPEND",
+        priority,
       }),
     });
 

@@ -203,6 +203,14 @@ export const voiceSessions = pgTable("voice_sessions", {
   sentimentAnalysis: text("sentiment_analysis"),
   status: text("status").default("active"),
   
+  telephonyStatus: text("telephony_status").default("idle"),
+  telephonyCallSid: text("telephony_call_sid"),
+  managerTranscripts: jsonb("manager_transcripts").$type<Array<{
+    id: string;
+    text: string;
+    timestamp: string;
+  }>>().default([]),
+
   startedAt: timestamp("started_at").defaultNow().notNull(),
   endedAt: timestamp("ended_at"),
 });
