@@ -20,7 +20,9 @@ import { startFrequencyVisualizer } from "./audio-visualizer";
 import {
   detectAssistantModalIntent,
   detectAssistantSearchIntent,
+  detectAssistantCalendarDateIntent,
   detectUserModalIntent,
+  detectUserCalendarDateIntent,
   parseOpenPropertyTag,
   parseCalendarSelectDateTag,
   parseBookTourTag,
@@ -402,6 +404,13 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
                   onUIActionRef.current?.(intent);
                 }
 
+                // Fast verbal calendar date intent matching
+                const userCalendarDate = detectUserCalendarDateIntent(spokenText);
+                if (userCalendarDate) {
+                  onLogEventRef.current?.("INTENT", `Detected User Calendar Date Intent: ${userCalendarDate}`, { text: spokenText });
+                  onCalendarSelectDateRef.current?.(userCalendarDate);
+                }
+
                 // Immediate parallel extraction: Run Gemini while Elena begins speaking
                 setTimeout(() => {
                   triggerTurnExtraction();
@@ -456,8 +465,8 @@ export function useAgoraVoiceAgent(options?: UseAgoraVoiceAgentOptions): UseAgor
                 }
               }
 
-              // Assistant calendar date selection: silent [CALENDAR_SELECT_DATE:YYYY-MM-DD] tag
-              const selectedDate = parseCalendarSelectDateTag(spokenText);
+              // Assistant calendar date selection: silent [CALENDAR_SELECT_DATE:...] tag or spoken fallback
+              const selectedDate = parseCalendarSelectDateTag(spokenText) || detectAssistantCalendarDateIntent(spokenText);
               if (selectedDate) {
                 const turnId = item.turn_id !== undefined ? String(item.turn_id) : spokenText.slice(0, 40).toLowerCase();
                 const dateKey = `assistant_calendar_date_${turnId}_${selectedDate}`;

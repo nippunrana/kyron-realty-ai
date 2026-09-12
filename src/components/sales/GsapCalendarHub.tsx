@@ -15,6 +15,7 @@ import {
   CalendarDays,
 } from "lucide-react";
 import type { CalendarDayAvailability } from "@/lib/calendar-service";
+import { resolveDateFromDays } from "@/hooks/voice-intents";
 
 export interface BookedTourSummary {
   propertyTitle: string;
@@ -51,9 +52,10 @@ export function GsapCalendarHub({
   const slotListRef = useRef<HTMLDivElement>(null);
   const successCardRef = useRef<HTMLDivElement>(null);
 
-  // Active day lookup
+  // Active day lookup with relative fallback
+  const resolvedDate = selectedDate ? resolveDateFromDays(selectedDate, days) || selectedDate : null;
   const activeDay =
-    days.find((d) => d.date === selectedDate) || days[0] || null;
+    days.find((d) => d.date === resolvedDate) || days[0] || null;
 
   // Stagger animate slots when active day changes
   useEffect(() => {
@@ -73,7 +75,7 @@ export function GsapCalendarHub({
         }
       );
     }
-  }, [selectedDate, isOpen, bookedTour]);
+  }, [selectedDate, resolvedDate, isOpen, bookedTour]);
 
   // Animate celebratory confirmation card
   useEffect(() => {

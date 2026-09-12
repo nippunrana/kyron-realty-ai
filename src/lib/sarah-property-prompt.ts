@@ -166,15 +166,34 @@ function renderEscalation(facts: PropertyPromptFacts): string {
 
 function renderCalendarInstructions(hasCalendarAccess?: boolean): string {
   if (hasCalendarAccess) {
+    const now = new Date();
+    const todayStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(now);
+    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const tomorrowStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(tomorrow);
+    const todayLabel = new Intl.DateTimeFormat("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      timeZone: "Asia/Kolkata",
+    }).format(now);
+    const tomorrowLabel = new Intl.DateTimeFormat("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      timeZone: "Asia/Kolkata",
+    }).format(tomorrow);
+
     return `LIVE GOOGLE CALENDAR & 1-HOUR TOUR BOOKING:
+- Current Date Reference (Asia/Kolkata): Today is ${todayLabel} (${todayStr}). Tomorrow is ${tomorrowLabel} (${tomorrowStr}).
 - Touring working hours are 10:00 AM to 6:00 PM IST daily. All tours are 1-hour private slots.
 - When the caller asks about viewing the home or scheduling a visit:
   1. Tell them you can bring up the touring calendar right on their screen, and emit the silent tag: [UI:OPEN_CALENDAR]
   2. Ask what day they prefer (e.g. "What day works best for you - today, tomorrow, or later this week?").
-  3. When they mention a specific day or date (e.g. "Friday", "tomorrow", "this weekend"), emit: [CALENDAR_SELECT_DATE:YYYY-MM-DD] to highlight that day's open slots on their screen, and verbally propose 1 or 2 available 1-hour slots.
+  3. When they mention a specific day or date (e.g. "Friday", "tomorrow", "this weekend"), emit: [CALENDAR_SELECT_DATE:YYYY-MM-DD] using the exact YYYY-MM-DD matching that day to highlight that day's open slots on their screen, and verbally propose 1 or 2 available 1-hour slots.
   4. When they pick an open slot (e.g. "3 PM works for me"), ask for their full name and best phone number (and mention email is optional if they would like a Google Calendar invite sent to them).
   5. Once they provide name and phone, emit: [BOOK_TOUR:date=YYYY-MM-DD,time=HH:00,name=...,phone=...,email=...]
   6. When you receive the background cue [TOUR_BOOKED:date=...,time=...,name=...], confirm warmly that their tour is officially confirmed and added to the property manager's Google Calendar!
+- NOTE ON [CALENDAR_SCHEDULE:...]: When the calendar loads, the screen sends you a background [CALENDAR_SCHEDULE:today=...,days=...] cue detailing the exact dates and open slot times. Use these real slots when suggesting times. Never read the cue aloud.
 - If a requested time is already booked or outside 10:00 AM - 6:00 PM IST, politely let them know and offer the nearest available slot.`;
   }
   return `VIEWING REQUESTS (CALENDAR UNLINKED):
@@ -313,7 +332,7 @@ ${renderCalendarInstructions(facts.hasCalendarAccess)}
 
 YOUR CUE TO SPEAK: a message reading [PROPERTY_OPENED:title=...,mode=...,verdict=...] means this page has just finished opening on the caller's screen. That is your signal to speak the opening beat described above. Never read the cue aloud, never mention it, and never repeat its contents back.
 
-NOTE ON THIS CALL'S HISTORY: earlier messages may contain [SEARCH_RESULT:...], [OPEN_PROPERTY:...], [TOUR_BOOKED:...], [MANAGER_CONNECTED:...], or [MANAGER_UNAVAILABLE:...] signals from the interface. Those were screen instructions, not things the caller said. Never read them aloud or refer to them.
+NOTE ON THIS CALL'S HISTORY: earlier messages may contain [SEARCH_RESULT:...], [OPEN_PROPERTY:...], [CALENDAR_SCHEDULE:...], [TOUR_BOOKED:...], [MANAGER_CONNECTED:...], or [MANAGER_UNAVAILABLE:...] signals from the interface. Those were screen instructions, not things the caller said. Never read them aloud or refer to them.
 `.trim();
 
   return { greeting: COLD_START_GREETING, systemPrompt };

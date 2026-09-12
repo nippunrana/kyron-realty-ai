@@ -7,7 +7,7 @@ import type { UIAction, ParsedSearchTag, ParsedBookTourTag, ParsedCallManagerTag
  * signal - the spoken-language patterns below are the fallback for a turn without one.
  */
 const UI_TAG = /\[\s*UI\s*:\s*([A-Z_]+)\s*\]/gi;
-const CONTROL_TAG = /\[\s*(UI|SEARCH|SEARCH_RESULT|OPEN_PROPERTY|PROPERTY_OPENED|CALENDAR_SELECT_DATE|BOOK_TOUR|TOUR_BOOKED|CALL_MANAGER|MANAGER_CONNECTED|MANAGER_DISCONNECTED|MANAGER_UNAVAILABLE)\s*:[^\]]+\]/gi;
+const CONTROL_TAG = /\[\s*(UI|SEARCH|SEARCH_RESULT|OPEN_PROPERTY|PROPERTY_OPENED|CALENDAR_SELECT_DATE|CALENDAR_SCHEDULE|BOOK_TOUR|TOUR_BOOKED|CALL_MANAGER|MANAGER_CONNECTED|MANAGER_DISCONNECTED|MANAGER_UNAVAILABLE)\s*:[^\]]+\]/gi;
 
 const TAG_ACTIONS: Record<string, UIAction> = {
   OPEN_CORE: "open_core_modal",
@@ -95,15 +95,140 @@ export function parseOpenPropertyTag(text: string): number | null {
   return index > 0 ? index : null;
 }
 
+export interface CalendarDayLookup {
+  date: string;
+  dayName?: string;
+  formattedDate?: string;
+  fullDayLabel?: string;
+}
+
+/**
+ * Resolves a date string or relative speech term ("today", "tomorrow", "Friday", "Sep 13", "2026-09-13")
+ * to an exact ISO YYYY-MM-DD date matching one of the loaded calendar days.
+ */
+export function resolveDateFromDays(query: string, days: CalendarDayLookup[]): string | null {
+  if (!query || !days || days.length === 0) return null;
+  const q = query.trim().toLowerCase();
+
+  // 1. Exact ISO match (e.g. "2026-09-13")
+  const isoMatch = q.match(/\b\d{4}-\d{2}-\d{2}\b/);
+  if (isoMatch) {
+    const found = days.find((d) => d.date === isoMatch[0]);
+    if (found) return found.date;
+  }
+  const exact = days.find((d) => d.date.toLowerCase() === q);
+  if (exact) return exact.date;
+
+  // 2. Relative "today" (first day in schedule)
+  if (q === "today" || /\btoday\b/i.test(q)) {
+    const todayDay = days.find((d) => d.dayName?.toLowerCase() === "today") || days[0];
+    return todayDay ? todayDay.date : null;
+  }
+
+  // 3. Relative "day after tomorrow" (checked before "tomorrow")
+  if (/\bday after tomorrow\b/i.test(q)) {
+    if (days.length > 2) return days[2].date;
+  }
+
+  // 4. Relative "tomorrow" (second day in schedule)
+  if (q === "tomorrow" || /\btomorrow\b/i.test(q)) {
+    const tomorrowDay = days.find((d) => d.dayName?.toLowerCase() === "tomorrow") || days[1] || days[0];
+    return tomorrowDay ? tomorrowDay.date : null;
+  }
+
+  // 5. Day names (e.g. "friday", "fri", "mon", "monday")
+  const dayNames = [
+    { full: "monday", short: "mon" },
+    { full: "tuesday", short: "tue" },
+    { full: "wednesday", short: "wed" },
+    { full: "thursday", short: "thu" },
+    { full: "friday", short: "fri" },
+    { full: "saturday", short: "sat" },
+    { full: "sunday", short: "sun" },
+  ];
+
+  for (const dn of dayNames) {
+    const regex = new RegExp(`\\b(${dn.full}|${dn.short})\\b`, "i");
+    if (regex.test(q)) {
+      const match = days.find(
+        (d) =>
+          d.dayName?.toLowerCase() === dn.full ||
+          d.dayName?.toLowerCase() === dn.short ||
+          d.fullDayLabel?.toLowerCase().includes(dn.full) ||
+          d.fullDayLabel?.toLowerCase().includes(dn.short)
+      );
+      if (match) return match.date;
+    }
+  }
+
+  // 6. Month + Day (e.g. "sep 13", "september 13th", "sep 14")
+  const monthDayMatch = q.match(
+    /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\s+(\d{1,2})(?:st|nd|rd|th)?\b/i
+  );
+  if (monthDayMatch) {
+    const monthPrefix = monthDayMatch[1].toLowerCase().slice(0, 3);
+    const dayNum = parseInt(monthDayMatch[2], 10);
+    const match = days.find((d) => {
+      const fd = (d.formattedDate || d.fullDayLabel || "").toLowerCase();
+      return fd.includes(monthPrefix) && fd.includes(String(dayNum));
+    });
+    if (match) return match.date;
+  }
+
+  return null;
+}
+
 const CALENDAR_SELECT_DATE_TAG = /\[\s*CALENDAR_SELECT_DATE\s*:\s*([^\]]+)\]/i;
 
-/** Extracts date string (YYYY-MM-DD) from [CALENDAR_SELECT_DATE:YYYY-MM-DD]. */
+/** Extracts date string or relative term (YYYY-MM-DD, "tomorrow", "Friday") from [CALENDAR_SELECT_DATE:...]. */
 export function parseCalendarSelectDateTag(text: string): string | null {
   const match = text.match(CALENDAR_SELECT_DATE_TAG);
   if (!match) return null;
   const raw = match[1].trim();
   const dateMatch = raw.match(/(\d{4}-\d{2}-\d{2})/);
   return dateMatch ? dateMatch[1] : raw;
+}
+
+const TARGET_DAYS =
+  "(?:today|tomorrow|day after tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\\s+\\d{1,2}|\\d{4}-\\d{2}-\\d{2})";
+
+const ASSISTANT_CALENDAR_DATE_SPOKEN_1 = new RegExp(
+  `(?:let me\\s+)?(?:switch|switched|switching|change|changed|changing|move|moved|moving|flip|flipping|turn|bring up)\\b[\\s\\S]{0,40}?\\b(?:to|for|on)\\s+(${TARGET_DAYS})`,
+  "i"
+);
+
+const ASSISTANT_CALENDAR_DATE_SPOKEN_2 = new RegExp(
+  `(?:let'?s\\s+)?(?:look at|check|checking|see|open|show|showing)\\b[\\s\\S]{0,30}?\\b(${TARGET_DAYS})`,
+  "i"
+);
+
+/** Detects spoken assistant date switching phrases like "Let me switch the calendar to tomorrow for you" or "Let's look at Friday." */
+export function detectAssistantCalendarDateIntent(text: string): string | null {
+  const m1 = text.match(ASSISTANT_CALENDAR_DATE_SPOKEN_1);
+  if (m1) return m1[1].trim();
+  const m2 = text.match(ASSISTANT_CALENDAR_DATE_SPOKEN_2);
+  if (m2) return m2[1].trim();
+  return null;
+}
+
+const USER_CALENDAR_DATE_SPOKEN_1 =
+  /(?:can you\s+)?(?:switch|show|change|open|move|display|look at|check|go to)\b[\s\S]{0,40}?\b(?:calendar|schedule|slots|it)?\b[\s\S]{0,20}?\b(?:to|for|on)\s+(today|tomorrow|day after tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\s+\d{1,2}|\d{4}-\d{2}-\d{2})/i;
+
+const USER_CALENDAR_DATE_SPOKEN_2 =
+  /(?:what about|how about|is|can we do)\s+(today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i;
+
+const USER_CALENDAR_DATE_SPOKEN_3 =
+  /(?:switch to|show me|show|open|check|look at)\s+(today|tomorrow|day after tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)(?:'?s\s+(?:calendar|schedule|slots))?/i;
+
+/** Detects user speech asking to view/switch a specific calendar day (e.g. "Can you show it for tomorrow?"). */
+export function detectUserCalendarDateIntent(text: string): string | null {
+  const m1 = text.match(USER_CALENDAR_DATE_SPOKEN_1);
+  if (m1) return m1[1].trim();
+  const m3 = text.match(USER_CALENDAR_DATE_SPOKEN_3);
+  if (m3) return m3[1].trim();
+  const m2 = text.match(USER_CALENDAR_DATE_SPOKEN_2);
+  if (m2) return m2[1].trim();
+  return null;
 }
 
 const BOOK_TOUR_TAG = /\[\s*BOOK_TOUR\s*:\s*([^\]]+)\]/i;
@@ -208,7 +333,7 @@ export function detectAssistantSearchIntent(text: string): ParsedSearchTag | nul
 
 /** Removes screen-control and search tags so they never reach the owner's transcript or extractors. */
 export function stripUITags(text: string): string {
-  if (!/\[\s*(UI|SEARCH|SEARCH_RESULT|OPEN_PROPERTY|PROPERTY_OPENED|CALENDAR_SELECT_DATE|BOOK_TOUR|TOUR_BOOKED|CALL_MANAGER|MANAGER_CONNECTED|MANAGER_UNAVAILABLE)\s*:/i.test(text)) return text;
+  if (!/\[\s*(UI|SEARCH|SEARCH_RESULT|OPEN_PROPERTY|PROPERTY_OPENED|CALENDAR_SELECT_DATE|CALENDAR_SCHEDULE|BOOK_TOUR|TOUR_BOOKED|CALL_MANAGER|MANAGER_CONNECTED|MANAGER_DISCONNECTED|MANAGER_UNAVAILABLE)\s*:/i.test(text)) return text;
   return text
     .replace(CONTROL_TAG, "")
     .replace(/\s+([.,!?;:])/g, "$1")

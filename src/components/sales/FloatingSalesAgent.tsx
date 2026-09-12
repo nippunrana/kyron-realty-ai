@@ -11,6 +11,7 @@ import { GsapSearchHub, type SearchHubProperty } from "./GsapSearchHub";
 import { GsapCalendarHub, type BookedTourSummary } from "./GsapCalendarHub";
 import type { CalendarDayAvailability, PropertyAvailabilityResult } from "@/lib/calendar-service";
 import { emptyJourney, type SalesJourney } from "@/lib/sales-journey";
+import { resolveDateFromDays, detectUserCalendarDateIntent } from "@/hooks/voice-intents";
 import { SalesDialogueStream } from "./SalesDialogueStream";
 import {
   Mic,
@@ -159,9 +160,15 @@ export function FloatingSalesAgent() {
   const [isCalendarHubOpen, setIsCalendarHubOpen] = useState(false);
   const [isLoadingCalendar, setIsLoadingCalendar] = useState(false);
   const [calendarDays, setCalendarDays] = useState<CalendarDayAvailability[]>([]);
+  const calendarDaysRef = useRef<CalendarDayAvailability[]>([]);
+  useEffect(() => {
+    calendarDaysRef.current = calendarDays;
+  }, [calendarDays]);
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<string | null>(null);
   const [bookedTour, setBookedTour] = useState<BookedTourSummary | null>(null);
   const [calendarPropertyTitle, setCalendarPropertyTitle] = useState<string>("Viewing Schedule");
+  const lastCalendarCueRef = useRef<string | null>(null);
+  const sendTextMessageRef = useRef<((text: string, options?: { priority?: "interrupt" | "append" }) => boolean) | null>(null);
 
   const fetchCalendarAvailability = useCallback(async (slug: string) => {
     setIsLoadingCalendar(true);
@@ -170,10 +177,29 @@ export function FloatingSalesAgent() {
       if (res.ok) {
         const data = (await res.json()) as PropertyAvailabilityResult;
         if (data.hasCalendar) {
-          setCalendarDays(data.days || []);
+          const days = data.days || [];
+          setCalendarDays(days);
+          calendarDaysRef.current = days;
           setCalendarPropertyTitle(data.propertyTitle || "Viewing Schedule");
-          if (data.days?.length > 0) {
-            setSelectedCalendarDate((prev) => prev || data.days[0].date);
+          if (days.length > 0) {
+            setSelectedCalendarDate((prev) => prev || days[0].date);
+
+            // Re-sync schedule back to Sarah over Agora RTM so she has exact date & slot awareness
+            if (sendTextMessageRef.current) {
+              const daySummaries = days.map((d) => {
+                const openSlots = d.slots
+                  .filter((s) => s.isAvailable)
+                  .map((s) => s.time)
+                  .slice(0, 4)
+                  .join(",");
+                return `${d.dayName}:${d.date}(${d.availableCount} open${openSlots ? ` - ${openSlots}` : ""})`;
+              });
+              const scheduleCue = `[CALENDAR_SCHEDULE:today=${days[0].date},title=${data.propertyTitle || "Home"},days=${daySummaries.join("|")}]`;
+              if (lastCalendarCueRef.current !== scheduleCue) {
+                lastCalendarCueRef.current = scheduleCue;
+                sendTextMessageRef.current(scheduleCue, { priority: "append" });
+              }
+            }
           }
         }
       }
@@ -246,14 +272,16 @@ export function FloatingSalesAgent() {
       router.push(`/listings/${target.slug}`);
     },
     onCalendarSelectDate: (date) => {
-      setSelectedCalendarDate(date);
+      const resolved = resolveDateFromDays(date, calendarDaysRef.current);
+      setSelectedCalendarDate(resolved || date);
     },
     onBookTourRequest: async (booking) => {
       const slug = getListingSlug(pathname);
-      if (!slug || !booking.date || !booking.time) return;
+      const resolvedDate = resolveDateFromDays(booking.date || "", calendarDaysRef.current) || booking.date;
+      if (!slug || !resolvedDate || !booking.time) return;
 
       const callerTurns = transcript.reduce((n, m) => (m.role === "user" ? n + 1 : n), 0);
-      const bookKey = `book_${callerTurns}_${booking.date}_${booking.time}_${booking.name || ""}`;
+      const bookKey = `book_${callerTurns}_${resolvedDate}_${booking.time}_${booking.name || ""}`;
       if (processedSearchTurnsRef.current.has(bookKey)) return;
       processedSearchTurnsRef.current.add(bookKey);
 
@@ -262,7 +290,7 @@ export function FloatingSalesAgent() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            date: booking.date,
+            date: resolvedDate,
             time: booking.time,
             attendeeName: booking.name,
             attendeePhone: booking.phone,
@@ -276,7 +304,7 @@ export function FloatingSalesAgent() {
           const result = await res.json();
           setBookedTour({
             propertyTitle: result.summary?.propertyTitle || calendarPropertyTitle,
-            date: result.summary?.date || booking.date,
+            date: result.summary?.date || resolvedDate,
             time: result.summary?.time || booking.time,
             attendeeName: result.summary?.attendeeName || booking.name || "Guest",
             attendeePhone: result.summary?.attendeePhone || booking.phone || "",
@@ -290,7 +318,7 @@ export function FloatingSalesAgent() {
 
           // Report back to Sarah with APPEND priority so she finishes her sentence before confirming
           sendTextMessage(
-            `[TOUR_BOOKED:date=${booking.date},time=${booking.time},name=${booking.name || "Guest"}]`,
+            `[TOUR_BOOKED:date=${resolvedDate},time=${booking.time},name=${booking.name || "Guest"}]`,
             { priority: "append" }
           );
         }
@@ -369,6 +397,18 @@ export function FloatingSalesAgent() {
       // Silent on a listing page: "does it have three bedrooms?" is a question about the home
       // on screen, and answering it with a search would drop the hub's overlay over that home.
       const lastMsg = currentTranscript[currentTranscript.length - 1];
+
+      // Calendar fast-path: if the calendar hub is open and user speech specifies a day/date, switch immediately.
+      if (isCalendarHubOpen && lastMsg && lastMsg.role === "user" && lastMsg.text) {
+        const detectedTarget = detectUserCalendarDateIntent(lastMsg.text);
+        if (detectedTarget) {
+          const resolved = resolveDateFromDays(detectedTarget, calendarDaysRef.current);
+          if (resolved) {
+            setSelectedCalendarDate(resolved);
+          }
+        }
+      }
+
       if (!getListingSlug(pathname) && lastMsg && lastMsg.role === "user" && lastMsg.text) {
         const cityMatch = lastMsg.text.match(/\b(faridabad|delhi|gurugram|gurgaon|noida|bangalore|bengaluru|mumbai|pune|hyderabad|chennai|kolkata)\b/i);
         const isRefinementIntent = /\b(pet|pets|bhk|bedroom|rent|sale|clear filter|reset filter)\b/i.test(lastMsg.text);
@@ -397,7 +437,6 @@ export function FloatingSalesAgent() {
     transcriptRef.current = transcript;
   }, [transcript]);
 
-  const sendTextMessageRef = useRef(sendTextMessage);
   useEffect(() => {
     sendTextMessageRef.current = sendTextMessage;
   }, [sendTextMessage]);

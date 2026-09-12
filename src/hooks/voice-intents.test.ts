@@ -9,11 +9,14 @@ import { buildOwnerOnboardingPrompt } from "../lib/elena-prompt.ts";
 import {
   detectAssistantModalIntent,
   detectAssistantSearchIntent,
+  detectAssistantCalendarDateIntent,
   detectUserModalIntent,
+  detectUserCalendarDateIntent,
   parseOpenPropertyTag,
   parseCalendarSelectDateTag,
   parseBookTourTag,
   parseCallManagerTag,
+  resolveDateFromDays,
   stripUITags,
 } from "./voice-intents.ts";
 
@@ -354,6 +357,60 @@ describe("calendar hub open, close, and booking intents", () => {
     );
   });
 
+  test("parseCalendarSelectDateTag extracts relative terms like tomorrow", () => {
+    assert.equal(
+      parseCalendarSelectDateTag("Let me switch that [CALENDAR_SELECT_DATE:tomorrow]"),
+      "tomorrow"
+    );
+  });
+
+  test("resolveDateFromDays correctly maps relative terms and day names", () => {
+    const mockDays = [
+      { date: "2026-09-12", dayName: "Today", formattedDate: "Sep 12", fullDayLabel: "Today, Sat, Sep 12" },
+      { date: "2026-09-13", dayName: "Tomorrow", formattedDate: "Sep 13", fullDayLabel: "Tomorrow, Sun, Sep 13" },
+      { date: "2026-09-14", dayName: "Mon", formattedDate: "Sep 14", fullDayLabel: "Mon, Sep 14" },
+      { date: "2026-09-15", dayName: "Tue", formattedDate: "Sep 15", fullDayLabel: "Tue, Sep 15" },
+      { date: "2026-09-16", dayName: "Wed", formattedDate: "Sep 16", fullDayLabel: "Wed, Sep 16" },
+      { date: "2026-09-17", dayName: "Thu", formattedDate: "Sep 17", fullDayLabel: "Thu, Sep 17" },
+      { date: "2026-09-18", dayName: "Fri", formattedDate: "Sep 18", fullDayLabel: "Fri, Sep 18" },
+    ];
+
+    assert.equal(resolveDateFromDays("today", mockDays), "2026-09-12");
+    assert.equal(resolveDateFromDays("tomorrow", mockDays), "2026-09-13");
+    assert.equal(resolveDateFromDays("day after tomorrow", mockDays), "2026-09-14");
+    assert.equal(resolveDateFromDays("monday", mockDays), "2026-09-14");
+    assert.equal(resolveDateFromDays("friday", mockDays), "2026-09-18");
+    assert.equal(resolveDateFromDays("Sep 13", mockDays), "2026-09-13");
+    assert.equal(resolveDateFromDays("2026-09-15", mockDays), "2026-09-15");
+    assert.equal(resolveDateFromDays("unknown", mockDays), null);
+  });
+
+  test("detectAssistantCalendarDateIntent captures spoken date change phrases", () => {
+    assert.equal(
+      detectAssistantCalendarDateIntent("Let me switch the calendar to tomorrow for you."),
+      "tomorrow"
+    );
+    assert.equal(
+      detectAssistantCalendarDateIntent("Let's look at Friday."),
+      "Friday"
+    );
+  });
+
+  test("detectUserCalendarDateIntent captures user speech requests", () => {
+    assert.equal(
+      detectUserCalendarDateIntent("The calendar is showing for today. Can you show it for tomorrow?"),
+      "tomorrow"
+    );
+    assert.equal(
+      detectUserCalendarDateIntent("Can you show tomorrow?"),
+      "tomorrow"
+    );
+    assert.equal(
+      detectUserCalendarDateIntent("Switch to Friday"),
+      "Friday"
+    );
+  });
+
   test("parseBookTourTag extracts booking parameters", () => {
     const tag = "Reserving that slot! [BOOK_TOUR:date=2026-09-18,time=15:00,name=Alex Kumar,phone=9876543210,email=alex@example.com]";
     const parsed = parseBookTourTag(tag);
@@ -381,6 +438,10 @@ describe("calendar hub open, close, and booking intents", () => {
     );
     assert.equal(
       stripUITags("[TOUR_BOOKED:date=2026-09-18,time=15:00,name=Alex]"),
+      ""
+    );
+    assert.equal(
+      stripUITags("[CALENDAR_SCHEDULE:today=2026-09-12,title=Mohan Tower,days=Today:2026-09-12|Tomorrow:2026-09-13]"),
       ""
     );
   });
