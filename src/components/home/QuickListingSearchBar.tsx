@@ -111,7 +111,7 @@ export function QuickListingSearchBar() {
       {/* Micro-hint */}
       <div className="flex items-center justify-center gap-2 mt-2.5 text-[11px] text-slate-500">
         <Sparkles className="w-3 h-3 text-indigo-500" />
-        <span>Every listing features an interactive commute map & 24/7 AI Voice concierge</span>
+        <span>Every listing shows real travel times — and answers its own calls, at any hour</span>
       </div>
     </div>
   );

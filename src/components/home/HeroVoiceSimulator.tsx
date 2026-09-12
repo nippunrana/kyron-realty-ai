@@ -3,72 +3,110 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
-  Sparkles,
   ArrowRight,
   PhoneCall,
   ShieldCheck,
-  Zap,
-  Play,
-  Pause,
+  Mic,
   Bot,
   User,
-  Building2,
+  Clock,
+  CalendarCheck,
+  MapPin,
+  Users,
+  Lock,
 } from "lucide-react";
+
+/**
+ * Hero: one promise, one primary CTA, one visual anchor (a replayed call).
+ * Every spoken line below must stay true to the facts in src/lib/demo-listing.ts —
+ * the owner's floor is never named aloud, and no concession exists that isn't in that file.
+ */
 
 interface Scenario {
   id: string;
-  label: string;
-  badge: string;
-  userQuery: string;
+  tab: string;
+  moment: string;
+  timestamp: string;
+  callerQuery: string;
   agentReply: string;
-  insight: string;
+  proof: string;
+  /** Where a visitor can reproduce this turn: the demo residence, or a fully onboarded listing. */
+  liveOn: "demo" | "listing";
 }
 
 const SCENARIOS: Scenario[] = [
   {
-    id: "negotiate",
-    label: "Rent Negotiation",
-    badge: "Exchange of Value",
-    userQuery: "Hey Sarah, the ₹95,000 rent is a bit steep for my budget. Can you do ₹88,000?",
+    id: "after-hours",
+    tab: "The 11pm question",
+    moment: "A buyer scans the sign outside the building. Nobody is in the office.",
+    timestamp: "23:14",
+    callerQuery: "Can I bring my dog? And is parking extra on top of the rent?",
     agentReply:
-      "I can certainly lock in ₹88,000/mo for you if you're open to an 18-month lease starting on the 1st. I'll also waive the first month's maintenance fee. Would that timeline work for you?",
-    insight: "Defends ₹90,000 floor price • Trades concession for longer lease commitment",
+      "Pets are welcome once they're registered with the society — there's a refundable deposit. Parking isn't extra: you get two reserved basement bays, and one of them has an EV charging point.",
+    proof: "Answers only what the owner actually said. Nothing invented, nothing promised twice.",
+    liveOn: "demo",
   },
   {
-    id: "amenities",
-    label: "Pets & EV Parking",
-    badge: "Verified Knowledge Base",
-    userQuery: "Does the Golf Course Road flat include assigned parking, and can I bring my dog?",
+    id: "price",
+    tab: "The lowball",
+    moment: "The part most owners dread handing to anyone else.",
+    timestamp: "23:16",
+    callerQuery: "₹95,000 is over my budget. Can you do ₹88,000?",
     agentReply:
-      "Yes, absolutely! The unit includes two reserved basement parking bays with dedicated EV charging, and pets are welcome with prior society registration and refundable deposit.",
-    insight: "Accurate to landlord specs • Zero hallucinations • Instant answer in <280ms",
+      "₹88,000 is under what the owner has authorised me to agree to, so I won't pretend otherwise. On an 18-month lease I can do ₹90,250, and if you move in within a week the first month's maintenance is waived. Shall I hold that for you?",
+    proof: "Trades a concession for a longer lease. Never goes below your floor — and never reveals it.",
+    liveOn: "demo",
   },
   {
-    id: "booking",
-    label: "Book In-Person Tour",
-    badge: "Direct Calendar Close",
-    userQuery: "Can I come see the flat in person this Thursday afternoon?",
+    id: "location",
+    tab: "\"Is it close?\"",
+    moment: "The question every listing answers with an adjective.",
+    timestamp: "23:18",
+    callerQuery: "Everyone says 'prime location'. How far is it really from the metro?",
     agentReply:
-      "I have two private walkthrough slots open this Thursday: 2:00 PM and 4:30 PM. Which one works better for you? I can confirm it directly to your phone right now.",
-    insight: "Captures qualified lead info • Books directly into broker CRM calendar",
+      "Six minutes by car to the metro, nine to the nearest international school. Those are measured door-to-door times from this address — I don't use words like 'prime', I use minutes.",
+    proof: "Measured when the listing is created — so it works on properties onboarded with their neighbourhood.",
+    liveOn: "listing",
+  },
+  {
+    id: "human",
+    tab: "\"Get me a human\"",
+    moment: "The moment a buyer usually hangs up and calls someone else.",
+    timestamp: "23:21",
+    callerQuery: "This is helpful, but can I just speak to the property manager?",
+    agentReply:
+      "Of course — calling them now. They'll get a quick private prompt so they're never caught off guard, and the moment they pick up I'll bring them into this call and step back.",
+    proof: "A real person joins the live call within seconds — on any listing with a manager on file.",
+    liveOn: "listing",
   },
 ];
 
+const TRUST_CHIPS = [
+  { icon: ShieldCheck, label: "Never quotes below your floor price" },
+  { icon: Lock, label: "Only repeats facts you gave it" },
+  { icon: CalendarCheck, label: "Books tours into your own calendar" },
+  { icon: Users, label: "Puts a real human on the line on request" },
+];
+
 interface HeroVoiceSimulatorProps {
+  /** Opens the persistent floating agent, who can search the whole catalogue. */
+  onTalkToSarah: () => void;
+  /** Opens a call scoped to the demo residence shown in the card. */
   onOpenCallModal: () => void;
 }
 
-export function HeroVoiceSimulator({ onOpenCallModal }: HeroVoiceSimulatorProps) {
-  const [activeScenarioId, setActiveScenarioId] = useState<string>("negotiate");
-  const [isPlaying, setIsPlaying] = useState<boolean>(true);
-  const [typed, setTyped] = useState<{ scenarioId: string; text: string }>({ scenarioId: "negotiate", text: "" });
+export function HeroVoiceSimulator({ onTalkToSarah, onOpenCallModal }: HeroVoiceSimulatorProps) {
+  const [activeScenarioId, setActiveScenarioId] = useState<string>("after-hours");
+  const [typed, setTyped] = useState<{ scenarioId: string; text: string }>({
+    scenarioId: "after-hours",
+    text: "",
+  });
 
-  const activeScenario =
-    SCENARIOS.find((s) => s.id === activeScenarioId) || SCENARIOS[0];
+  const activeScenario = SCENARIOS.find((s) => s.id === activeScenarioId) || SCENARIOS[0];
   // A scenario switch starts from an empty string without a synchronous reset inside the effect
   const typedText = typed.scenarioId === activeScenario.id ? typed.text : "";
 
-  // Typing effect when switching scenario
+  // Replays the agent's answer as if it were being spoken
   useEffect(() => {
     let currentIdx = 0;
     const { id: scenarioId, agentReply: fullText } = activeScenario;
@@ -79,150 +117,121 @@ export function HeroVoiceSimulator({ onOpenCallModal }: HeroVoiceSimulatorProps)
       } else {
         clearInterval(interval);
       }
-    }, 18);
+    }, 16);
     return () => clearInterval(interval);
   }, [activeScenario]);
 
   return (
-    <section className="relative w-full max-w-6xl mx-auto px-4 sm:px-6 pt-10 pb-16 md:pt-14 md:pb-24 flex flex-col items-center">
-      {/* Live Technology Pill */}
-      <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-blue-50/90 border border-blue-200/80 text-blue-900 text-xs font-semibold shadow-xs mb-8 transition-all hover:bg-blue-100/90">
-        <span className="flex h-2 w-2 relative">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-        </span>
-        <span>Powered by Agora Real-Time Conversational AI & SD-RTN</span>
-        <span className="text-blue-400">|</span>
-        <span className="text-blue-700 font-medium">Sub-300ms Voice</span>
-      </div>
+    <section className="relative w-full">
+      {/* Blueprint grid wash behind the fold */}
+      <div className="absolute inset-0 luxury-grid pointer-events-none -z-10" aria-hidden="true" />
 
-      {/* Hero Headline */}
-      <h1 className="max-w-4xl text-center text-4xl sm:text-5xl md:text-6xl lg:text-[64px] font-extrabold tracking-tight text-slate-900 leading-[1.12]">
-        Never Lose a Real Estate Lead to{" "}
-        <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700">
-          Voicemail Again
-        </span>
-      </h1>
-
-      {/* Subtitle */}
-      <p className="mt-6 max-w-2xl text-center text-base sm:text-lg text-slate-600 leading-relaxed font-normal">
-        The autonomous voice AI sales associate for high-ticket leasing and property sales.
-        Answers caller inquiries in <strong className="text-slate-900 font-semibold">&lt;300ms</strong>,
-        negotiates concessions within landlord guardrails, and books tours directly into your CRM.
-      </p>
-
-      {/* CTA Buttons Row */}
-      <div className="mt-8 flex flex-wrap items-center justify-center gap-3 sm:gap-4">
-        <button
-          type="button"
-          onClick={onOpenCallModal}
-          className="inline-flex items-center justify-center gap-2.5 px-6 py-3.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 rounded-xl shadow-lg shadow-blue-500/25 transition-all hover:-translate-y-0.5 cursor-pointer"
-        >
-          <PhoneCall className="w-4 h-4 text-blue-100" />
-          <span>Test Live Voice Call</span>
-          <span className="px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider rounded bg-blue-500/80 text-white">
-            Live
-          </span>
-        </button>
-
-        <Link
-          href="/dashboard/properties/new"
-          className="inline-flex items-center justify-center gap-2 px-5 py-3.5 text-sm font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200/90 rounded-xl shadow-xs transition-all hover:text-slate-900 hover:border-slate-300"
-        >
-          <Sparkles className="w-4 h-4 text-indigo-600" />
-          <span>60-Sec Onboarding Studio</span>
-          <ArrowRight className="w-4 h-4 text-slate-400" />
-        </Link>
-      </div>
-
-      {/* Interactive Voice Simulator Card */}
-      <div id="hero-simulator" className="mt-12 w-full max-w-4xl">
-        <div className="luxury-card rounded-2xl p-6 sm:p-8 border border-slate-200/90 shadow-xl shadow-slate-200/50 relative overflow-hidden bg-white/95">
-          {/* Subtle Accent Glow */}
-          <div className="absolute top-0 right-0 w-80 h-80 bg-radial from-blue-400/10 via-indigo-300/5 to-transparent blur-2xl pointer-events-none -z-10" />
-
-          {/* Top Bar: Caller HUD Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <div className="w-11 h-11 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-md shadow-blue-500/20">
-                  <Bot className="w-6 h-6" />
-                </div>
-                <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-white" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-bold text-slate-900">
-                    Sarah — AI Leasing Specialist
-                  </h3>
-                  <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    Online (Agora Voice)
-                  </span>
-                </div>
-                <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5">
-                  <Building2 className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Golf Course Road, Gurugram</span>
-                  <span>•</span>
-                  <span className="font-semibold text-slate-700">₹95,000/mo</span>
-                </p>
-              </div>
-            </div>
-
-            {/* Live Audio Visualizer Bar */}
-            <div className="flex items-center gap-3 px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200/80">
-              <button
-                type="button"
-                onClick={() => setIsPlaying(!isPlaying)}
-                title={isPlaying ? "Pause Waveform" : "Resume Waveform"}
-                className="p-1 rounded-md text-slate-600 hover:text-blue-600 transition-colors cursor-pointer"
-              >
-                {isPlaying ? (
-                  <Pause className="w-4 h-4 text-blue-600" />
-                ) : (
-                  <Play className="w-4 h-4 text-slate-500" />
-                )}
-              </button>
-
-              <div className="flex items-center gap-1 h-8 px-1">
-                {[
-                  { delay: "0s", height: "14px" },
-                  { delay: "0.2s", height: "24px" },
-                  { delay: "0.1s", height: "18px" },
-                  { delay: "0.4s", height: "28px" },
-                  { delay: "0.15s", height: "12px" },
-                  { delay: "0.35s", height: "22px" },
-                  { delay: "0.25s", height: "16px" },
-                  { delay: "0.05s", height: "26px" },
-                  { delay: "0.3s", height: "20px" },
-                  { delay: "0.45s", height: "10px" },
-                ].map((bar, i) => (
-                  <span
-                    key={i}
-                    style={{
-                      animationDelay: isPlaying ? bar.delay : "0s",
-                      height: isPlaying ? undefined : bar.height,
-                    }}
-                    className={`w-1 rounded-full ${
-                      isPlaying
-                        ? "bg-blue-600 animate-wave-bar"
-                        : "bg-slate-300"
-                    }`}
-                  />
-                ))}
-              </div>
-
-              <span className="text-[11px] font-semibold text-slate-600 tabular-nums">
-                {isPlaying ? "260ms Latency" : "Paused"}
-              </span>
-            </div>
+      <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 pt-12 pb-14 md:pt-20 md:pb-20 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
+        {/* ---------- Left: the promise ---------- */}
+        <div className="lg:col-span-6 flex flex-col items-start animate-soft-rise">
+          <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-white/90 border border-slate-200 text-slate-700 text-xs font-semibold shadow-xs">
+            <span className="flex h-2 w-2 relative">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+            </span>
+            <span>Sarah is live on this page right now — not a recorded demo</span>
           </div>
 
-          {/* Scenario Selector Pills */}
-          <div className="mt-5 flex items-center justify-between flex-wrap gap-2">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Try Inbound Call Scenarios:
+          <h1 className="mt-7 text-4xl sm:text-5xl lg:text-[56px] font-extrabold tracking-tight text-slate-900 leading-[1.08]">
+            Your listings now{" "}
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700">
+              answer the phone
             </span>
-            <div className="flex flex-wrap gap-2">
+            .
+          </h1>
+
+          <p className="mt-6 max-w-xl text-base sm:text-lg text-slate-600 leading-relaxed">
+            Describe a property out loud and it is live in about two minutes — schools, commute
+            times and neighbourhood facts already measured. After that, every buyer who calls it
+            gets a straight answer within seconds: honest pricing, real distances, a tour slot in
+            your calendar, and a human on the line the moment they ask for one.
+          </p>
+
+          {/* Primary conversion point */}
+          <div className="mt-9 flex flex-col sm:flex-row items-stretch sm:items-center gap-3.5 w-full sm:w-auto">
+            <button
+              type="button"
+              onClick={onTalkToSarah}
+              className="inline-flex items-center justify-center gap-2.5 px-7 py-4 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 rounded-xl shadow-lg shadow-blue-600/25 transition-all hover:-translate-y-0.5 cursor-pointer"
+            >
+              <Mic className="w-4 h-4 text-blue-100" />
+              <span>Talk to Sarah now</span>
+            </button>
+
+            <Link
+              href="/dashboard/properties/new"
+              className="inline-flex items-center justify-center gap-2 px-6 py-4 text-sm font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl shadow-xs transition-all hover:text-slate-900 hover:border-slate-300"
+            >
+              <span>List a property by talking</span>
+              <ArrowRight className="w-4 h-4 text-slate-400" />
+            </Link>
+          </div>
+
+          <p className="mt-3 text-xs text-slate-500">
+            Speak in two clicks. No form, no calendar invite, no sales call.{" "}
+            <span className="text-slate-400">Listing a property needs a free account.</span>
+          </p>
+
+          {/* Trust strip — each chip answers an objection raised later on the page */}
+          <ul className="mt-9 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5 text-xs text-slate-600">
+            {TRUST_CHIPS.map((chip) => {
+              const Icon = chip.icon;
+              return (
+                <li key={chip.label} className="flex items-center gap-2">
+                  <Icon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span className="font-medium">{chip.label}</span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+
+        {/* ---------- Right: a real call, replayed ---------- */}
+        <div id="hero-simulator" className="lg:col-span-6 w-full animate-soft-rise">
+          <div className="luxury-card rounded-3xl p-5 sm:p-7 shadow-xl shadow-slate-300/40 relative overflow-hidden">
+            <div className="absolute -top-24 -right-16 w-72 h-72 bg-radial from-blue-400/15 via-indigo-300/5 to-transparent blur-2xl pointer-events-none -z-10" />
+
+            {/* Caller HUD */}
+            <div className="flex items-center justify-between gap-4 pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <div className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center shadow-md">
+                    <Bot className="w-5 h-5" />
+                  </div>
+                  <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-white" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Sarah — your leasing associate</h3>
+                  <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Golf Course Road, Gurugram</span>
+                    <span className="text-slate-300">•</span>
+                    <span className="font-semibold text-slate-700">₹95,000/mo</span>
+                  </p>
+                </div>
+              </div>
+
+              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200/80">
+                <div className="flex items-end gap-0.5 h-4">
+                  {["0s", "0.2s", "0.1s", "0.35s", "0.15s"].map((delay) => (
+                    <span
+                      key={delay}
+                      style={{ animationDelay: delay }}
+                      className="w-0.5 rounded-full bg-emerald-600 animate-wave-bar"
+                    />
+                  ))}
+                </div>
+                <span className="text-[11px] font-bold text-emerald-800">On the call</span>
+              </div>
+            </div>
+
+            {/* Scenario tabs */}
+            <div className="mt-4 flex flex-wrap gap-1.5">
               {SCENARIOS.map((scenario) => {
                 const isActive = scenario.id === activeScenarioId;
                 return (
@@ -232,70 +241,82 @@ export function HeroVoiceSimulator({ onOpenCallModal }: HeroVoiceSimulatorProps)
                     onClick={() => setActiveScenarioId(scenario.id)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                       isActive
-                        ? "bg-blue-600 text-white shadow-xs"
-                        : "bg-slate-100 hover:bg-slate-200/80 text-slate-700"
+                        ? "bg-slate-900 text-white shadow-xs"
+                        : "bg-slate-100 hover:bg-slate-200/80 text-slate-600"
                     }`}
                   >
-                    {scenario.label}
+                    {scenario.tab}
                   </button>
                 );
               })}
             </div>
-          </div>
 
-          {/* Dialogue Display Box */}
-          <div className="mt-5 space-y-3.5">
-            {/* User Speech Bubble */}
-            <div className="flex items-start gap-3 justify-end">
-              <div className="max-w-lg bg-blue-50/80 border border-blue-100 text-slate-900 rounded-2xl rounded-tr-xs px-4 py-3 text-sm leading-relaxed shadow-xs">
-                <div className="flex items-center justify-between gap-2 mb-1">
-                  <span className="text-[11px] font-bold text-blue-700">Inbound Caller</span>
-                  <span className="text-[10px] text-slate-400">00:04</span>
-                </div>
-                <p>{activeScenario.userQuery}</p>
-              </div>
-              <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center shrink-0">
-                <User className="w-4 h-4" />
-              </div>
-            </div>
+            <p className="mt-3.5 text-xs text-slate-500 italic leading-relaxed">
+              {activeScenario.moment}
+            </p>
 
-            {/* Agent Speech Bubble */}
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-                <Bot className="w-4 h-4" />
-              </div>
-              <div className="max-w-xl bg-slate-50 border border-slate-200/90 text-slate-900 rounded-2xl rounded-tl-xs px-4 py-3 text-sm leading-relaxed shadow-xs">
-                <div className="flex items-center justify-between gap-2 mb-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[11px] font-bold text-slate-900">Sarah (AI Agent)</span>
-                    <span className="px-1.5 py-0.2 text-[9px] font-semibold rounded bg-blue-100 text-blue-800">
-                      {activeScenario.badge}
+            {/* Transcript */}
+            <div className="mt-4 space-y-3">
+              <div className="flex items-start gap-2.5 justify-end">
+                <div className="max-w-sm bg-blue-50/80 border border-blue-100 rounded-2xl rounded-tr-xs px-4 py-3 text-sm leading-relaxed text-slate-900 shadow-xs">
+                  <div className="flex items-center justify-between gap-3 mb-1">
+                    <span className="text-[11px] font-bold text-blue-700">Buyer</span>
+                    <span className="text-[10px] text-slate-400 tabular-nums flex items-center gap-1">
+                      <Clock className="w-2.5 h-2.5" />
+                      {activeScenario.timestamp}
                     </span>
                   </div>
-                  <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
-                    <Zap className="w-2.5 h-2.5" /> Spoken in 280ms
-                  </span>
+                  <p>{activeScenario.callerQuery}</p>
                 </div>
-                <p className="text-slate-800 font-medium">{typedText || activeScenario.agentReply}</p>
+                <div className="w-7 h-7 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center shrink-0">
+                  <User className="w-3.5 h-3.5" />
+                </div>
+              </div>
+
+              <div className="flex items-start gap-2.5">
+                <div className="w-7 h-7 rounded-full bg-slate-900 text-white flex items-center justify-center shrink-0">
+                  <Bot className="w-3.5 h-3.5" />
+                </div>
+                <div className="max-w-md bg-slate-50 border border-slate-200/90 rounded-2xl rounded-tl-xs px-4 py-3 text-sm leading-relaxed shadow-xs">
+                  <div className="flex items-center justify-between gap-3 mb-1">
+                    <span className="text-[11px] font-bold text-slate-900">Sarah</span>
+                    <span className="text-[10px] font-semibold text-emerald-600">
+                      answered instantly
+                    </span>
+                  </div>
+                  {/* min-height keeps the card from reflowing while the reply types out */}
+                  <p className="text-slate-800 font-medium min-h-[6.5rem] sm:min-h-[5.5rem]">
+                    {typedText || activeScenario.agentReply}
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Bottom Card Footer: Guardrail Insight & Live Call Action */}
-          <div className="mt-6 pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2 text-slate-600">
-              <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>{activeScenario.insight}</span>
+            {/* Why this answer is safe to hand over */}
+            <div className="mt-5 pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-start gap-2 text-xs text-slate-600 leading-relaxed">
+                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-px" />
+                <span>{activeScenario.proof}</span>
+              </div>
+              {activeScenario.liveOn === "demo" ? (
+                <button
+                  type="button"
+                  onClick={onOpenCallModal}
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-800 whitespace-nowrap cursor-pointer"
+                >
+                  <PhoneCall className="w-3.5 h-3.5" />
+                  <span>Try it on this flat</span>
+                </button>
+              ) : (
+                <Link
+                  href="/listings"
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-800 whitespace-nowrap"
+                >
+                  <PhoneCall className="w-3.5 h-3.5" />
+                  <span>Try it on a live listing</span>
+                </Link>
+              )}
             </div>
-
-            <button
-              type="button"
-              onClick={onOpenCallModal}
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
-            >
-              <span>Speak live with Sarah right now</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
           </div>
         </div>
       </div>

@@ -4,8 +4,8 @@ import { FloatingSalesAgent } from "@/components/sales/FloatingSalesAgent";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Kyron Realty AI | 24/7 Autonomous Voice AI Leasing & Sales Associate",
-  description: "Never lose a high-value lead to voicemail again. Sub-300ms real-time voice, dynamic concession negotiation, and instant tour booking powered by Agora SD-RTN.",
+  title: "Kyron Realty AI | List a property by talking. It answers its own calls.",
+  description: "Describe a property out loud and it is live in about two minutes. From then on every buyer who calls gets a straight answer, an honest price, a viewing in your calendar — and a real person on the line the moment they ask.",
 };
 
 export default function RootLayout({

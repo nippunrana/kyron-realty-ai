@@ -11,90 +11,89 @@ import {
 } from "lucide-react";
 import { DEMO_LISTING } from "@/lib/demo-listing";
 
+/**
+ * Interactive proof that discounts are traded, never given away.
+ * Outcomes below must only use concessions that exist in DEMO_LISTING.concessionRules,
+ * and must never let the agent quote under DEMO_LISTING.minFloorPrice.
+ */
+
+const TARGET_PRICE = Number(DEMO_LISTING.price);
+const FLOOR_PRICE = DEMO_LISTING.minFloorPrice;
+// The only authorised discount: 5% off for an 18-month term, clamped so it can never
+// fall under the owner's private floor no matter what the buyer proposes.
+const LONG_LEASE_PRICE = Math.max(FLOOR_PRICE, Math.round(TARGET_PRICE * 0.95));
+
 export function NegotiationSimulator() {
   const [callerBudget, setCallerBudget] = useState<number>(88000);
   const [leaseMonths, setLeaseMonths] = useState<number>(18);
   const [moveInQuick, setMoveInQuick] = useState<boolean>(true);
 
-  const TARGET_PRICE = Number(DEMO_LISTING.price);
-  const FLOOR_PRICE = DEMO_LISTING.minFloorPrice;
+  const maintenanceLine = moveInQuick
+    ? " And since you can take it within the week, the first month's maintenance is on us."
+    : "";
 
-  // Compute negotiation outcome
-  let outcomeType: "accepted_with_trade" | "alternative_pivot" | "standard_rate" = "accepted_with_trade";
+  let outcomeType: "traded" | "held" | "standard" = "traded";
   let negotiatedRent = TARGET_PRICE;
-  let concessionText = "";
-  let dialogueReply = "";
+  let ruleApplied = "";
+  let spokenReply = "";
 
   if (callerBudget >= TARGET_PRICE) {
-    outcomeType = "standard_rate";
+    outcomeType = "standard";
     negotiatedRent = TARGET_PRICE;
-    concessionText = "Standard rate accepted. Zero rent discount needed.";
-    dialogueReply =
-      `"Great! The asking rent is ₹${TARGET_PRICE.toLocaleString("en-IN")}/mo. Let's schedule your private tour for this Thursday or Friday to lock this unit in before the weekend."`;
-  } else if (callerBudget < 85000) {
-    outcomeType = "alternative_pivot";
-    negotiatedRent = 75000;
-    concessionText = `Budget below ₹${FLOOR_PRICE.toLocaleString("en-IN")} floor • Graceful Pivot to 2-BHK executive inventory`;
-    dialogueReply =
-      `"I can't drop this 3-BHK luxury unit below our landlord minimum of ₹${FLOOR_PRICE.toLocaleString("en-IN")}/mo. However, we have a premium 2-BHK unit with private balcony in the same society for ₹75,000/mo. Would you like to tour that one instead?"`;
+    ruleApplied = "Budget meets the asking rent — no discount offered, none needed.";
+    spokenReply = `"Then we're already there — it's ₹${TARGET_PRICE.toLocaleString("en-IN")} a month.${moveInQuick ? " And if you move in within the week, the first month's maintenance is waived." : ""} Shall I hold a viewing for you this weekend?"`;
+  } else if (leaseMonths >= 18 && callerBudget >= LONG_LEASE_PRICE) {
+    outcomeType = "traded";
+    negotiatedRent = LONG_LEASE_PRICE;
+    ruleApplied = "18-month term traded for the 5% reduction.";
+    spokenReply = `"On an 18-month lease I can bring that to ₹${LONG_LEASE_PRICE.toLocaleString("en-IN")} a month, which lands inside your budget.${maintenanceLine} Shall I put a viewing in?"`;
+  } else if (leaseMonths >= 18) {
+    outcomeType = "held";
+    negotiatedRent = LONG_LEASE_PRICE;
+    ruleApplied = "Best authorised price offered. Below it, the answer is an honest no.";
+    spokenReply = `"₹${callerBudget.toLocaleString("en-IN")} is under what I'm authorised to agree to, and I'd rather tell you that than waste your evening. On the 18-month term the best I can do is ₹${LONG_LEASE_PRICE.toLocaleString("en-IN")}.${maintenanceLine} If that's still over your line, tell me your ceiling and I'll find you something that actually fits."`;
   } else {
-    outcomeType = "accepted_with_trade";
-    if (leaseMonths >= 18 && moveInQuick) {
-      negotiatedRent = Math.max(FLOOR_PRICE, callerBudget);
-      concessionText = "18-Mo Lease + Fast Move-In Trade • Waive ₹8,000 Maintenance + ₹5,000 Rent Reduction";
-      dialogueReply =
-        `"Here's what I can do: if you sign an 18-month lease starting by next Friday, I will approve ₹${negotiatedRent.toLocaleString("en-IN")}/mo and waive the first month's society maintenance fee entirely. Shall we book your walkthrough?"`;
-    } else if (leaseMonths >= 18) {
-      negotiatedRent = Math.max(FLOOR_PRICE, callerBudget);
-      concessionText = "18-Mo Lease Commitment Trade • 5% Monthly Concession";
-      dialogueReply =
-        `"To accommodate your ₹${negotiatedRent.toLocaleString("en-IN")}/mo target, our landlord requires an 18-month lease term. If that timeline works for you, I can lock in that price right now."`;
-    } else if (moveInQuick) {
-      negotiatedRent = 92000;
-      concessionText = "Immediate Move-In Trade • Waive 1st Month Maintenance & ₹3,000 off rent";
-      dialogueReply =
-        `"I cannot reach ₹${callerBudget.toLocaleString("en-IN")} on a standard 12-month lease, but if you can take possession by next week, I can do ₹92,000/mo and waive the entire first month's maintenance fee."`;
-    } else {
-      negotiatedRent = TARGET_PRICE;
-      concessionText = "No value trade provided • Floor price protected at standard terms";
-      dialogueReply =
-        `"The base rent is ₹${TARGET_PRICE.toLocaleString("en-IN")}/mo. We can only adjust the price if you're open to an extended 18-month lease or an immediate move-in this week. Would either of those options be feasible?"`;
-    }
+    outcomeType = "held";
+    negotiatedRent = TARGET_PRICE;
+    ruleApplied = "No term offered in exchange — the asking rent stands.";
+    spokenReply = `"I can move on price, but not for nothing. Stretch to an 18-month term and it becomes ₹${LONG_LEASE_PRICE.toLocaleString("en-IN")} a month.${maintenanceLine} On a ${leaseMonths}-month lease it stays at ₹${TARGET_PRICE.toLocaleString("en-IN")}. Which would you rather have?"`;
   }
 
   return (
     <section id="negotiation-engine" className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-16 md:py-24 border-t border-slate-200/80">
-      {/* Section Header */}
-      <div className="text-center max-w-2xl mx-auto mb-14">
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200/80 text-indigo-700 text-xs font-semibold mb-3">
+      {/* Section header */}
+      <div className="max-w-3xl mb-12 md:mb-14">
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200/80 text-indigo-700 text-xs font-semibold mb-4">
           <Scale className="w-3.5 h-3.5" />
-          <span>Exchange-of-Value Concession Matrix</span>
+          <span>Try to talk it down. Go on.</span>
         </div>
-        <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900">
-          Negotiate Like a Senior Broker, Not a Dumb Chatbot
+        <h2 className="text-3xl sm:text-4xl md:text-[42px] font-extrabold tracking-tight text-slate-900 leading-[1.12]">
+          It negotiates like your best agent. Not like a chatbot with a discount button.
         </h2>
-        <p className="mt-4 text-base text-slate-600 leading-relaxed">
-          Unlike chatbots that either give blind discounts or say &quot;No&quot;, Kyron&apos;s AI employs an adaptive Give-and-Get concession ladder that fiercely defends landlord floor yields.
+        <p className="mt-5 text-base text-slate-600 leading-relaxed">
+          You set the lowest number you would ever accept. It is never spoken aloud, never shown on
+          screen, and never handed to the buyer — the agent simply never crosses it. Every rupee it
+          gives away buys you something back: a longer term, a faster move-in.
         </p>
       </div>
 
-      {/* Interactive Simulator Container */}
-      <div className="luxury-card rounded-2xl p-6 sm:p-10 border border-slate-200/90 shadow-xl shadow-slate-200/40 bg-white/95">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-          {/* Controls Column (Left) */}
-          <div className="lg:col-span-6 space-y-6">
+      {/* Interactive simulator */}
+      <div className="luxury-card rounded-3xl p-6 sm:p-10 shadow-xl shadow-slate-200/40">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+          {/* Buyer's side */}
+          <div className="lg:col-span-6 space-y-5">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                 <Sliders className="w-4 h-4 text-blue-600" />
-                <span>Caller Negotiation Inputs</span>
+                <span>Play the buyer</span>
               </h3>
-              <span className="text-xs text-slate-500 font-medium">Test Live Response</span>
+              <span className="text-xs text-slate-500 font-medium">Answers update live</span>
             </div>
 
-            {/* Slider 1: Proposed Budget */}
+            {/* Budget */}
             <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80">
               <div className="flex items-center justify-between text-xs mb-2">
-                <span className="font-semibold text-slate-700">Caller Budget Offer:</span>
+                <span className="font-semibold text-slate-700">What they say they can pay</span>
                 <span className="font-extrabold text-blue-600 text-sm tabular-nums">
                   ₹{callerBudget.toLocaleString("en-IN")}/mo
                 </span>
@@ -107,19 +106,19 @@ export function NegotiationSimulator() {
                 value={callerBudget}
                 onChange={(e) => setCallerBudget(Number(e.target.value))}
                 className="w-full accent-blue-600 cursor-pointer"
+                aria-label="Buyer budget"
               />
               <div className="flex justify-between text-[11px] text-slate-400 mt-1 font-medium">
-                <span>₹80,000 (Low)</span>
-                <span className="text-emerald-700 font-bold">₹{FLOOR_PRICE.toLocaleString("en-IN")} Floor</span>
-                <span>₹{TARGET_PRICE.toLocaleString("en-IN")} (Target)</span>
+                <span>₹80,000</span>
+                <span>Asking ₹{TARGET_PRICE.toLocaleString("en-IN")}</span>
               </div>
             </div>
 
-            {/* Toggle 2: Lease Length */}
+            {/* Lease term */}
             <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80">
-              <label className="block text-xs font-semibold text-slate-700 mb-2">
-                Caller Lease Commitment Term:
-              </label>
+              <span className="block text-xs font-semibold text-slate-700 mb-2">
+                How long they will commit for
+              </span>
               <div className="grid grid-cols-3 gap-2">
                 {[12, 18, 24].map((term) => (
                   <button
@@ -132,26 +131,27 @@ export function NegotiationSimulator() {
                         : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100"
                     }`}
                   >
-                    {term} Months
+                    {term} months
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Checkbox 3: Fast Move In */}
-            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between">
+            {/* Move-in speed */}
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-4">
               <div>
                 <span className="text-xs font-semibold text-slate-800 block">
-                  Move-In Within 7 Days?
+                  Can move in within a week
                 </span>
                 <span className="text-[11px] text-slate-500">
-                  Enables upfront parking & deposit concessions
+                  Fills your vacancy sooner — so it is worth something
                 </span>
               </div>
               <button
                 type="button"
                 onClick={() => setMoveInQuick(!moveInQuick)}
-                className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
+                aria-pressed={moveInQuick}
+                className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer shrink-0 ${
                   moveInQuick ? "bg-blue-600" : "bg-slate-300"
                 }`}
               >
@@ -164,70 +164,57 @@ export function NegotiationSimulator() {
             </div>
           </div>
 
-          {/* AI Response Output Column (Right) */}
-          <div className="lg:col-span-6 bg-slate-50/90 rounded-2xl p-6 border border-slate-200/90 flex flex-col justify-between h-full shadow-xs">
+          {/* Agent's reply */}
+          <div className="lg:col-span-6 bg-slate-50/90 rounded-2xl p-6 border border-slate-200/90 flex flex-col justify-between shadow-xs">
             <div>
-              {/* Status Header */}
-              <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+              <div className="flex items-center justify-between gap-3 pb-4 border-b border-slate-200">
                 <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center">
+                  <div className="w-7 h-7 rounded-lg bg-slate-900 text-white flex items-center justify-center">
                     <Bot className="w-4 h-4" />
                   </div>
-                  <span className="text-xs font-bold text-slate-900">
-                    Kyron Real-Time Strategy Engine
-                  </span>
+                  <span className="text-xs font-bold text-slate-900">What Sarah says back</span>
                 </div>
 
-                {outcomeType === "accepted_with_trade" && (
+                {outcomeType === "traded" && (
                   <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-emerald-100 text-emerald-800 flex items-center gap-1">
                     <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                    Give-Get Deal Locked
+                    Traded, not given
                   </span>
                 )}
-                {outcomeType === "alternative_pivot" && (
+                {outcomeType === "held" && (
                   <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-amber-100 text-amber-800 flex items-center gap-1">
                     <ShieldAlert className="w-3 h-3 text-amber-600" />
-                    Floor Protected / Pivot
+                    Line held
                   </span>
                 )}
-                {outcomeType === "standard_rate" && (
+                {outcomeType === "standard" && (
                   <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-blue-100 text-blue-800">
-                    Full Asking Rent
+                    Full asking rent
                   </span>
                 )}
               </div>
 
-              {/* Concession Summary Banner */}
               <div className="mt-4 p-3 rounded-xl bg-white border border-slate-200 text-xs">
-                <span className="text-slate-500 block font-medium">Applied Concession Rule:</span>
-                <span className="font-bold text-slate-900 mt-0.5 block">
-                  {concessionText}
-                </span>
+                <span className="text-slate-500 block font-medium">Your rule that applied</span>
+                <span className="font-bold text-slate-900 mt-0.5 block">{ruleApplied}</span>
               </div>
 
-              {/* Dynamic Spoken Dialogue Bubble */}
-              <div className="mt-4">
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
-                  Sarah Spoken Reply (&lt;280ms):
-                </span>
-                <div className="p-4 rounded-xl bg-white border border-blue-100 text-sm text-slate-800 leading-relaxed font-medium shadow-xs italic">
-                  {dialogueReply}
-                </div>
+              <div className="mt-4 p-4 rounded-xl bg-white border border-blue-100 text-sm text-slate-800 leading-relaxed font-medium shadow-xs italic min-h-[9rem]">
+                {spokenReply}
               </div>
             </div>
 
-            {/* Landlord Guardrail Strip */}
             <div className="mt-6 pt-4 border-t border-slate-200 grid grid-cols-2 gap-4 text-xs">
               <div>
-                <span className="text-slate-500 block">Landlord Floor Price:</span>
+                <span className="text-slate-500 block">Your private floor</span>
                 <span className="font-bold text-slate-900 text-sm flex items-center gap-1">
                   <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                  ₹{FLOOR_PRICE.toLocaleString("en-IN")}/mo (Protected)
+                  Never spoken, never crossed
                 </span>
               </div>
               <div>
-                <span className="text-slate-500 block">Final Agreed Rent:</span>
-                <span className="font-bold text-blue-700 text-sm">
+                <span className="text-slate-500 block">Rent it settles on</span>
+                <span className="font-bold text-blue-700 text-sm tabular-nums">
                   ₹{negotiatedRent.toLocaleString("en-IN")}/mo
                 </span>
               </div>
@@ -235,6 +222,11 @@ export function NegotiationSimulator() {
           </div>
         </div>
       </div>
+
+      <p className="mt-4 text-xs text-slate-400 text-center">
+        Live example using the demo residence below. Your own floor price and trade rules are set
+        when you list the property — and they are never sent to the AI as a number it could repeat.
+      </p>
     </section>
   );
 }

@@ -35,13 +35,13 @@ export function DemoListingCard({ onOpenCallModal }: DemoListingCardProps) {
       <div className="text-center max-w-2xl mx-auto mb-14">
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200/80 text-blue-700 text-xs font-semibold mb-3">
           <Building2 className="w-3.5 h-3.5" />
-          <span>Live Demo Property & Distribution Kit</span>
+          <span>See a finished listing</span>
         </div>
         <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900">
-          Experience a Live Listing in Action
+          This is what two minutes of talking produces
         </h2>
         <p className="mt-4 text-base text-slate-600 leading-relaxed">
-          See how physical yard signs and WhatsApp social links connect directly to our 24/7 Agora Voice Sales Agent.
+          A proper page, a share card for WhatsApp, and a printable code for the board outside — every one of them a way for a buyer to start talking to the property.
         </p>
       </div>
 
@@ -67,7 +67,7 @@ export function DemoListingCard({ onOpenCallModal }: DemoListingCardProps) {
                     Verified Active Listing
                   </span>
                   <span className="px-3 py-1 text-xs font-bold rounded-full bg-blue-600 text-white shadow-sm flex items-center gap-1">
-                    <Sparkles className="w-3 h-3" /> 24/7 Voice AI Ready
+                    <Sparkles className="w-3 h-3" /> Answers 24/7
                   </span>
                 </div>
 
@@ -141,7 +141,7 @@ export function DemoListingCard({ onOpenCallModal }: DemoListingCardProps) {
                 className="flex-1 min-w-[200px] inline-flex items-center justify-center gap-2.5 px-6 py-3.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 rounded-xl shadow-md shadow-blue-500/20 transition-all cursor-pointer"
               >
                 <PhoneCall className="w-4 h-4" />
-                <span>Call Voice Agent Now</span>
+                <span>Ask Sarah about this flat</span>
               </button>
 
               <Link
@@ -159,7 +159,7 @@ export function DemoListingCard({ onOpenCallModal }: DemoListingCardProps) {
             <div>
               <div className="flex items-center justify-between pb-4 border-b border-slate-200">
                 <span className="text-xs font-extrabold uppercase tracking-wider text-slate-700">
-                  Distribution Toolkit
+                  What comes with it
                 </span>
                 <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-100 text-emerald-800">
                   Print & Share Ready
@@ -177,10 +177,10 @@ export function DemoListingCard({ onOpenCallModal }: DemoListingCardProps) {
                 <div>
                   <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                     <QrCode className="w-3.5 h-3.5 text-blue-600" />
-                    <span>Yard Sign & Flyer QR Code</span>
+                    <span>Code for the board outside</span>
                   </h4>
                   <p className="text-[11px] text-slate-500 mt-1 leading-snug">
-                    Print directly on yard signs. Callers scan with their camera to instantly speak with Sarah without downloading an app.
+                    Print it on the sign. A buyer standing outside points their camera at it and is talking to the property seconds later — no app, no form.
                   </p>
                 </div>
               </div>
@@ -190,7 +190,7 @@ export function DemoListingCard({ onOpenCallModal }: DemoListingCardProps) {
                 <div className="flex items-center justify-between text-xs font-bold text-emerald-800 mb-1.5">
                   <span className="flex items-center gap-1">
                     <Share2 className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>WhatsApp Deep Link Preview</span>
+                    <span>How it looks when shared</span>
                   </span>
                   <button
                     type="button"
@@ -201,7 +201,7 @@ export function DemoListingCard({ onOpenCallModal }: DemoListingCardProps) {
                   </button>
                 </div>
                 <div className="p-2.5 rounded-lg bg-emerald-50/60 border border-emerald-100 text-[11px] text-slate-700 leading-relaxed">
-                  &quot;🏡 Just Listed: Golf Course Road, Gurugram! 3 Bed | 3 Bath | ₹95,000/mo. Tap here to view photos &amp; speak directly with our 24/7 Voice AI Agent for instant tour booking: <span className="text-blue-600 underline">egnitech.com/marina-loft</span>&quot;
+                  &quot;🏡 Just Listed: Golf Course Road, Gurugram! 3 Bed | 3 Bath | ₹95,000/mo. Tap here to view photos &amp; ask anything about it and book a viewing on the spot: <span className="text-blue-600 underline">egnitech.com/marina-loft</span>&quot;
                 </div>
               </div>
             </div>
@@ -209,9 +209,9 @@ export function DemoListingCard({ onOpenCallModal }: DemoListingCardProps) {
             <div className="mt-6 pt-4 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
               <span className="flex items-center gap-1.5">
                 <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                <span>Zero app install required for callers</span>
+                <span>Nothing for the buyer to install</span>
               </span>
-              <span className="font-semibold text-slate-700">Sub-300ms WebRTC</span>
+              <span className="font-semibold text-slate-700">Answers on the first ring</span>
             </div>
           </div>
         </div>

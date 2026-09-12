@@ -79,3 +79,35 @@
 .animate-indeterminate-shimmer {
   animation: indeterminate-shimmer 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
+/* Landing page: faint blueprint grid behind the hero (light surface only) */
+.luxury-grid {
+  background-image:
+    linear-gradient(to right, rgba(15, 23, 42, 0.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(15, 23, 42, 0.045) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 20%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 20%, transparent 75%);
+}
+
+@keyframes soft-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-soft-rise {
+  animation: soft-rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-soft-rise {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
